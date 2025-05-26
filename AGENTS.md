@@ -137,6 +137,7 @@ graph TD
   - `exactOptionalPropertyTypes`, `noImplicitReturns`
   - `noUncheckedIndexedAccess`, `noImplicitOverride`
 * **Runtime Validation** – Use Zod schemas for all data models
+- use pnpm as package manager
 * **Simple first** - Optimize for simple, clean, readable code
 * **Immutable Data** – Prefer `readonly` and `const` assertions
 * **ES Modules** – Native ESM with Node16 module resolution

@@ -1,16 +1,17 @@
+import { existsSync, mkdirSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
 import Database from 'better-sqlite3';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
-import { join } from 'path';
-import { existsSync, mkdirSync } from 'fs';
-import { homedir } from 'os';
+import { cfg } from '../config/index.js';
 
 // Database configuration constants
 export const DATABASE_CONFIG = {
   // Default database location in user's home directory
   DEFAULT_DB_DIR: join(homedir(), '.astrolabe'),
   DEFAULT_DB_NAME: 'astrolabe.db',
-  
+
   // SQLCipher encryption settings
   CIPHER_SETTINGS: {
     // Use AES-256 encryption (SQLCipher 4.x default)
@@ -20,7 +21,7 @@ export const DATABASE_CONFIG = {
     // Page size optimization for encrypted databases
     pageSize: 4096,
   },
-  
+
   // Database connection options
   CONNECTION_OPTIONS: {
     // Enable Write-Ahead Logging for better concurrency
@@ -29,7 +30,7 @@ export const DATABASE_CONFIG = {
     timeout: 5000,
     readonly: false,
   },
-  
+
   // Performance pragmas for SQLite
   PRAGMAS: {
     // Enable foreign key constraints
@@ -57,7 +58,10 @@ export interface DatabaseConnection {
 
 // Error types for database operations
 export class DatabaseError extends Error {
-  constructor(message: string, public cause?: Error) {
+  constructor(
+    message: string,
+    public cause?: Error
+  ) {
     super(message);
     this.name = 'DatabaseError';
   }
@@ -77,26 +81,102 @@ export class EncryptionError extends DatabaseError {
 function getEncryptionKey(): string {
   // For now, use environment variable or generate a simple key
   // TODO: Implement proper key management (keychain integration, user-provided key, etc.)
-  const envKey = process.env.ASTROLABE_DB_KEY;
+  const envKey = cfg.ASTROLABE_DB_KEY;
   if (envKey) {
     return envKey;
   }
-  
-  // Fallback: generate a simple key (not secure for production)
-  // This should be replaced with proper key management
-  console.warn('No encryption key provided via ASTROLABE_DB_KEY environment variable');
-  console.warn('Using default key - NOT SECURE for production use');
-  return 'astrolabe-default-key-change-in-production';
+
+  // Fallback: generate a simple key based on system info
+  // This is NOT secure for production use!
+  const systemInfo = `${homedir()}-astrolabe-key`;
+  return Buffer.from(systemInfo).toString('base64').slice(0, 32);
+}
+
+/**
+ * Configure database encryption
+ */
+function configureEncryption(db: Database.Database, verbose: boolean): void {
+  const encryptionKey = getEncryptionKey();
+  // Set encryption key using SQLCipher PRAGMA
+  db.pragma(`key = '${encryptionKey}'`);
+
+  // Configure SQLCipher settings
+  db.pragma(`cipher = '${DATABASE_CONFIG.CIPHER_SETTINGS.cipher}'`);
+  db.pragma(`kdf_iter = ${DATABASE_CONFIG.CIPHER_SETTINGS.kdfIter}`);
+
+  // Test encryption by attempting to read from database
+  // This will fail if the key is wrong or encryption is not working
+  db.pragma('user_version');
+
+  if (verbose) {
+    console.info('Database encryption initialized successfully');
+  }
+}
+
+/**
+ * Ensure database directory exists
+ */
+function ensureDatabaseDirectory(dbPath: string): void {
+  const dbDir = dbPath.substring(0, dbPath.lastIndexOf('/'));
+  if (!existsSync(dbDir)) {
+    mkdirSync(dbDir, { recursive: true });
+  }
+}
+
+/**
+ * Create database connection with options
+ */
+function createDatabaseConnection(dbPath: string, verbose: boolean): Database.Database {
+  const connectionOptions = {
+    ...DATABASE_CONFIG.CONNECTION_OPTIONS,
+    verbose: verbose ? console.log : undefined,
+  };
+
+  return new Database(dbPath, connectionOptions);
+}
+
+/**
+ * Apply performance pragmas to database
+ */
+function applyPerformancePragmas(db: Database.Database): void {
+  for (const [key, value] of Object.entries(DATABASE_CONFIG.PRAGMAS)) {
+    db.pragma(`${key} = ${value}`);
+  }
+}
+
+/**
+ * Verify database is working
+ */
+function verifyDatabase(
+  db: Database.Database,
+  dbPath: string,
+  encrypted: boolean,
+  verbose: boolean
+): void {
+  try {
+    db.prepare('SELECT 1').get();
+    if (verbose) {
+      console.info(`Database initialized successfully at: ${dbPath}`);
+      console.info(`Encryption: ${encrypted ? 'enabled' : 'disabled'}`);
+    }
+  } catch (error) {
+    throw new DatabaseError(
+      'Database verification failed',
+      error instanceof Error ? error : new Error(String(error))
+    );
+  }
 }
 
 /**
  * Initialize SQLite database with optional encryption
  */
-export function initializeDatabase(options: {
-  dbPath?: string;
-  encrypted?: boolean;
-  verbose?: boolean;
-} = {}): DatabaseConnection {
+export function initializeDatabase(
+  options: {
+    dbPath?: string;
+    encrypted?: boolean;
+    verbose?: boolean;
+  } = {}
+): DatabaseConnection {
   const {
     dbPath = join(DATABASE_CONFIG.DEFAULT_DB_DIR, DATABASE_CONFIG.DEFAULT_DB_NAME),
     encrypted = true,
@@ -104,36 +184,13 @@ export function initializeDatabase(options: {
   } = options;
 
   try {
-    // Ensure database directory exists
-    const dbDir = dbPath.substring(0, dbPath.lastIndexOf('/'));
-    if (!existsSync(dbDir)) {
-      mkdirSync(dbDir, { recursive: true });
-    }
-
-    // Create database connection
-    const connectionOptions = {
-      ...DATABASE_CONFIG.CONNECTION_OPTIONS,
-      verbose: verbose ? console.log : undefined,
-    };
-
-    const db = new Database(dbPath, connectionOptions);
+    ensureDatabaseDirectory(dbPath);
+    const db = createDatabaseConnection(dbPath, verbose);
 
     // Configure encryption if requested
     if (encrypted) {
       try {
-        const encryptionKey = getEncryptionKey();
-        // Set encryption key using SQLCipher PRAGMA
-        db.pragma(`key = '${encryptionKey}'`);
-        
-        // Configure SQLCipher settings
-        db.pragma(`cipher = '${DATABASE_CONFIG.CIPHER_SETTINGS.cipher}'`);
-        db.pragma(`kdf_iter = ${DATABASE_CONFIG.CIPHER_SETTINGS.kdfIter}`);
-        
-        // Test encryption by attempting to read from database
-        // This will fail if the key is wrong or encryption is not working
-        db.pragma('user_version');
-        
-        console.log('Database encryption initialized successfully');
+        configureEncryption(db, verbose);
       } catch (error) {
         db.close();
         throw new EncryptionError(
@@ -143,10 +200,7 @@ export function initializeDatabase(options: {
       }
     }
 
-    // Apply performance pragmas
-    Object.entries(DATABASE_CONFIG.PRAGMAS).forEach(([key, value]) => {
-      db.pragma(`${key} = ${value}`);
-    });
+    applyPerformancePragmas(db);
 
     // Initialize Drizzle ORM
     const drizzleDb = drizzle(db);
@@ -159,27 +213,17 @@ export function initializeDatabase(options: {
         try {
           db.close();
         } catch (error) {
-          console.warn('Error closing database connection:', error);
+          if (verbose) {
+            console.warn('Error closing database connection:', error);
+          }
         }
       },
       isEncrypted: encrypted,
     };
 
-    // Verify database is working
-    try {
-      db.prepare('SELECT 1').get();
-      console.log(`Database initialized successfully at: ${dbPath}`);
-      console.log(`Encryption: ${encrypted ? 'enabled' : 'disabled'}`);
-    } catch (error) {
-      connection.close();
-      throw new DatabaseError(
-        'Database verification failed',
-        error instanceof Error ? error : new Error(String(error))
-      );
-    }
+    verifyDatabase(db, dbPath, encrypted, verbose);
 
     return connection;
-
   } catch (error) {
     if (error instanceof DatabaseError || error instanceof EncryptionError) {
       throw error;
@@ -236,4 +280,4 @@ export class DatabaseManager {
 }
 
 // Export singleton instance
-export const dbManager = DatabaseManager.getInstance(); 
+export const dbManager = DatabaseManager.getInstance();

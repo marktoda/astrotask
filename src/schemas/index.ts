@@ -74,12 +74,9 @@ export interface ValidationResult<T> {
 }
 
 // Safe parsing utility with standardized error format
-export function safeParseSchema<T>(
-  schema: z.ZodSchema<T>,
-  data: unknown
-): ValidationResult<T> {
+export function safeParseSchema<T>(schema: z.ZodSchema<T>, data: unknown): ValidationResult<T> {
   const result = schema.safeParse(data);
-  
+
   if (result.success) {
     return {
       success: true,
@@ -101,34 +98,24 @@ export function safeParseSchema<T>(
 }
 
 // Validation with detailed error formatting
-export function validateWithErrors<T>(
-  schema: z.ZodSchema<T>,
-  data: unknown
-): T {
+export function validateWithErrors<T>(schema: z.ZodSchema<T>, data: unknown): T {
   const result = safeParseSchema(schema, data);
-  
+
   if (!result.success) {
-    const errorMessages = result.errors!.map(
-      (err) => `${err.field}: ${err.message}`
-    ).join(', ');
+    const errorMessages =
+      result.errors?.map((err) => `${err.field}: ${err.message}`).join(', ') ||
+      'Unknown validation error';
     throw new Error(`Validation failed: ${errorMessages}`);
   }
-  
-  return result.data!;
+
+  // TypeScript knows result.success is true here, so data should be defined
+  return result.data as T;
 }
 
 // Import schemas for use in registry
-import {
-  taskSchema,
-  createTaskSchema,
-  updateTaskSchema,
-} from './task.js';
+import { createTaskSchema, taskSchema, updateTaskSchema } from './task.js';
 
-import {
-  projectSchema,
-  createProjectSchema,
-  updateProjectSchema,
-} from './project.js';
+import { createProjectSchema, projectSchema, updateProjectSchema } from './project.js';
 
 import {
   contextSliceSchema,
@@ -139,10 +126,10 @@ import {
 import { uuidPattern } from './base.js';
 import { CONSTRAINTS } from './types.js';
 
-// Import types directly from source files
-import type { Task, CreateTask, UpdateTask } from './task.js';
-import type { Project, CreateProject, UpdateProject } from './project.js';
 import type { ContextSlice, CreateContextSlice, UpdateContextSlice } from './contextSlice.js';
+import type { CreateProject, Project, UpdateProject } from './project.js';
+// Import types directly from source files
+import type { CreateTask, Task, UpdateTask } from './task.js';
 
 // Schema registry with proper typing
 export const schemaRegistry = {
@@ -178,16 +165,16 @@ export function validateBySchemaKey<K extends SchemaKey>(
   data: unknown
 ): SchemaReturnTypeMap[K] {
   const schema = schemaRegistry[key];
-  
+
   // Use the schema's parse method directly to maintain proper typing
   try {
     const result = schema.parse(data);
     return result as SchemaReturnTypeMap[K];
   } catch (error) {
     if (error instanceof z.ZodError) {
-      const errorMessages = error.errors.map(
-        (err) => `${err.path.join('.')}: ${err.message}`
-      ).join(', ');
+      const errorMessages = error.errors
+        .map((err) => `${err.path.join('.')}: ${err.message}`)
+        .join(', ');
       throw new Error(`Validation failed: ${errorMessages}`);
     }
     throw error;
@@ -195,26 +182,24 @@ export function validateBySchemaKey<K extends SchemaKey>(
 }
 
 // Batch validation utility with strict typing
-export function validateBatch<T>(
-  schema: z.ZodSchema<T>,
-  items: unknown[]
-): ValidationResult<T[]> {
+export function validateBatch<T>(schema: z.ZodSchema<T>, items: unknown[]): ValidationResult<T[]> {
   const results: T[] = [];
   const errors: ValidationError[] = [];
 
-  items.forEach((item, index) => {
+  for (const [index, item] of items.entries()) {
     const result = safeParseSchema(schema, item);
     if (result.success) {
-      results.push(result.data!);
+      // When success is true, data is guaranteed to be defined
+      results.push(result.data as T);
     } else {
-      errors.push(
-        ...result.errors!.map((err) => ({
+      const itemErrors =
+        result.errors?.map((err) => ({
           ...err,
           field: `[${index}].${err.field}`,
-        }))
-      );
+        })) || [];
+      errors.push(...itemErrors);
     }
-  });
+  }
 
   if (errors.length > 0) {
     return {
@@ -256,23 +241,24 @@ function getNestedValue(obj: unknown, path: (string | number)[]): unknown {
 export const validationUtils = {
   // Check if string is valid UUID
   isValidUuid: (value: string): boolean => uuidPattern.test(value),
-  
+
   // Validate datetime string
   isValidDateTime: (value: string): boolean => {
     try {
-      return !isNaN(new Date(value).getTime()) && value.includes('T');
+      return !Number.isNaN(new Date(value).getTime()) && value.includes('T');
     } catch {
       return false;
     }
   },
-  
+
   // Check if value meets title constraints
   isValidTitle: (value: string): boolean => {
-    return value.length >= CONSTRAINTS.TITLE.MIN_LENGTH && 
-           value.length <= CONSTRAINTS.TITLE.MAX_LENGTH;
+    return (
+      value.length >= CONSTRAINTS.TITLE.MIN_LENGTH && value.length <= CONSTRAINTS.TITLE.MAX_LENGTH
+    );
   },
-  
-  // Check if value meets description constraints  
+
+  // Check if value meets description constraints
   isValidDescription: (value: string): boolean => {
     return value.length <= CONSTRAINTS.DESCRIPTION.MAX_LENGTH;
   },
@@ -288,4 +274,4 @@ export const validation = {
   isProject,
   isContextSlice,
   ...validationUtils,
-} as const; 
+} as const;
