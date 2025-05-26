@@ -18,11 +18,11 @@ export interface DatabaseOptions {
 
 /**
  * Create a new database store with automatic migration and configuration.
- * 
+ *
  * This is the main entry point for database operations, providing:
  * - Automatic database initialization and migration
  * - Type-safe ORM via Drizzle
- * - Raw SQL access via PGlite 
+ * - Raw SQL access via PGlite
  * - Optional real-time sync via ElectricSQL
  * - Business methods for common operations
  *
@@ -30,12 +30,7 @@ export interface DatabaseOptions {
  * @returns Store instance with all database functionality
  */
 export async function createDatabase(options: DatabaseOptions = {}): Promise<Store> {
-  const {
-    dbPath = 'astrolabe.db',
-    encrypted = false,
-    verbose = false,
-    autoSync = false,
-  } = options;
+  const { dbPath = 'astrolabe.db', encrypted = false, verbose = false, autoSync = false } = options;
 
   // Initialize the database connection and run migrations
   const connection = await initializeDatabase({
@@ -46,16 +41,11 @@ export async function createDatabase(options: DatabaseOptions = {}): Promise<Sto
   });
 
   // Create the store with ElectricSQL integration
-  const store = await createStore(
-    connection.db,
-    connection.drizzle,
-    connection.isEncrypted,
-    {
-      sync: autoSync,
-      verbose,
-      databasePath: dbPath,
-    }
-  );
+  const store = await createStore(connection.db, connection.drizzle, connection.isEncrypted, {
+    sync: autoSync,
+    verbose,
+    databasePath: dbPath,
+  });
 
   if (verbose) {
     console.info('Database store created successfully');
@@ -76,4 +66,4 @@ export type {
   NewProject,
   NewTask,
   NewContextSlice,
-} from './schema.js'; 
+} from './schema.js';

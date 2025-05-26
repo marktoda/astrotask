@@ -3,7 +3,7 @@ import type { ShapeStreamOptions } from '@electric-sql/client';
 import type { PGlite } from '@electric-sql/pglite';
 import type { PgliteDatabase } from 'drizzle-orm/pglite';
 import { cfg } from '../config/index.js';
-import { schema } from './schema.js';
+import type { schema } from './schema.js';
 import { DatabaseStore, type Store } from './store.js';
 
 /**

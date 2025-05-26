@@ -1,16 +1,16 @@
-import { PGlite } from '@electric-sql/pglite';
+import type { PGlite } from '@electric-sql/pglite';
+import { and, desc, eq, isNull } from 'drizzle-orm';
 import type { PgliteDatabase } from 'drizzle-orm/pglite';
-import { eq, desc, and, isNull } from 'drizzle-orm';
-import { 
-  schema,
-  type Project,
-  type Task,
+import type { ElectricConnection } from './electric.js';
+import {
   type ContextSlice,
+  type NewContextSlice,
   type NewProject,
   type NewTask,
-  type NewContextSlice,
+  type Project,
+  type Task,
+  schema,
 } from './schema.js';
-import type { ElectricConnection } from './electric.js';
 
 /**
  * Store interface following the ElectricSQL + Drizzle + PGlite guide pattern
@@ -32,32 +32,32 @@ export interface Store {
   isEncrypted: boolean;
   /** Whether sync is currently active */
   get isSyncing(): boolean;
-  
+
   // Business Methods - Projects
   listProjects(): Promise<Project[]>;
   addProject(data: NewProject): Promise<Project>;
   getProject(id: string): Promise<Project | null>;
-  
-  // Business Methods - Tasks  
+
+  // Business Methods - Tasks
   listTasks(projectId?: string): Promise<Task[]>;
   addTask(data: NewTask): Promise<Task>;
   getTask(id: string): Promise<Task | null>;
   updateTaskStatus(id: string, status: string): Promise<Task | null>;
-  
+
   // Extended Task Methods
   listTasksByStatus(status: string, projectId?: string): Promise<Task[]>;
   listRootTasks(projectId?: string): Promise<Task[]>;
   listSubtasks(parentId: string): Promise<Task[]>;
   updateTask(id: string, updates: Partial<Omit<Task, 'id' | 'createdAt'>>): Promise<Task | null>;
   deleteTask(id: string): Promise<boolean>;
-  
+
   // Business Methods - Context Slices
   listContextSlices(taskId: string): Promise<ContextSlice[]>;
   addContextSlice(data: NewContextSlice): Promise<ContextSlice>;
-  
+
   // Real-time features
   enableSync(table: string): Promise<void>;
-  
+
   /** Close all connections and cleanup */
   close(): Promise<void>;
 }
@@ -107,11 +107,12 @@ export class DatabaseStore implements Store {
     const result = await this.sql.select().from(schema.projects).where(eq(schema.projects.id, id));
     return result[0] || null;
   }
-  
-  // Business Methods - Tasks  
+
+  // Business Methods - Tasks
   async listTasks(projectId?: string): Promise<Task[]> {
     if (projectId) {
-      return this.sql.select()
+      return this.sql
+        .select()
         .from(schema.tasks)
         .where(eq(schema.tasks.projectId, projectId))
         .orderBy(desc(schema.tasks.updatedAt));
@@ -140,10 +141,11 @@ export class DatabaseStore implements Store {
       .returning();
     return result[0] || null;
   }
-  
+
   // Business Methods - Context Slices
   async listContextSlices(taskId: string): Promise<ContextSlice[]> {
-    return this.sql.select()
+    return this.sql
+      .select()
       .from(schema.contextSlices)
       .where(eq(schema.contextSlices.taskId, taskId))
       .orderBy(desc(schema.contextSlices.updatedAt));
@@ -156,7 +158,7 @@ export class DatabaseStore implements Store {
     }
     return contextSlice;
   }
-  
+
   // Real-time features
   async enableSync(table: string): Promise<void> {
     await this.electric.sync(table);
@@ -177,7 +179,8 @@ export class DatabaseStore implements Store {
     if (projectId) {
       conditions.push(eq(schema.tasks.projectId, projectId));
     }
-    return this.sql.select()
+    return this.sql
+      .select()
       .from(schema.tasks)
       .where(and(...conditions))
       .orderBy(desc(schema.tasks.updatedAt));
@@ -188,20 +191,25 @@ export class DatabaseStore implements Store {
     if (projectId) {
       conditions.push(eq(schema.tasks.projectId, projectId));
     }
-    return this.sql.select()
+    return this.sql
+      .select()
       .from(schema.tasks)
       .where(and(...conditions))
       .orderBy(desc(schema.tasks.updatedAt));
   }
 
   async listSubtasks(parentId: string): Promise<Task[]> {
-    return this.sql.select()
+    return this.sql
+      .select()
       .from(schema.tasks)
       .where(eq(schema.tasks.parentId, parentId))
       .orderBy(desc(schema.tasks.updatedAt));
   }
 
-  async updateTask(id: string, updates: Partial<Omit<Task, 'id' | 'createdAt'>>): Promise<Task | null> {
+  async updateTask(
+    id: string,
+    updates: Partial<Omit<Task, 'id' | 'createdAt'>>
+  ): Promise<Task | null> {
     const result = await this.sql
       .update(schema.tasks)
       .set({ ...updates, updatedAt: new Date() })
@@ -211,10 +219,7 @@ export class DatabaseStore implements Store {
   }
 
   async deleteTask(id: string): Promise<boolean> {
-    const result = await this.sql
-      .delete(schema.tasks)
-      .where(eq(schema.tasks.id, id))
-      .returning();
+    const result = await this.sql.delete(schema.tasks).where(eq(schema.tasks.id, id)).returning();
     return result.length > 0;
   }
-} 
+}

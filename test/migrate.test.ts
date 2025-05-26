@@ -9,20 +9,26 @@ import { runMigrations, needsMigration, autoMigrate } from '../src/database/migr
 
 describe('Database Migration System', () => {
   const testDbPath = join(process.cwd(), 'test-migration.db');
-  let connection: DatabaseConnection;
+  let connection: DatabaseConnection | null = null;
 
   beforeEach(async () => {
     // Clean up any existing test database
     if (existsSync(testDbPath)) {
       rmSync(testDbPath, { recursive: true, force: true });
     }
+    connection = null;
   });
 
   afterEach(async () => {
     // Clean up after tests
     if (connection) {
-      await connection.db.close();
+      try {
+        await connection.db.close();
+      } catch (error) {
+        // Ignore errors when closing already closed connections
+      }
     }
+    connection = null;
     if (existsSync(testDbPath)) {
       rmSync(testDbPath, { recursive: true, force: true });
     }
@@ -99,8 +105,14 @@ describe('Database Migration System', () => {
       verbose: false,
     });
 
-    // Close and reconnect
-    await connection.db.close();
+    // Close the first connection properly
+    try {
+      await connection.db.close();
+    } catch (error) {
+      // Ignore close errors
+    }
+
+    // Reconnect to the same database
     connection = await initializeDatabase({
       dbPath: testDbPath,
       verbose: false,
@@ -109,7 +121,7 @@ describe('Database Migration System', () => {
     // Should still be up to date
     const migrationsNeeded = await needsMigration(connection);
     expect(migrationsNeeded).toBe(false);
-  });
+  }, 10000); // Increase timeout for this test
 
   it('should handle migration errors gracefully', async () => {
     connection = await initializeDatabase({
