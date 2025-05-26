@@ -5,6 +5,7 @@ import Database from 'better-sqlite3';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { cfg } from '../config/index.js';
+import { schema } from './schema.js';
 
 // Database configuration constants
 export const DATABASE_CONFIG = {
@@ -49,9 +50,9 @@ export const DATABASE_CONFIG = {
 } as const;
 
 // Database connection interface
-export interface DatabaseConnection {
+export interface DatabaseConnection<TSchema extends Record<string, unknown> = typeof schema> {
   db: Database.Database;
-  drizzle: BetterSQLite3Database;
+  drizzle: BetterSQLite3Database<TSchema>;
   close: () => void;
   isEncrypted: boolean;
 }
@@ -202,8 +203,8 @@ export function initializeDatabase(
 
     applyPerformancePragmas(db);
 
-    // Initialize Drizzle ORM
-    const drizzleDb = drizzle(db);
+    // Initialize Drizzle ORM with generated schema for full type-safety
+    const drizzleDb = drizzle(db, { schema });
 
     // Create connection object
     const connection: DatabaseConnection = {
