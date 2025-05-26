@@ -11,6 +11,11 @@
     "build": "tsc",
     "dev": "tsx watch src/index.ts",
     "type-check": "tsc --noEmit",
+    "lint": "biome check src/",
+    "lint:fix": "biome check --write src/",
+    "format": "biome format src/",
+    "format:fix": "biome format --write src/",
+    "verify": "pnpm type-check && pnpm lint:fix && pnpm format:fix && pnpm build && pnpm test",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [
@@ -27,6 +32,7 @@
     "node": ">=18.0.0"
   },
   "devDependencies": {
+    "@biomejs/biome": "^1.9.4",
     "@types/node": "^22.15.21",
     "tsx": "^4.19.4",
     "typescript": "^5.8.3"

@@ -17,4 +17,4 @@ export function greet(name: string): string {
 if (import.meta.url === new URL(import.meta.url).href) {
   console.log(greet('Developer'));
   console.log(`Version: ${APP_VERSION}`);
-} 
+}
