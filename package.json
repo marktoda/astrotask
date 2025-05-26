@@ -9,6 +9,7 @@
   },
   "scripts": {
     "build": "tsc",
+    "start": "tsx src/index.ts",
     "dev": "tsx watch src/index.ts",
     "type-check": "tsc --noEmit",
     "lint": "biome check src/",
@@ -34,9 +35,16 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
+    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^22.15.21",
     "tsx": "^4.19.4",
     "typescript": "^5.8.3",
     "vitest": "^2.1.8"
+  },
+  "dependencies": {
+    "@electric-sql/client": "^1.0.4",
+    "@modelcontextprotocol/sdk": "^1.12.0",
+    "better-sqlite3": "^11.10.0",
+    "zod": "^3.25.28"
   }
 }
