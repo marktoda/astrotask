@@ -7,7 +7,6 @@ describe('Configuration System', () => {
     expect(cfg.NODE_ENV).toBe('development'); // default from schema
     expect(cfg.PORT).toBe(3000); // default from schema
     expect(cfg.LOG_LEVEL).toBe('info'); // default from schema
-    expect(cfg.ENABLE_EXPERIMENTAL_FEATURES).toBe(false); // default from schema
   });
 
   it('should have proper types', () => {
@@ -15,12 +14,10 @@ describe('Configuration System', () => {
     const env: 'development' | 'production' | 'test' = cfg.NODE_ENV;
     const port: number = cfg.PORT;
     const logLevel: 'debug' | 'info' | 'warn' | 'error' = cfg.LOG_LEVEL;
-    const experimental: boolean = cfg.ENABLE_EXPERIMENTAL_FEATURES;
 
     expect(typeof env).toBe('string');
     expect(typeof port).toBe('number');
     expect(typeof logLevel).toBe('string');
-    expect(typeof experimental).toBe('boolean');
   });
 
   it('should handle optional fields properly', () => {
@@ -39,4 +36,4 @@ describe('Configuration System', () => {
     expect(cfg.PORT).toBeLessThanOrEqual(65535);
     expect(Number.isInteger(cfg.PORT)).toBe(true);
   });
-}); 
+});

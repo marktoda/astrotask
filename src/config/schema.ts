@@ -15,11 +15,9 @@ export const configSchema = z.object({
   // Log verbosity
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
 
+  // TODO: make required
   // Database connection string (optional because some environments might not require it)
   DATABASE_URL: z.string().url().optional(),
-
-  // Feature flags
-  ENABLE_EXPERIMENTAL_FEATURES: z.coerce.boolean().default(false),
 
   // Database encryption key (optional, will use default if not provided)
   ASTROLABE_DB_KEY: z.string().optional(),
