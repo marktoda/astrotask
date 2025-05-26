@@ -7,6 +7,8 @@ alwaysApply: true
 
 This guide outlines the typical process for using Task Master to manage software development projects.
 
+[AGENTS.md](mdc:AGENTS.md) provides a project-specific overview of Astrolabe's architecture, tech stack, and coding conventions. Scan it first so the steps below make sense in context.
+
 ## Primary Interaction: MCP Server vs. CLI
 
 Task Master offers two primary ways to interact:

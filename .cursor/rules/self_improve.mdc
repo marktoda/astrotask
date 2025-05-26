@@ -3,6 +3,7 @@ description: Guidelines for continuously improving Cursor rules based on emergin
 globs: **/*
 alwaysApply: true
 ---
+[AGENTS.md](mdc:AGENTS.md) offers a comprehensive view of the project's architecture and conventions—consult it when assessing whether new patterns warrant rule updates.
 
 - **Rule Improvement Triggers:**
   - New code patterns not covered by existing rules
