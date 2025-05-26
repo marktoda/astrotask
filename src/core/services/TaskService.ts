@@ -1,5 +1,5 @@
-import type { Task } from '../../database/schema.js';
 import type { Store } from '../../database/store.js';
+import type { Task, TaskStatus } from '../../schemas/task.js';
 
 /**
  * TaskService - Business logic layer for hierarchical task operations
@@ -120,7 +120,7 @@ export class TaskService {
   /**
    * Bulk update status for an entire task tree
    */
-  async updateTreeStatus(rootId: string, status: string): Promise<number> {
+  async updateTreeStatus(rootId: string, status: TaskStatus): Promise<number> {
     const descendants = await this.getTaskDescendants(rootId);
     const allTasks = [rootId, ...descendants.map((d) => d.id)];
 

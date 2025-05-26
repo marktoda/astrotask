@@ -59,11 +59,17 @@ export type { Store } from './store.js';
 export { DatabaseError, EncryptionError } from './config.js';
 export type { ElectricConnection } from './electric.js';
 export { schema } from './schema.js';
+
+// Import types from Zod schemas (single source of truth)
 export type {
   Project,
+  CreateProject as NewProject,
+} from '../schemas/project.js';
+export type {
   Task,
+  CreateTask as NewTask,
+} from '../schemas/task.js';
+export type {
   ContextSlice,
-  NewProject,
-  NewTask,
-  NewContextSlice,
-} from './schema.js';
+  CreateContextSlice as NewContextSlice,
+} from '../schemas/contextSlice.js';

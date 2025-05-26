@@ -8,6 +8,9 @@ import { foreignKey, pgTable, text, timestamp } from 'drizzle-orm/pg-core';
   is designed to work with ElectricSQL CRDT replication. Each table uses
   UUID primary keys (stored as TEXT). Timestamps use PostgreSQL's NOW() function
   for maximum cross-platform consistency with PostgreSQL-based ElectricSQL.
+  
+  NOTE: Types are defined in src/schemas/* to avoid duplication. This file only
+  defines the database table structure with proper enum constraints.
 */
 
 // ---------------------------------------------------------------------------
@@ -17,14 +20,15 @@ export const projects = pgTable('projects', {
   id: text('id').primaryKey(), // UUID
   title: text('title').notNull(),
   description: text('description'),
-  status: text('status').notNull().default('active'), // active | completed | archived
-  priority: text('priority').notNull().default('medium'), // low | medium | high
+  status: text('status', { enum: ['active', 'completed', 'archived'] })
+    .notNull()
+    .default('active'),
+  priority: text('priority', { enum: ['low', 'medium', 'high'] })
+    .notNull()
+    .default('medium'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
-
-export type Project = typeof projects.$inferSelect;
-export type NewProject = typeof projects.$inferInsert;
 
 // ---------------------------------------------------------------------------
 // tasks
@@ -36,7 +40,9 @@ export const tasks = pgTable(
     parentId: text('parent_id'),
     title: text('title').notNull(),
     description: text('description'),
-    status: text('status').notNull().default('pending'), // pending | in-progress | done | cancelled
+    status: text('status', { enum: ['pending', 'in-progress', 'done', 'cancelled'] })
+      .notNull()
+      .default('pending'),
 
     prd: text('prd'),
     contextDigest: text('context_digest'),
@@ -57,9 +63,6 @@ export const tasks = pgTable(
   }
 );
 
-export type Task = typeof tasks.$inferSelect;
-export type NewTask = typeof tasks.$inferInsert;
-
 // ---------------------------------------------------------------------------
 // context_slices
 // ---------------------------------------------------------------------------
@@ -75,9 +78,6 @@ export const contextSlices = pgTable('context_slices', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
-
-export type ContextSlice = typeof contextSlices.$inferSelect;
-export type NewContextSlice = typeof contextSlices.$inferInsert;
 
 // ---------------------------------------------------------------------------
 // Relationships (Drizzle helpers)

@@ -1,16 +1,17 @@
+import { randomUUID } from 'node:crypto';
 import type { PGlite } from '@electric-sql/pglite';
 import { and, desc, eq, isNull } from 'drizzle-orm';
 import type { PgliteDatabase } from 'drizzle-orm/pglite';
 import type { ElectricConnection } from './electric.js';
-import {
-  type ContextSlice,
-  type NewContextSlice,
-  type NewProject,
-  type NewTask,
-  type Project,
-  type Task,
-  schema,
-} from './schema.js';
+import { schema } from './schema.js';
+
+// Import types from Zod schemas (single source of truth)
+import type {
+  ContextSlice,
+  CreateContextSlice as NewContextSlice,
+} from '../schemas/contextSlice.js';
+import type { CreateProject as NewProject, Project } from '../schemas/project.js';
+import type { CreateTask as NewTask, Task } from '../schemas/task.js';
 
 /**
  * Store interface following the ElectricSQL + Drizzle + PGlite guide pattern
@@ -42,10 +43,16 @@ export interface Store {
   listTasks(projectId?: string): Promise<Task[]>;
   addTask(data: NewTask): Promise<Task>;
   getTask(id: string): Promise<Task | null>;
-  updateTaskStatus(id: string, status: string): Promise<Task | null>;
+  updateTaskStatus(
+    id: string,
+    status: 'pending' | 'in-progress' | 'done' | 'cancelled'
+  ): Promise<Task | null>;
 
   // Extended Task Methods
-  listTasksByStatus(status: string, projectId?: string): Promise<Task[]>;
+  listTasksByStatus(
+    status: 'pending' | 'in-progress' | 'done' | 'cancelled',
+    projectId?: string
+  ): Promise<Task[]>;
   listRootTasks(projectId?: string): Promise<Task[]>;
   listSubtasks(parentId: string): Promise<Task[]>;
   updateTask(id: string, updates: Partial<Omit<Task, 'id' | 'createdAt'>>): Promise<Task | null>;
@@ -98,7 +105,18 @@ export class DatabaseStore implements Store {
   }
 
   async addProject(data: NewProject): Promise<Project> {
-    const [project] = await this.sql.insert(schema.projects).values(data).returning();
+    // Ensure we have an ID and proper null handling
+    const projectData = {
+      id: data.id || randomUUID(),
+      title: data.title,
+      description: data.description ?? null,
+      status: data.status,
+      priority: data.priority,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    const [project] = await this.sql.insert(schema.projects).values(projectData).returning();
     if (!project) {
       throw new Error('Failed to create project');
     }
@@ -123,7 +141,21 @@ export class DatabaseStore implements Store {
   }
 
   async addTask(data: NewTask): Promise<Task> {
-    const [task] = await this.sql.insert(schema.tasks).values(data).returning();
+    // Ensure we have an ID and proper null handling
+    const taskData = {
+      id: data.id || randomUUID(),
+      parentId: data.parentId ?? null,
+      title: data.title,
+      description: data.description ?? null,
+      status: data.status,
+      prd: data.prd ?? null,
+      contextDigest: data.contextDigest ?? null,
+      projectId: data.projectId ?? null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    const [task] = await this.sql.insert(schema.tasks).values(taskData).returning();
     if (!task) {
       throw new Error('Failed to create task');
     }
@@ -135,7 +167,10 @@ export class DatabaseStore implements Store {
     return result[0] || null;
   }
 
-  async updateTaskStatus(id: string, status: string): Promise<Task | null> {
+  async updateTaskStatus(
+    id: string,
+    status: 'pending' | 'in-progress' | 'done' | 'cancelled'
+  ): Promise<Task | null> {
     const result = await this.sql
       .update(schema.tasks)
       .set({ status, updatedAt: new Date() })
@@ -154,7 +189,22 @@ export class DatabaseStore implements Store {
   }
 
   async addContextSlice(data: NewContextSlice): Promise<ContextSlice> {
-    const [contextSlice] = await this.sql.insert(schema.contextSlices).values(data).returning();
+    // Ensure we have an ID and proper null handling
+    const contextData = {
+      id: data.id || randomUUID(),
+      title: data.title,
+      description: data.description ?? null,
+      taskId: data.taskId ?? null,
+      projectId: data.projectId ?? null,
+      contextDigest: data.contextDigest ?? null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    const [contextSlice] = await this.sql
+      .insert(schema.contextSlices)
+      .values(contextData)
+      .returning();
     if (!contextSlice) {
       throw new Error('Failed to create context slice');
     }
@@ -176,7 +226,10 @@ export class DatabaseStore implements Store {
   }
 
   // Extended Task Methods
-  async listTasksByStatus(status: string, projectId?: string): Promise<Task[]> {
+  async listTasksByStatus(
+    status: 'pending' | 'in-progress' | 'done' | 'cancelled',
+    projectId?: string
+  ): Promise<Task[]> {
     const conditions = [eq(schema.tasks.status, status)];
     if (projectId) {
       conditions.push(eq(schema.tasks.projectId, projectId));
