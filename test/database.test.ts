@@ -30,7 +30,7 @@ describe('Database Configuration', () => {
 
   describe('Database Initialization', () => {
     it('should create and initialize database without encryption', async () => {
-      const connection = initializeDatabase({
+      const connection = await initializeDatabase({
         dbPath: testDbPath,
         encrypted: false,
         verbose: false,
@@ -55,7 +55,7 @@ describe('Database Configuration', () => {
       // Set a test encryption key
       process.env.ASTROLABE_DB_KEY = 'test-encryption-key-12345';
 
-      const connection = initializeDatabase({
+      const connection = await initializeDatabase({
         dbPath: testDbPath,
         encrypted: true,
         verbose: false,
@@ -75,7 +75,7 @@ describe('Database Configuration', () => {
     }, 10000);
 
     it('should apply correct pragmas for performance', async () => {
-      const connection = initializeDatabase({
+      const connection = await initializeDatabase({
         dbPath: testDbPath,
         encrypted: false,
       });
@@ -92,7 +92,7 @@ describe('Database Configuration', () => {
     it('should handle database directory creation', async () => {
       const nestedTestDbPath = join(testDbDir, 'nested', 'deep', 'test.db');
       
-      const connection = initializeDatabase({
+      const connection = await initializeDatabase({
         dbPath: nestedTestDbPath,
         encrypted: false,
       });
@@ -125,7 +125,7 @@ describe('Database Configuration', () => {
       
       expect(manager.isConnected()).toBe(false);
 
-      const connection = manager.connect({
+      const connection = await manager.connect({
         dbPath: testDbPath,
         encrypted: false,
       });
@@ -134,7 +134,7 @@ describe('Database Configuration', () => {
       expect(connection).toBeDefined();
 
       // Should return same connection on subsequent calls
-      const connection2 = manager.connect();
+      const connection2 = await manager.connect();
       expect(connection2).toBe(connection);
 
       await manager.close();

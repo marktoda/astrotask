@@ -3,6 +3,7 @@ import { PGlite } from '@electric-sql/pglite';
 import { type PgliteDatabase, drizzle } from 'drizzle-orm/pglite';
 import { cfg } from '../config/index.js';
 import { type Store, createStore } from './electric.js';
+import { autoMigrate } from './migrate.js';
 import { schema } from './schema.js';
 
 /**
@@ -101,17 +102,19 @@ function verifyDatabase(_db: PGlite, dbPath: string, encrypted: boolean, verbose
 /**
  * Initialize SQLite database with optional encryption
  */
-export function initializeDatabase(
+export async function initializeDatabase(
   options: {
     dbPath?: string;
     encrypted?: boolean;
     verbose?: boolean;
+    autoMigrate?: boolean;
   } = {}
-): DatabaseConnection {
+): Promise<DatabaseConnection> {
   const {
     dbPath = cfg.DATABASE_URL,
     encrypted = cfg.DB_ENCRYPTED,
     verbose = cfg.DB_VERBOSE,
+    autoMigrate: shouldAutoMigrate = true,
   } = options;
 
   try {
@@ -140,12 +143,19 @@ export function initializeDatabase(
     // Initialize Drizzle ORM
     const drizzleDb = drizzle(db, { schema });
 
-    return {
+    const connection: DatabaseConnection = {
       db,
       drizzle: drizzleDb,
       isEncrypted: encrypted,
       path: dbPath,
     };
+
+    // Run database migrations if requested
+    if (shouldAutoMigrate) {
+      await autoMigrate(connection, { verbose });
+    }
+
+    return connection;
   } catch (error) {
     throw new DatabaseError(
       'Failed to initialize database',
@@ -171,12 +181,12 @@ export class DatabaseManager {
     return DatabaseManager.instance;
   }
 
-  connect(options?: Parameters<typeof initializeDatabase>[0]): DatabaseConnection {
+  async connect(options?: Parameters<typeof initializeDatabase>[0]): Promise<DatabaseConnection> {
     if (this.connection) {
       return this.connection;
     }
 
-    this.connection = initializeDatabase(options);
+    this.connection = await initializeDatabase(options);
     return this.connection;
   }
 
@@ -195,7 +205,7 @@ export class DatabaseManager {
     }
 
     // First create a regular database connection
-    const baseConnection = this.connect(options);
+    const baseConnection = await this.connect(options);
 
     // Then create the store with ElectricSQL integration
     const storeOptions = {
