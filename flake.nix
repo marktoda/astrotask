@@ -1,7 +1,7 @@
 {
   description = "Astrolabe - A local-first, MCP-compatible task-navigation platform";
   inputs = {
-    nixpkgs.url = "github:nixos/nixpkgs/nixos-24.11";
+    nixpkgs.url = "github:nixos/nixpkgs/nixos-25.05";
   };
   outputs = {
     self,
@@ -20,7 +20,7 @@
       default = pkgs.mkShell {
         packages = with pkgs; [
           # Node.js ecosystem
-          nodejs_20
+          nodejs_22
           pnpm
 
           # Development tools
