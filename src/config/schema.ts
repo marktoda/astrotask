@@ -17,10 +17,10 @@ export const configSchema = z.object({
 
   // TODO: make required
   // Database connection string (optional because some environments might not require it)
-  DATABASE_URL: z.string().url().optional(),
+  DATABASE_URL: z.string().url().default('./dev.db'),
 
   // Database encryption key (optional, will use default if not provided)
-  ASTROLABE_DB_KEY: z.string().optional(),
+  ASTROLABE_DB_KEY: z.string().default('TEST'),
 });
 
 export type AppConfig = z.infer<typeof configSchema>;

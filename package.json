@@ -18,7 +18,11 @@
     "format:fix": "biome format --write src/",
     "verify": "pnpm type-check && pnpm lint:fix && pnpm format:fix && pnpm build && pnpm test",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:push": "drizzle-kit push",
+    "db:studio": "drizzle-kit studio"
   },
   "keywords": [
     "task-management",
