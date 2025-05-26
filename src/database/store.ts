@@ -60,6 +60,25 @@ export interface Store {
 
   /** Close all connections and cleanup */
   close(): Promise<void>;
+
+  // Hierarchical Operations
+  /** Recursively build the task tree starting from the provided root task ID */
+  getTaskTree(rootId: string, maxDepth?: number): Promise<TaskTree | null>;
+  /** Return all ancestor tasks up to the root (closest first, root last) */
+  getTaskAncestors(taskId: string): Promise<Task[]>;
+  /** Return every descendant (children, grandchildren, etc.) of a task */
+  getTaskDescendants(taskId: string): Promise<Task[]>;
+  /** Return depth (distance from root) of the task in its hierarchy */
+  getTaskDepth(taskId: string): Promise<number>;
+  /** Calculate completion ratio (0-1) of a task based on its subtasks */
+  calculateTaskProgress(taskId: string): Promise<number>;
+  /** Aggregate status counts for whole hierarchy beginning at root */
+  getHierarchyStats(rootId: string): Promise<Record<string, number>>;
+}
+
+// Add after Task type import
+export interface TaskTree extends Task {
+  children: TaskTree[];
 }
 
 /**
@@ -221,5 +240,119 @@ export class DatabaseStore implements Store {
   async deleteTask(id: string): Promise<boolean> {
     const result = await this.sql.delete(schema.tasks).where(eq(schema.tasks.id, id)).returning();
     return result.length > 0;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Hierarchical Operations
+  // ---------------------------------------------------------------------------
+
+  /** Helper to recursively build a TaskTree */
+  private async buildTaskTree(node: Task, depthLeft: number): Promise<TaskTree> {
+    if (depthLeft === 0) {
+      return { ...node, children: [] };
+    }
+    const children = await this.listSubtasks(node.id);
+    const childTrees: TaskTree[] = [];
+    for (const child of children) {
+      childTrees.push(await this.buildTaskTree(child, depthLeft - 1));
+    }
+    return { ...node, children: childTrees };
+  }
+
+  async getTaskTree(rootId: string, maxDepth = Number.POSITIVE_INFINITY): Promise<TaskTree | null> {
+    const root = await this.getTask(rootId);
+    if (!root) return null;
+    return this.buildTaskTree(root, maxDepth);
+  }
+
+  async getTaskAncestors(taskId: string): Promise<Task[]> {
+    const ancestors: Task[] = [];
+    let current = await this.getTask(taskId);
+    while (current?.parentId) {
+      const parent = await this.getTask(current.parentId);
+      if (!parent) break;
+      ancestors.unshift(parent); // root first ordering
+      current = parent;
+    }
+    return ancestors;
+  }
+
+  /** Recursively collect descendants */
+  private async collectDescendants(parentId: string, bucket: Task[]): Promise<void> {
+    const children = await this.listSubtasks(parentId);
+    for (const child of children) {
+      bucket.push(child);
+      await this.collectDescendants(child.id, bucket);
+    }
+  }
+
+  async getTaskDescendants(taskId: string): Promise<Task[]> {
+    const descendants: Task[] = [];
+    await this.collectDescendants(taskId, descendants);
+    return descendants;
+  }
+
+  async getTaskDepth(taskId: string): Promise<number> {
+    const ancestors = await this.getTaskAncestors(taskId);
+    return ancestors.length;
+  }
+
+  /** Map task status to numeric completion ratio */
+  private statusToProgress(status: string): number {
+    switch (status) {
+      case 'done':
+        return 1;
+      case 'in-progress':
+        return 0.5;
+      default:
+        return 0;
+    }
+  }
+
+  private async computeProgress(taskId: string): Promise<{ sum: number; count: number }> {
+    const task = await this.getTask(taskId);
+    if (!task) return { sum: 0, count: 0 };
+
+    const children = await this.listSubtasks(taskId);
+    if (children.length === 0) {
+      return { sum: this.statusToProgress(task.status), count: 1 };
+    }
+
+    let sum = 0;
+    let count = 0;
+    for (const child of children) {
+      const { sum: childSum, count: childCount } = await this.computeProgress(child.id);
+      sum += childSum;
+      count += childCount;
+    }
+    return { sum, count };
+  }
+
+  async calculateTaskProgress(taskId: string): Promise<number> {
+    const { sum, count } = await this.computeProgress(taskId);
+    return count === 0 ? 0 : sum / count;
+  }
+
+  async getHierarchyStats(rootId: string): Promise<Record<string, number>> {
+    const stats: { [key: string]: number; total: number } = {
+      pending: 0,
+      'in-progress': 0,
+      done: 0,
+      cancelled: 0,
+      total: 0,
+    };
+
+    const stack: string[] = [rootId];
+    while (stack.length) {
+      const id = stack.pop() as string;
+      const task = await this.getTask(id);
+      if (!task) continue;
+      stats.total += 1;
+      stats[task.status] = (stats[task.status] || 0) + 1;
+
+      const children = await this.listSubtasks(id);
+      stack.push(...children.map((c) => c.id));
+    }
+    return stats;
   }
 }
