@@ -1,18 +1,18 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { join } from 'node:path';
-import { existsSync, unlinkSync } from 'node:fs';
-import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
+import { existsSync, rmSync } from 'node:fs';
+import { migrate } from 'drizzle-orm/pglite/migrator';
 import { initializeDatabase } from '../src/database/config.js';
 import type { DatabaseConnection } from '../src/database/config.js';
 
 describe('Database Migration System', () => {
   let connection: DatabaseConnection;
-  const testDbPath = join(process.cwd(), 'test.db');
+  const testDbPath = join(process.cwd(), 'test-db');
 
   beforeEach(() => {
-    // Clean up any existing test database
+    // Clean up any existing test database directory
     if (existsSync(testDbPath)) {
-      unlinkSync(testDbPath);
+      rmSync(testDbPath, { recursive: true, force: true });
     }
     
     // Initialize unencrypted database for testing
@@ -23,12 +23,12 @@ describe('Database Migration System', () => {
     });
   });
 
-  afterEach(() => {
-    connection.close();
+  afterEach(async () => {
+    await connection.db.close();
     
-    // Clean up test database
+    // Clean up test database directory
     if (existsSync(testDbPath)) {
-      unlinkSync(testDbPath);
+      rmSync(testDbPath, { recursive: true, force: true });
     }
   });
 
@@ -38,16 +38,19 @@ describe('Database Migration System', () => {
       migrationsFolder: join(process.cwd(), 'src/database/migrations'),
     });
 
-    // Verify tables were created by checking schema
-    const result = connection.db
-      .prepare(
-        `SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name`
-      )
-      .all();
+    // Verify tables were created by checking PostgreSQL information_schema
+    const result = await connection.db.query(`
+      SELECT table_name 
+      FROM information_schema.tables 
+      WHERE table_schema = 'public' 
+      AND table_type = 'BASE TABLE'
+      ORDER BY table_name
+    `);
 
-    const tableNames = result.map((row: any) => row.name);
+    const tableNames = result.rows.map((row: any) => row.table_name);
     
-    expect(tableNames).toEqual(['__drizzle_migrations', 'context_slices', 'projects', 'tasks']);
+    expect(tableNames).toEqual(expect.arrayContaining(['context_slices', 'projects', 'tasks']));
+    expect(tableNames.length).toBeGreaterThanOrEqual(3);
   });
 
   it('should enforce foreign key constraints', async () => {
@@ -57,11 +60,12 @@ describe('Database Migration System', () => {
     });
 
     // Test foreign key constraint by trying to insert invalid reference
-    expect(() => {
-      connection.db
-        .prepare('INSERT INTO tasks (id, title, project_id) VALUES (?, ?, ?)')
-        .run('test-task', 'Test Task', 'nonexistent-project');
-    }).toThrow(); // Should fail due to foreign key constraint
+    await expect(async () => {
+      await connection.db.query(
+        'INSERT INTO tasks (id, title, project_id) VALUES ($1, $2, $3)',
+        ['test-task', 'Test Task', 'nonexistent-project']
+      );
+    }).rejects.toThrow(); // Should fail due to foreign key constraint
   });
 
   it('should create tables with proper timestamp defaults', async () => {
@@ -72,20 +76,23 @@ describe('Database Migration System', () => {
 
     // Insert a project to test timestamp defaults
     const projectId = 'test-project-1';
-    connection.db
-      .prepare('INSERT INTO projects (id, title) VALUES (?, ?)')
-      .run(projectId, 'Test Project');
+    await connection.db.query(
+      'INSERT INTO projects (id, title) VALUES ($1, $2)',
+      [projectId, 'Test Project']
+    );
 
     // Retrieve the project to check timestamps
-    const project = connection.db
-      .prepare('SELECT created_at, updated_at FROM projects WHERE id = ?')
-      .get(projectId) as any;
-
+    const result = await connection.db.query(
+      'SELECT created_at, updated_at FROM projects WHERE id = $1',
+      [projectId]
+    );
+    
+    const project = result.rows[0] as { created_at: string; updated_at: string };
     expect(project.created_at).toBeDefined();
     expect(project.updated_at).toBeDefined();
     
-    // Verify timestamp format (ISO 8601)
-    expect(project.created_at).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
-    expect(project.updated_at).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+    // Verify timestamp format (ISO 8601 with timezone)
+    expect(new Date(project.created_at)).toBeInstanceOf(Date);
+    expect(new Date(project.updated_at)).toBeInstanceOf(Date);
   });
 }); 

@@ -30,6 +30,7 @@ if (import.meta.url === new URL(import.meta.url).href) {
 
     logger.info(greet('Developer'));
     logger.info('Application initialized', { version: APP_VERSION });
+    logger.info({ cfg });
 
     // Set up graceful shutdown handling
     process.on('SIGTERM', () => {

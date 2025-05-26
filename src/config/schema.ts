@@ -40,6 +40,9 @@ export const configSchema = z.object({
   // Database directory and filename defaults
   DB_DEFAULT_DIR: z.string().default('~/.astrolabe'),
   DB_DEFAULT_NAME: z.string().default('astrolabe.db'),
+
+  // ElectricSQL configuration (optional for local-first operation)
+  ELECTRIC_URL: z.string().optional(),
 });
 
 export type AppConfig = z.infer<typeof configSchema>;

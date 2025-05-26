@@ -19,6 +19,8 @@
     devShells = forEachSupportedSystem ({pkgs, ...}: {
       default = pkgs.mkShell {
         packages = with pkgs; [
+          openssl
+          prisma
           # Node.js ecosystem
           nodejs_22
           pnpm

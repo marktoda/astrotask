@@ -1,29 +1,30 @@
 import { defineConfig } from 'drizzle-kit';
-import { cfg } from './src/config/index.js';
+import 'dotenv/config';
+
+// Use DATABASE_URL from environment or fallback path
+const databaseUrl = process.env.DATABASE_URL || 'file:dev.db';
 
 export default defineConfig({
-  // Database driver
-  dialect: 'sqlite',
-  
+  // Database driver - PGlite uses PostgreSQL dialect
+  dialect: 'postgresql',
+
   // Schema files
   schema: './src/database/schema.ts',
-  
+
   // Migration output directory
   out: './src/database/migrations',
-  
-  // Database configuration
+
+  // Database configuration for PGlite
   dbCredentials: {
-    // Use the configured database URL
-    // For migrations, this will typically be the development database
-    url: cfg.DATABASE_URL,
+    url: databaseUrl,
   },
-  
+
   // Additional configuration
-  verbose: cfg.DB_VERBOSE,
+  verbose: process.env.DB_VERBOSE === 'true',
   strict: true,
-  
+
   // Include migration metadata
   migrations: {
     prefix: 'timestamp',
   },
-}); 
+});
