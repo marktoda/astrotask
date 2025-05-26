@@ -6,9 +6,12 @@ import { join } from 'node:path';
 import { rmSync, existsSync } from 'node:fs';
 import { initializeDatabase, type DatabaseConnection } from '../src/database/config.js';
 import { runMigrations, needsMigration, autoMigrate } from '../src/database/migrate.js';
+import { tmpdir } from 'node:os';
 
 describe('Database Migration System', () => {
-  const testDbPath = join(process.cwd(), 'test-migration.db');
+  // Use a temp directory to avoid polluting repo
+  const testDbDir = join(tmpdir(), 'astrolabe-test');
+  const testDbPath = join(testDbDir, `test-migration-${Date.now()}.db`);
   let connection: DatabaseConnection | null = null;
 
   beforeEach(async () => {

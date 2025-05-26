@@ -2,8 +2,9 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { TaskService } from '../src/core/services/TaskService.js';
 import { createDatabase } from '../src/database/index.js';
 import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import { rmSync, existsSync } from 'node:fs';
-import type { Task, NewTask } from '../src/database/schema.js';
+import type { Task, CreateTask as NewTask } from '../src/schemas/task.js';
 import type { Store } from '../src/database/store.js';
 
 /**
@@ -12,13 +13,13 @@ import type { Store } from '../src/database/store.js';
 function createTask(data: Partial<NewTask> & { id: string }): NewTask {
   return {
     id: data.id,
-    parentId: data.parentId ?? null,
+    parentId: data.parentId,
     title: data.title ?? `Task ${data.id}`,
-    description: data.description ?? '',
+    description: data.description ?? undefined,
     status: data.status ?? 'pending',
-    prd: null,
-    contextDigest: null,
-    projectId: null,
+    prd: undefined,
+    contextDigest: undefined,
+    projectId: undefined,
   };
 }
 
@@ -28,8 +29,8 @@ let service: TaskService;
 let dbPath: string;
 
 beforeEach(async () => {
-  // Use a unique file for each test run to avoid cross-test interference
-  dbPath = join(process.cwd(), `taskservice-test-${Date.now()}.db`);
+  // Use a unique file in temporary directory for each test run
+  dbPath = join(tmpdir(), `taskservice-test-${Date.now()}.db`);
   store = await createDatabase({ dbPath, verbose: false });
 
   // Seed a small task hierarchy:
