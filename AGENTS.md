@@ -106,13 +106,13 @@ graph TD
     SQLite[(SQLite Database<br>ElectricSQL)]
     Resolver[Context Resolver]
   end
-  
+
   subgraph External
     Postgres[(Shared Postgres)]
     Linear[Linear Cloud]
     Agent[LLM Agent]
   end
-  
+
   CLI --> MCP
   Agent --> MCP
   MCP --> SQLite
@@ -137,6 +137,7 @@ graph TD
   - `exactOptionalPropertyTypes`, `noImplicitReturns`
   - `noUncheckedIndexedAccess`, `noImplicitOverride`
 * **Runtime Validation** – Use Zod schemas for all data models
+* **Simple first** - Optimize for simple, clean, readable code
 * **Immutable Data** – Prefer `readonly` and `const` assertions
 * **ES Modules** – Native ESM with Node16 module resolution
 * **No `any`** – Explicit typing required, reject in PR review
@@ -163,7 +164,7 @@ export type Task = z.infer<typeof TaskSchema>;
 The project includes comprehensive Cursor rules in `.cursor/rules/`:
 
 - **`dev_workflow.mdc`** – Task Master development workflow
-- **`taskmaster.mdc`** – Complete MCP tool reference  
+- **`taskmaster.mdc`** – Complete MCP tool reference
 - **`self_improve.mdc`** – Guidelines for improving rules
 - **`cursor_rules.mdc`** – Rule formatting standards
 
