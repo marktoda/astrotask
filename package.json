@@ -16,7 +16,8 @@
     "format": "biome format src/",
     "format:fix": "biome format --write src/",
     "verify": "pnpm type-check && pnpm lint:fix && pnpm format:fix && pnpm build && pnpm test",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "keywords": [
     "task-management",
@@ -35,6 +36,7 @@
     "@biomejs/biome": "^1.9.4",
     "@types/node": "^22.15.21",
     "tsx": "^4.19.4",
-    "typescript": "^5.8.3"
+    "typescript": "^5.8.3",
+    "vitest": "^2.1.8"
   }
 }
