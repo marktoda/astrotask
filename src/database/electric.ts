@@ -3,31 +3,8 @@ import type { ShapeStreamOptions } from '@electric-sql/client';
 import type { PGlite } from '@electric-sql/pglite';
 import type { PgliteDatabase } from 'drizzle-orm/pglite';
 import { cfg } from '../config/index.js';
-import type { schema } from './schema.js';
-
-/**
- * Store interface following the ElectricSQL + Drizzle + PGlite guide pattern
- *
- * Combines:
- * - Raw PGlite client for direct SQL operations
- * - Type-safe Drizzle ORM instance
- * - Real-time sync via ElectricSQL
- * - Single-file storage
- */
-export interface Store {
-  /** Raw PGlite client for direct SQL operations */
-  pgLite: PGlite;
-  /** Type-safe Drizzle ORM instance */
-  sql: PgliteDatabase<typeof schema>;
-  /** ElectricSQL sync integration */
-  electric: ElectricConnection;
-  /** Whether encryption is enabled */
-  isEncrypted: boolean;
-  /** Whether sync is currently active */
-  get isSyncing(): boolean;
-  /** Close all connections and cleanup */
-  close(): Promise<void>;
-}
+import { schema } from './schema.js';
+import { DatabaseStore, type Store } from './store.js';
 
 /**
  * Store initialization options
@@ -96,26 +73,8 @@ export async function createStore(
     }
   }
 
-  const store: Store = {
-    pgLite,
-    sql,
-    electric,
-    isEncrypted,
-
-    get isSyncing() {
-      return electric.isConnected && !(electric instanceof NoOpElectricConnection);
-    },
-
-    async close() {
-      await electric.disconnect();
-      await pgLite.close();
-      if (verbose) {
-        console.info('Store closed');
-      }
-    },
-  };
-
-  return store;
+  // Create and return the DatabaseStore instance
+  return new DatabaseStore(pgLite, sql, electric, isEncrypted, verbose);
 }
 
 // ---------------------------------------------------------------------------

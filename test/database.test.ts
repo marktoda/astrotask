@@ -4,10 +4,10 @@ import { existsSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
 import { 
   initializeDatabase, 
-  DatabaseManager, 
   DatabaseError, 
   EncryptionError,
 } from '../src/database/config';
+import { createDatabase } from '../src/database/index';
 import { cfg } from '../src/config';
 
 describe('Database Configuration', () => {
@@ -112,41 +112,129 @@ describe('Database Configuration', () => {
     });
   });
 
-  describe('DatabaseManager', () => {
-    it('should implement singleton pattern', () => {
-      const manager1 = DatabaseManager.getInstance();
-      const manager2 = DatabaseManager.getInstance();
-      
-      expect(manager1).toBe(manager2);
-    });
-
-    it('should connect and manage database connection', async () => {
-      const manager = DatabaseManager.getInstance();
-      
-      expect(manager.isConnected()).toBe(false);
-
-      const connection = await manager.connect({
+  describe('Simplified Database API', () => {
+    it('should create database store with all features', async () => {
+      const store = await createDatabase({
         dbPath: testDbPath,
         encrypted: false,
+        verbose: false,
+        autoSync: false, // Disable sync for tests
       });
 
-      expect(manager.isConnected()).toBe(true);
-      expect(connection).toBeDefined();
+      expect(store).toBeDefined();
+      expect(store.pgLite).toBeDefined();
+      expect(store.sql).toBeDefined();
+      expect(store.electric).toBeDefined();
+      expect(store.isEncrypted).toBe(false);
+      expect(typeof store.close).toBe('function');
 
-      // Should return same connection on subsequent calls
-      const connection2 = await manager.connect();
-      expect(connection2).toBe(connection);
+      // Test basic database operation
+      const result = await store.pgLite.query('SELECT 1 as test');
+      expect(result.rows[0]).toEqual({ test: 1 });
 
-      await manager.close();
-      expect(manager.isConnected()).toBe(false);
+      await store.close();
     });
 
-    it('should throw error when getting connection before connecting', async () => {
-      const manager = DatabaseManager.getInstance();
-      await manager.close(); // Ensure clean state
+    it('should auto-migrate on database creation', async () => {
+      const store = await createDatabase({
+        dbPath: testDbPath,
+        encrypted: false,
+        verbose: false,
+      });
 
-      expect(() => manager.getConnection()).toThrow(DatabaseError);
-      expect(() => manager.getConnection()).toThrow('Database not connected');
+      // Verify tables were created by migration
+      const result = await store.pgLite.query(`
+        SELECT table_name 
+        FROM information_schema.tables 
+        WHERE table_schema = 'public' 
+        AND table_type = 'BASE TABLE'
+        ORDER BY table_name
+      `);
+
+      const tableNames = result.rows.map((row: any) => row.table_name);
+      expect(tableNames).toContain('projects');
+      expect(tableNames).toContain('tasks');
+      expect(tableNames).toContain('context_slices');
+
+      await store.close();
+    });
+
+    it('should provide business methods for projects', async () => {
+      const store = await createDatabase({
+        dbPath: testDbPath,
+        encrypted: false,
+        verbose: false,
+        autoSync: false,
+      });
+
+      // Test business methods
+      const projects = await store.listProjects();
+      expect(projects).toEqual([]);
+
+      const newProject = await store.addProject({
+        id: 'test-project-1',
+        title: 'Test Project',
+        description: 'A test project',
+      });
+
+      expect(newProject).toBeDefined();
+      expect(newProject.title).toBe('Test Project');
+      expect(newProject.id).toBe('test-project-1');
+
+      const foundProject = await store.getProject(newProject.id);
+      expect(foundProject).toEqual(newProject);
+
+      const allProjects = await store.listProjects();
+      expect(allProjects).toHaveLength(1);
+      expect(allProjects[0]).toEqual(newProject);
+
+      await store.close();
+    });
+
+    it('should provide business methods for tasks', async () => {
+      const store = await createDatabase({
+        dbPath: testDbPath,
+        encrypted: false,
+        verbose: false,
+        autoSync: false,
+      });
+
+      // Create a project first
+      const project = await store.addProject({
+        id: 'test-project-1',
+        title: 'Test Project',
+        description: 'A test project',
+      });
+
+      // Test task business methods
+      const tasks = await store.listTasks();
+      expect(tasks).toEqual([]);
+
+      const newTask = await store.addTask({
+        id: 'test-task-1',
+        projectId: project.id,
+        title: 'Test Task',
+        description: 'A test task',
+        status: 'pending',
+      });
+
+      expect(newTask).toBeDefined();
+      expect(newTask.title).toBe('Test Task');
+      expect(newTask.projectId).toBe(project.id);
+
+      const foundTask = await store.getTask(newTask.id);
+      expect(foundTask).toEqual(newTask);
+
+      // Test status update
+      const updatedTask = await store.updateTaskStatus(newTask.id, 'completed');
+      expect(updatedTask?.status).toBe('completed');
+
+      // Test filtering by project
+      const projectTasks = await store.listTasks(project.id);
+      expect(projectTasks).toHaveLength(1);
+      expect(projectTasks[0].status).toBe('completed');
+
+      await store.close();
     });
   });
 
