@@ -52,8 +52,14 @@ function configureEncryption(_db: PGlite, verbose: boolean): void {
  * Ensure database directory exists
  */
 function ensureDatabaseDirectory(dbPath: string): void {
-  const dbDir = dbPath.substring(0, dbPath.lastIndexOf('/'));
-  if (!existsSync(dbDir)) {
+  const lastSlash = dbPath.lastIndexOf('/');
+  if (lastSlash === -1) {
+    // Path is in current working directory; no directory to ensure
+    return;
+  }
+
+  const dbDir = dbPath.substring(0, lastSlash);
+  if (dbDir && !existsSync(dbDir)) {
     mkdirSync(dbDir, { recursive: true });
   }
 }

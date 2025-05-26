@@ -11,7 +11,7 @@ export const cfg = (await loadConfig({
   schema: configSchema,
   adapters: [
     // Order matters: later adapters win -> env overrides `.env` defaults.
-    dotEnvAdapter({ path: '.env' }), // .env file
+    dotEnvAdapter({ path: '.env', silent: true, }), // .env file
     envAdapter(), // process.env
   ],
 })) as AppConfig;

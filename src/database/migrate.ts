@@ -1,4 +1,5 @@
 import { join } from 'node:path';
+import { existsSync } from 'node:fs';
 /**
  * Database migration utilities using Drizzle's built-in PGlite migrator
  */
@@ -22,8 +23,36 @@ export async function runMigrations(
     verbose?: boolean;
   } = {}
 ): Promise<void> {
-  const { migrationsFolder = join(process.cwd(), 'src/database/migrations'), verbose = false } =
-    options;
+  // Locate migrations folder relative to this file to ensure it works regardless of CWD
+  const defaultFolder = join(
+    // eslint-disable-next-line node/file-path-in-import-meta-url
+    new URL('.', import.meta.url).pathname,
+    'migrations'
+  );
+
+  let { migrationsFolder = defaultFolder, verbose = false } = options;
+
+  // If compiled code is running from dist but migrations only exist in src, fall back
+  if (!existsSync(migrationsFolder)) {
+    const fallback = join(process.cwd(), 'src/database/migrations');
+    if (existsSync(fallback)) {
+      migrationsFolder = fallback;
+    }
+  }
+
+  // Final fallback: walk up directory tree to locate `src/database/migrations`
+  if (!existsSync(migrationsFolder)) {
+    let current = process.cwd();
+    const root = '/';
+    while (current !== root) {
+      const potential = join(current, 'src/database/migrations');
+      if (existsSync(potential)) {
+        migrationsFolder = potential;
+        break;
+      }
+      current = join(current, '..');
+    }
+  }
 
   try {
     if (verbose) {
