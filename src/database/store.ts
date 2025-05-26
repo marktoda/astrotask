@@ -1,6 +1,6 @@
 import { PGlite } from '@electric-sql/pglite';
 import type { PgliteDatabase } from 'drizzle-orm/pglite';
-import { eq, desc } from 'drizzle-orm';
+import { eq, desc, and, isNull } from 'drizzle-orm';
 import { 
   schema,
   type Project,
@@ -43,6 +43,13 @@ export interface Store {
   addTask(data: NewTask): Promise<Task>;
   getTask(id: string): Promise<Task | null>;
   updateTaskStatus(id: string, status: string): Promise<Task | null>;
+  
+  // Extended Task Methods
+  listTasksByStatus(status: string, projectId?: string): Promise<Task[]>;
+  listRootTasks(projectId?: string): Promise<Task[]>;
+  listSubtasks(parentId: string): Promise<Task[]>;
+  updateTask(id: string, updates: Partial<Omit<Task, 'id' | 'createdAt'>>): Promise<Task | null>;
+  deleteTask(id: string): Promise<boolean>;
   
   // Business Methods - Context Slices
   listContextSlices(taskId: string): Promise<ContextSlice[]>;
@@ -162,5 +169,52 @@ export class DatabaseStore implements Store {
     if (this.verbose) {
       console.info('Store closed');
     }
+  }
+
+  // Extended Task Methods
+  async listTasksByStatus(status: string, projectId?: string): Promise<Task[]> {
+    const conditions = [eq(schema.tasks.status, status)];
+    if (projectId) {
+      conditions.push(eq(schema.tasks.projectId, projectId));
+    }
+    return this.sql.select()
+      .from(schema.tasks)
+      .where(and(...conditions))
+      .orderBy(desc(schema.tasks.updatedAt));
+  }
+
+  async listRootTasks(projectId?: string): Promise<Task[]> {
+    const conditions = [isNull(schema.tasks.parentId)];
+    if (projectId) {
+      conditions.push(eq(schema.tasks.projectId, projectId));
+    }
+    return this.sql.select()
+      .from(schema.tasks)
+      .where(and(...conditions))
+      .orderBy(desc(schema.tasks.updatedAt));
+  }
+
+  async listSubtasks(parentId: string): Promise<Task[]> {
+    return this.sql.select()
+      .from(schema.tasks)
+      .where(eq(schema.tasks.parentId, parentId))
+      .orderBy(desc(schema.tasks.updatedAt));
+  }
+
+  async updateTask(id: string, updates: Partial<Omit<Task, 'id' | 'createdAt'>>): Promise<Task | null> {
+    const result = await this.sql
+      .update(schema.tasks)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(schema.tasks.id, id))
+      .returning();
+    return result[0] || null;
+  }
+
+  async deleteTask(id: string): Promise<boolean> {
+    const result = await this.sql
+      .delete(schema.tasks)
+      .where(eq(schema.tasks.id, id))
+      .returning();
+    return result.length > 0;
   }
 } 
