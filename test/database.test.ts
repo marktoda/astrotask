@@ -7,8 +7,8 @@ import {
   DatabaseManager, 
   DatabaseError, 
   EncryptionError,
-  DATABASE_CONFIG 
 } from '../src/database/config';
+import { cfg } from '../src/config';
 
 describe('Database Configuration', () => {
   const testDbDir = join(tmpdir(), 'astrolabe-test');
@@ -157,11 +157,11 @@ describe('Database Configuration', () => {
 
   describe('Database Configuration Constants', () => {
     it('should have correct default configuration', () => {
-      expect(DATABASE_CONFIG.DEFAULT_DB_NAME).toBe('astrolabe.db');
-      expect(DATABASE_CONFIG.CIPHER_SETTINGS.cipher).toBe('aes-256-cbc');
-      expect(DATABASE_CONFIG.CIPHER_SETTINGS.kdfIter).toBe(4000);
-      expect(DATABASE_CONFIG.PRAGMAS.foreign_keys).toBe('ON');
-      expect(DATABASE_CONFIG.PRAGMAS.journal_mode).toBe('WAL');
+      expect(cfg.DB_DEFAULT_NAME).toBe('astrolabe.db');
+      expect(cfg.DB_CIPHER).toBe('aes-256-cbc');
+      expect(cfg.DB_KDF_ITER).toBe(4000);
+      expect(cfg.DB_JOURNAL_MODE).toBe('WAL');
+      expect(cfg.DB_SYNCHRONOUS).toBe('NORMAL');
     });
   });
 }); 

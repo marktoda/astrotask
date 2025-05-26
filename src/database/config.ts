@@ -2,52 +2,19 @@ import { existsSync, mkdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import Database from 'better-sqlite3';
-import { drizzle } from 'drizzle-orm/better-sqlite3';
-import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
+import { type BetterSQLite3Database, drizzle } from 'drizzle-orm/better-sqlite3';
 import { cfg } from '../config/index.js';
 import { schema } from './schema.js';
 
-// Database configuration constants
-export const DATABASE_CONFIG = {
-  // Default database location in user's home directory
-  DEFAULT_DB_DIR: join(homedir(), '.astrolabe'),
-  DEFAULT_DB_NAME: 'astrolabe.db',
-
-  // SQLCipher encryption settings
-  CIPHER_SETTINGS: {
-    // Use AES-256 encryption (SQLCipher 4.x default)
-    cipher: 'aes-256-cbc',
-    // Key derivation iterations (higher = more secure but slower)
-    kdfIter: 4000,
-    // Page size optimization for encrypted databases
-    pageSize: 4096,
-  },
-
-  // Database connection options
-  CONNECTION_OPTIONS: {
-    // Enable Write-Ahead Logging for better concurrency
-    verbose: undefined as ((message?: unknown, ...additionalArgs: unknown[]) => void) | undefined,
-    fileMustExist: false,
-    timeout: 5000,
-    readonly: false,
-  },
-
-  // Performance pragmas for SQLite
-  PRAGMAS: {
-    // Enable foreign key constraints
-    foreign_keys: 'ON',
-    // Use WAL mode for better concurrency
-    journal_mode: 'WAL',
-    // Synchronous mode for data safety vs performance balance
-    synchronous: 'NORMAL',
-    // Cache size (negative value = KB, positive = pages)
-    cache_size: -2000, // 2MB cache
-    // Memory-mapped I/O size
-    mmap_size: 268435456, // 256MB
-    // Optimize for SSD storage
-    optimize: true,
-  },
-} as const;
+/**
+ * Resolve tilde (~) in database paths to home directory
+ */
+function resolveDatabasePath(path: string): string {
+  if (path.startsWith('~')) {
+    return join(homedir(), path.slice(1));
+  }
+  return path;
+}
 
 // Database connection interface
 export interface DatabaseConnection<TSchema extends Record<string, unknown> = typeof schema> {
@@ -80,10 +47,9 @@ export class EncryptionError extends DatabaseError {
  * In production, this should be more sophisticated (e.g., key derivation from user input)
  */
 function getEncryptionKey(): string {
-  // For now, use environment variable or generate a simple key
-  // TODO: Implement proper key management (keychain integration, user-provided key, etc.)
+  // Use configured encryption key
   const envKey = cfg.ASTROLABE_DB_KEY;
-  if (envKey) {
+  if (envKey && envKey !== 'TEST') {
     return envKey;
   }
 
@@ -98,12 +64,13 @@ function getEncryptionKey(): string {
  */
 function configureEncryption(db: Database.Database, verbose: boolean): void {
   const encryptionKey = getEncryptionKey();
+
   // Set encryption key using SQLCipher PRAGMA
   db.pragma(`key = '${encryptionKey}'`);
 
   // Configure SQLCipher settings
-  db.pragma(`cipher = '${DATABASE_CONFIG.CIPHER_SETTINGS.cipher}'`);
-  db.pragma(`kdf_iter = ${DATABASE_CONFIG.CIPHER_SETTINGS.kdfIter}`);
+  db.pragma(`cipher = '${cfg.DB_CIPHER}'`);
+  db.pragma(`kdf_iter = ${cfg.DB_KDF_ITER}`);
 
   // Test encryption by attempting to read from database
   // This will fail if the key is wrong or encryption is not working
@@ -129,8 +96,10 @@ function ensureDatabaseDirectory(dbPath: string): void {
  */
 function createDatabaseConnection(dbPath: string, verbose: boolean): Database.Database {
   const connectionOptions = {
-    ...DATABASE_CONFIG.CONNECTION_OPTIONS,
     verbose: verbose ? console.log : undefined,
+    fileMustExist: false,
+    timeout: cfg.DB_TIMEOUT,
+    readonly: false,
   };
 
   return new Database(dbPath, connectionOptions);
@@ -140,7 +109,16 @@ function createDatabaseConnection(dbPath: string, verbose: boolean): Database.Da
  * Apply performance pragmas to database
  */
 function applyPerformancePragmas(db: Database.Database): void {
-  for (const [key, value] of Object.entries(DATABASE_CONFIG.PRAGMAS)) {
+  const pragmas = {
+    foreign_keys: 'ON',
+    journal_mode: cfg.DB_JOURNAL_MODE,
+    synchronous: cfg.DB_SYNCHRONOUS,
+    cache_size: cfg.DB_CACHE_SIZE,
+    mmap_size: cfg.DB_MMAP_SIZE,
+    optimize: true,
+  };
+
+  for (const [key, value] of Object.entries(pragmas)) {
     db.pragma(`${key} = ${value}`);
   }
 }
@@ -178,10 +156,13 @@ export function initializeDatabase(
     verbose?: boolean;
   } = {}
 ): DatabaseConnection {
+  const defaultDbDir = resolveDatabasePath(cfg.DB_DEFAULT_DIR);
   const {
-    dbPath = join(DATABASE_CONFIG.DEFAULT_DB_DIR, DATABASE_CONFIG.DEFAULT_DB_NAME),
-    encrypted = true,
-    verbose = false,
+    dbPath = cfg.DATABASE_URL.startsWith('./') || cfg.DATABASE_URL.startsWith('/')
+      ? cfg.DATABASE_URL
+      : join(defaultDbDir, cfg.DB_DEFAULT_NAME),
+    encrypted = cfg.DB_ENCRYPTED,
+    verbose = cfg.DB_VERBOSE,
   } = options;
 
   try {
@@ -201,36 +182,24 @@ export function initializeDatabase(
       }
     }
 
+    // Apply performance optimizations
     applyPerformancePragmas(db);
 
-    // Initialize Drizzle ORM with generated schema for full type-safety
-    const drizzleDb = drizzle(db, { schema });
-
-    // Create connection object
-    const connection: DatabaseConnection = {
-      db,
-      drizzle: drizzleDb,
-      close: () => {
-        try {
-          db.close();
-        } catch (error) {
-          if (verbose) {
-            console.warn('Error closing database connection:', error);
-          }
-        }
-      },
-      isEncrypted: encrypted,
-    };
-
+    // Verify the database is working
     verifyDatabase(db, dbPath, encrypted, verbose);
 
-    return connection;
+    // Initialize Drizzle ORM
+    const drizzleDb = drizzle(db, { schema });
+
+    return {
+      db,
+      drizzle: drizzleDb,
+      close: () => db.close(),
+      isEncrypted: encrypted,
+    };
   } catch (error) {
-    if (error instanceof DatabaseError || error instanceof EncryptionError) {
-      throw error;
-    }
     throw new DatabaseError(
-      `Failed to initialize database at ${dbPath}`,
+      'Failed to initialize database',
       error instanceof Error ? error : new Error(String(error))
     );
   }

@@ -1,4 +1,5 @@
 import { defineConfig } from 'drizzle-kit';
+import { cfg } from './src/config/index.js';
 
 export default defineConfig({
   // Database driver
@@ -12,13 +13,13 @@ export default defineConfig({
   
   // Database configuration
   dbCredentials: {
-    // Use a development database for migrations
-    // The actual encrypted database path is managed by src/database/config.ts
-    url: './dev.db',
+    // Use the configured database URL
+    // For migrations, this will typically be the development database
+    url: cfg.DATABASE_URL,
   },
   
   // Additional configuration
-  verbose: true,
+  verbose: cfg.DB_VERBOSE,
   strict: true,
   
   // Include migration metadata
