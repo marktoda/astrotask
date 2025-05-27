@@ -14,23 +14,6 @@ import { foreignKey, pgTable, text, timestamp } from 'drizzle-orm/pg-core';
 */
 
 // ---------------------------------------------------------------------------
-// projects
-// ---------------------------------------------------------------------------
-export const projects = pgTable('projects', {
-  id: text('id').primaryKey(), // UUID
-  title: text('title').notNull(),
-  description: text('description'),
-  status: text('status', { enum: ['active', 'completed', 'archived'] })
-    .notNull()
-    .default('active'),
-  priority: text('priority', { enum: ['low', 'medium', 'high'] })
-    .notNull()
-    .default('medium'),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-});
-
-// ---------------------------------------------------------------------------
 // tasks
 // ---------------------------------------------------------------------------
 export const tasks = pgTable(
@@ -40,15 +23,15 @@ export const tasks = pgTable(
     parentId: text('parent_id'),
     title: text('title').notNull(),
     description: text('description'),
-    status: text('status', { enum: ['pending', 'in-progress', 'done', 'cancelled'] })
+    status: text('status', { enum: ['pending', 'in-progress', 'done', 'cancelled', 'archived'] })
       .notNull()
       .default('pending'),
+    priority: text('priority', { enum: ['low', 'medium', 'high'] })
+      .notNull()
+      .default('medium'),
 
     prd: text('prd'),
     contextDigest: text('context_digest'),
-
-    // Foreign references (nullable)
-    projectId: text('project_id').references(() => projects.id),
 
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
@@ -72,7 +55,6 @@ export const contextSlices = pgTable('context_slices', {
   description: text('description'),
 
   taskId: text('task_id').references(() => tasks.id),
-  projectId: text('project_id').references(() => projects.id),
   contextDigest: text('context_digest'),
 
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
@@ -84,20 +66,10 @@ export const contextSlices = pgTable('context_slices', {
 // ---------------------------------------------------------------------------
 
 // @ts-expect-error - Drizzle relation type inference issue under exactOptionalPropertyTypes
-export const projectRelations = relations(projects, ({ many }) => ({
-  tasks: many(tasks),
-  contextSlices: many(contextSlices),
-}));
-
-// @ts-expect-error - Drizzle relation type inference issue under exactOptionalPropertyTypes
 export const taskRelations = relations(tasks, ({ one, many }) => ({
   parent: one(tasks, {
     fields: [tasks.parentId],
     references: [tasks.id],
-  }),
-  project: one(projects, {
-    fields: [tasks.projectId],
-    references: [projects.id],
   }),
   children: many(tasks),
   contextSlices: many(contextSlices),
@@ -109,17 +81,12 @@ export const contextSliceRelations = relations(contextSlices, ({ one }) => ({
     fields: [contextSlices.taskId],
     references: [tasks.id],
   }),
-  project: one(projects, {
-    fields: [contextSlices.projectId],
-    references: [projects.id],
-  }),
 }));
 
 // ---------------------------------------------------------------------------
 // Export grouped schema to allow `drizzle(db, { schema })`
 // ---------------------------------------------------------------------------
 export const schema = {
-  projects,
   tasks,
   contextSlices,
 };

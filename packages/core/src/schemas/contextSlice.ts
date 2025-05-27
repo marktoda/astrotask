@@ -7,11 +7,7 @@ export const contextSliceSchema = z.object({
   title: title,
   description: description.nullable(), // Database returns null, not undefined
 
-  // Core context fields for AI context resolution
   taskId: optionalUuid.nullable(), // Database returns null, not undefined
-  projectId: optionalUuid.nullable(), // Database returns null, not undefined
-
-  // Context digest for AI agents (from design doc)
   contextDigest: z.string().nullable(),
 
   // Timestamps as Date objects (matches database return type)
@@ -19,7 +15,7 @@ export const contextSliceSchema = z.object({
   updatedAt: z.date(),
 });
 
-// Context creation schema (for database insertion, nullable fields optional)
+// ContextSlice creation schema (for database insertion, nullable fields optional)
 export const createContextSliceSchema = contextSliceSchema
   .omit({
     id: true,
@@ -28,14 +24,12 @@ export const createContextSliceSchema = contextSliceSchema
   })
   .extend({
     id: uuid.optional(), // Allow optional ID for creation
-    // Transform API optionals to database nullables
-    description: description.optional(),
-    taskId: optionalUuid.optional(),
-    projectId: optionalUuid.optional(),
+    description: description.optional(), // API uses optional, transform to null for DB
+    taskId: optionalUuid.optional(), // API uses optional, transform to null for DB
     contextDigest: z.string().optional(),
   });
 
-// Context update schema (all fields optional except id)
+// ContextSlice update schema (all fields optional except id)
 export const updateContextSliceSchema = contextSliceSchema.partial().extend({
   id: uuid, // ID is required for updates
 });
@@ -44,8 +38,7 @@ export const updateContextSliceSchema = contextSliceSchema.partial().extend({
 export const contextSliceApiSchema = contextSliceSchema.extend({
   description: description.optional(), // API uses optional instead of null
   taskId: optionalUuid.optional(), // API uses optional instead of null
-  projectId: optionalUuid.optional(), // API uses optional instead of null
-  contextDigest: z.string().optional(), // API uses optional instead of null
+  contextDigest: z.string().optional(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
 });
@@ -53,7 +46,6 @@ export const contextSliceApiSchema = contextSliceSchema.extend({
 export const createContextSliceApiSchema = createContextSliceSchema.extend({
   description: description.optional(),
   taskId: optionalUuid.optional(),
-  projectId: optionalUuid.optional(),
   contextDigest: z.string().optional(),
 });
 
@@ -63,7 +55,6 @@ export function contextSliceToApi(contextSlice: ContextSlice): ContextSliceApi {
     ...contextSlice,
     description: contextSlice.description ?? undefined, // null -> undefined
     taskId: contextSlice.taskId ?? undefined, // null -> undefined
-    projectId: contextSlice.projectId ?? undefined, // null -> undefined
     contextDigest: contextSlice.contextDigest ?? undefined, // null -> undefined
     createdAt: contextSlice.createdAt.toISOString(),
     updatedAt: contextSlice.updatedAt.toISOString(),
@@ -77,22 +68,19 @@ export function contextSliceFromApi(
     ...apiContextSlice,
     description: apiContextSlice.description ?? null, // undefined -> null
     taskId: apiContextSlice.taskId ?? null, // undefined -> null
-    projectId: apiContextSlice.projectId ?? null, // undefined -> null
     contextDigest: apiContextSlice.contextDigest ?? null, // undefined -> null
   };
 }
 
-// Basic context validation - just schema validation
-export function validateContextSlice(context: ContextSlice): boolean {
-  contextSliceSchema.parse(context);
+// Basic context slice validation - just schema validation
+export function validateContextSlice(contextSlice: ContextSlice): boolean {
+  contextSliceSchema.parse(contextSlice);
   return true;
 }
 
-// Type inference
+// Derived types
 export type ContextSlice = z.infer<typeof contextSliceSchema>;
 export type CreateContextSlice = z.infer<typeof createContextSliceSchema>;
 export type UpdateContextSlice = z.infer<typeof updateContextSliceSchema>;
-
-// API types for serialization
 export type ContextSliceApi = z.infer<typeof contextSliceApiSchema>;
 export type CreateContextSliceApi = z.infer<typeof createContextSliceApiSchema>;

@@ -10,7 +10,6 @@ import type {
   ContextSlice,
   CreateContextSlice as NewContextSlice,
 } from '../schemas/contextSlice.js';
-import type { CreateProject as NewProject, Project } from '../schemas/project.js';
 import type { CreateTask as NewTask, Task, TaskStatus } from '../schemas/task.js';
 
 /**
@@ -33,14 +32,8 @@ export interface Store {
   /** Whether sync is currently active */
   readonly isSyncing: boolean;
 
-  // Project operations
-  listProjects(): Promise<Project[]>;
-  addProject(data: NewProject): Promise<Project>;
-  getProject(id: string): Promise<Project | null>;
-
   // Task operations
   listTasks(filters?: {
-    projectId?: string;
     status?: TaskStatus;
     parentId?: string | null;
   }): Promise<Task[]>;
@@ -48,6 +41,12 @@ export interface Store {
   getTask(id: string): Promise<Task | null>;
   updateTask(id: string, updates: Partial<Omit<Task, 'id' | 'createdAt'>>): Promise<Task | null>;
   deleteTask(id: string): Promise<boolean>;
+
+  // Convenience methods for common task queries
+  listTasksByStatus(status: TaskStatus): Promise<Task[]>;
+  listRootTasks(): Promise<Task[]>;
+  listSubtasks(parentId: string): Promise<Task[]>;
+  updateTaskStatus(id: string, status: TaskStatus): Promise<Task | null>;
 
   // Context slice operations
   listContextSlices(taskId: string): Promise<ContextSlice[]>;
@@ -66,63 +65,28 @@ export class DatabaseStore implements Store {
   public readonly sql: PgliteDatabase<typeof schema>;
   public readonly electric: ElectricConnection;
   public readonly isEncrypted: boolean;
-  private readonly verbose: boolean;
 
   constructor(
     pgLite: PGlite,
     sql: PgliteDatabase<typeof schema>,
     electric: ElectricConnection,
-    isEncrypted: boolean,
-    verbose = false
+    isEncrypted: boolean
   ) {
     this.pgLite = pgLite;
     this.sql = sql;
     this.electric = electric;
     this.isEncrypted = isEncrypted;
-    this.verbose = verbose;
   }
 
   get isSyncing(): boolean {
     return this.electric.isConnected && this.electric.constructor.name !== 'NoOpElectricConnection';
   }
 
-  // Project operations
-  async listProjects(): Promise<Project[]> {
-    return this.sql.select().from(schema.projects).orderBy(desc(schema.projects.updatedAt));
-  }
-
-  async addProject(data: NewProject): Promise<Project> {
-    const projectData = {
-      id: data.id || randomUUID(),
-      title: data.title,
-      description: data.description ?? null,
-      status: data.status,
-      priority: data.priority,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-
-    const [project] = await this.sql.insert(schema.projects).values(projectData).returning();
-    if (!project) {
-      throw new Error('Failed to create project');
-    }
-    return project;
-  }
-
-  async getProject(id: string): Promise<Project | null> {
-    const result = await this.sql.select().from(schema.projects).where(eq(schema.projects.id, id));
-    return result[0] || null;
-  }
-
   // Task operations (consolidated)
   async listTasks(
-    filters: { projectId?: string; status?: TaskStatus; parentId?: string | null } = {}
+    filters: { status?: TaskStatus; parentId?: string | null } = {}
   ): Promise<Task[]> {
     const conditions = [];
-
-    if (filters.projectId) {
-      conditions.push(eq(schema.tasks.projectId, filters.projectId));
-    }
 
     if (filters.status) {
       conditions.push(eq(schema.tasks.status, filters.status));
@@ -152,9 +116,9 @@ export class DatabaseStore implements Store {
       title: data.title,
       description: data.description ?? null,
       status: data.status,
+      priority: data.priority,
       prd: data.prd ?? null,
       contextDigest: data.contextDigest ?? null,
-      projectId: data.projectId ?? null,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -198,12 +162,11 @@ export class DatabaseStore implements Store {
   }
 
   async addContextSlice(data: NewContextSlice): Promise<ContextSlice> {
-    const contextData = {
+    const contextSliceData = {
       id: data.id || randomUUID(),
       title: data.title,
       description: data.description ?? null,
       taskId: data.taskId ?? null,
-      projectId: data.projectId ?? null,
       contextDigest: data.contextDigest ?? null,
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -211,7 +174,7 @@ export class DatabaseStore implements Store {
 
     const [contextSlice] = await this.sql
       .insert(schema.contextSlices)
-      .values(contextData)
+      .values(contextSliceData)
       .returning();
     if (!contextSlice) {
       throw new Error('Failed to create context slice');
@@ -225,28 +188,17 @@ export class DatabaseStore implements Store {
   }
 
   async close(): Promise<void> {
-    await this.electric.disconnect();
     await this.pgLite.close();
-    if (this.verbose) {
-      console.info('Store closed');
-    }
+    await this.electric.disconnect();
   }
 
-  // Convenience methods (backward compatibility)
-  async listTasksByStatus(status: TaskStatus, projectId?: string): Promise<Task[]> {
-    const filters: { status: TaskStatus; projectId?: string } = { status };
-    if (projectId) {
-      filters.projectId = projectId;
-    }
-    return this.listTasks(filters);
+  // Convenience methods for common task queries
+  async listTasksByStatus(status: TaskStatus): Promise<Task[]> {
+    return this.listTasks({ status });
   }
 
-  async listRootTasks(projectId?: string): Promise<Task[]> {
-    const filters: { projectId?: string; parentId: null } = { parentId: null };
-    if (projectId) {
-      filters.projectId = projectId;
-    }
-    return this.listTasks(filters);
+  async listRootTasks(): Promise<Task[]> {
+    return this.listTasks({ parentId: null });
   }
 
   async listSubtasks(parentId: string): Promise<Task[]> {

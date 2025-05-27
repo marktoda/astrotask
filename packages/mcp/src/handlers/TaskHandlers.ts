@@ -31,10 +31,10 @@ export class TaskHandlers {
       tasks = await this.context.store.listTasks({ parentId: args.parentId });
     } else if (args.status) {
       // Filter by status
-      tasks = await this.context.store.listTasks({ status: args.status, projectId: args.projectId });
+      tasks = await this.context.store.listTasks({ status: args.status });
     } else {
-      // Get all tasks or filter by project
-      tasks = await this.context.store.listTasks({ projectId: args.projectId });
+      // Get all tasks
+      tasks = await this.context.store.listTasks({});
     }
 
     if (args.includeSubtasks) {
@@ -55,8 +55,8 @@ export class TaskHandlers {
       title: args.title,
       description: args.description,
       parentId: args.parentId,
-      projectId: args.projectId,
       status: args.status ?? 'pending' as const,
+      priority: args.priority ?? 'medium' as const,
       prd: args.prd,
       contextDigest: args.contextDigest,
     });
@@ -72,6 +72,7 @@ export class TaskHandlers {
       title: args.title,
       description: args.description,
       status: args.status,
+      priority: args.priority,
       parentId: args.parentId,
       prd: args.prd,
       contextDigest: args.contextDigest,

@@ -8,7 +8,7 @@ describe('List Task Command', () => {
     expect(listCommand.description).toBeDefined();
     expect(typeof listCommand.description).toBe('string');
     expect(listCommand.description.length).toBeGreaterThan(0);
-    expect(listCommand.description).toBe('List tasks, optionally filtered by project');
+    expect(listCommand.description).toBe('List tasks with status and priority information');
   });
 
   it('should export default component', () => {

@@ -5,35 +5,27 @@
 
 import { pathToFileURL } from 'node:url';
 // Import centralised configuration
-import { cfg } from './config/index.js';
+import { cfg } from './utils/config.js';
 import { createModuleLogger, logShutdown } from './utils/logger.js';
 
 export const APP_VERSION = '0.1.0';
 export const APP_NAME = 'Astrolabe';
 
-// Re-export main database functionality for library usage
-export { createDatabase } from './database/index.js';
-export { DatabaseStore } from './database/store.js';
-export type { Store } from './database/store.js';
-export type { DatabaseOptions } from './database/index.js';
+// Core functionality
+export * from './database/index.js';
+export * from './services/TaskService.js';
 
-// Re-export TaskService for hierarchical operations
-export { TaskService, type TaskTree } from './services/TaskService.js';
+// Configuration
+export * from './utils/config.js';
 
 // Re-export task types
 export type {
   Task,
   CreateTask as NewTask,
   TaskStatus,
+  TaskPriority,
 } from './schemas/task.js';
 export { taskToApi } from './schemas/task.js';
-
-// Re-export project types
-export type {
-  Project,
-  CreateProject as NewProject,
-  ProjectStatus,
-} from './schemas/project.js';
 
 // Re-export context slice types
 export type {

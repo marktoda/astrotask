@@ -84,7 +84,6 @@ List tasks with optional filtering.
 
 **Parameters:**
 - `status` (optional): Filter by task status (`pending`, `in-progress`, `done`, `cancelled`)
-- `projectId` (optional): Filter by project ID
 - `parentId` (optional): Filter by parent task ID
 - `includeSubtasks` (optional): Include nested subtasks in results
 
@@ -107,7 +106,6 @@ Create a new task.
 - `title` (required): Task title
 - `description` (optional): Detailed task description
 - `status` (optional): Initial status (default: `pending`)
-- `projectId` (optional): Project to assign task to
 - `parentId` (optional): Parent task for subtasks
 - `prd` (optional): Product Requirements Document content
 - `contextDigest` (optional): Context digest for AI agents
@@ -119,8 +117,7 @@ Create a new task.
   "arguments": {
     "title": "Implement user authentication",
     "description": "Add JWT-based authentication with refresh token support",
-    "status": "pending",
-    "projectId": "proj_123"
+    "status": "pending"
   }
 }
 ```
@@ -258,7 +255,7 @@ Configure Cursor to use Astrolabe MCP server:
       "command": "npx",
       "args": ["@astrolabe/mcp"],
       "env": {
-        "DATABASE_PATH": "./project-tasks.db",
+        "DATABASE_PATH": "./tasks.db",
         "LOG_LEVEL": "info"
       }
     }
@@ -437,4 +434,4 @@ MIT License - see [LICENSE](../../LICENSE) for details.
 
 - [GitHub Issues](https://github.com/astrolabe/astrolabe/issues) - Bug reports and feature requests
 - [Documentation](../../docs/) - Comprehensive guides and API reference
-- [Examples](../../docs/examples/) - Usage examples and tutorials 
+- [Examples](../../docs/examples/) - Usage examples and tutorials

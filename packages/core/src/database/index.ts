@@ -62,12 +62,10 @@ export { schema } from './schema.js';
 
 // Import types from Zod schemas (single source of truth)
 export type {
-  Project,
-  CreateProject as NewProject,
-} from '../schemas/project.js';
-export type {
   Task,
   CreateTask as NewTask,
+  TaskStatus,
+  TaskPriority,
 } from '../schemas/task.js';
 export type {
   ContextSlice,

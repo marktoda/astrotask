@@ -1,12 +1,11 @@
-import type { Project, Task } from "@astrolabe/core";
+import type { Task } from "@astrolabe/core";
 import { Box, Text } from "ink";
 import { useEffect, useState } from "react";
 import { useDatabase } from "../context/DatabaseContext.js";
 
-export const description = "Dashboard - Project overview and status";
+export const description = "Dashboard - Task overview and status";
 
 interface DashboardData {
-	projects: Project[];
 	allTasks: Task[];
 	rootTasks: Task[];
 	recentTasks: Task[];
@@ -18,6 +17,7 @@ interface TaskStats {
 	inProgress: number;
 	done: number;
 	cancelled: number;
+	archived: number;
 	completionRate: number;
 }
 
@@ -30,8 +30,7 @@ export default function Dashboard() {
 	useEffect(() => {
 		async function loadDashboardData() {
 			try {
-				const [projects, allTasks, rootTasks] = await Promise.all([
-					db.listProjects(),
+				const [allTasks, rootTasks] = await Promise.all([
 					db.listTasks(),
 					db.listTasks({ parentId: null }),
 				]);
@@ -42,13 +41,14 @@ export default function Dashboard() {
 					.slice(0, 10);
 
 				setData({
-					projects,
 					allTasks,
 					rootTasks,
 					recentTasks,
 				});
 			} catch (err) {
-				setError(err instanceof Error ? err.message : "Failed to load dashboard data");
+				setError(
+					err instanceof Error ? err.message : "Failed to load dashboard data",
+				);
 			} finally {
 				setLoading(false);
 			}
@@ -61,35 +61,47 @@ export default function Dashboard() {
 	if (!data) return <Text color="red">No data available</Text>;
 
 	const taskStats = calculateTaskStats(data.allTasks);
-	const activeProjects = data.projects.filter(p => p.status === 'active');
+	const activeRootTasks = data.rootTasks.filter(
+		(t) =>
+			t.status !== "done" &&
+			t.status !== "cancelled" &&
+			t.status !== "archived",
+	);
 	const lastUpdate = getLastUpdateTime(data.allTasks);
 
 	return (
 		<Box flexDirection="column" gap={1}>
 			{/* Header */}
 			<Box flexDirection="column">
-				<Text bold color="cyan">🚀 Astrolabe Dashboard</Text>
+				<Text bold color="cyan">
+					🚀 Astrolabe Dashboard
+				</Text>
 				<Text color="gray">Local-first task navigation platform</Text>
 			</Box>
 
-			{/* Project Overview */}
+			{/* Root Tasks Overview */}
 			<Box flexDirection="column">
-				<Text bold>📁 Projects ({data.projects.length})</Text>
-				{activeProjects.length > 0 ? (
+				<Text bold>🎯 Root Tasks ({data.rootTasks.length})</Text>
+				{activeRootTasks.length > 0 ? (
 					<Box flexDirection="column" paddingLeft={2}>
-						{activeProjects.slice(0, 5).map((project) => (
-							<Text key={project.id}>
-								<Text color="green">●</Text> {project.title}
-								{project.description && <Text color="gray"> - {project.description}</Text>}
+						{activeRootTasks.slice(0, 5).map((task) => (
+							<Text key={task.id}>
+								{getStatusIcon(task.status)} <Text bold>{task.title}</Text>
+								{task.description && (
+									<Text color="gray"> - {task.description}</Text>
+								)}
+								<Text color="magenta"> [{task.priority}]</Text>
 							</Text>
 						))}
-						{activeProjects.length > 5 && (
-							<Text color="gray">... and {activeProjects.length - 5} more</Text>
+						{activeRootTasks.length > 5 && (
+							<Text color="gray">
+								... and {activeRootTasks.length - 5} more
+							</Text>
 						)}
 					</Box>
 				) : (
 					<Box paddingLeft={2}>
-						<Text color="gray">No active projects</Text>
+						<Text color="gray">No active root tasks</Text>
 					</Box>
 				)}
 			</Box>
@@ -101,7 +113,16 @@ export default function Dashboard() {
 					<Text>
 						Total: <Text color="cyan">{taskStats.total}</Text>
 						{" | "}
-						Completion: <Text color={taskStats.completionRate >= 70 ? "green" : taskStats.completionRate >= 40 ? "yellow" : "red"}>
+						Completion:{" "}
+						<Text
+							color={
+								taskStats.completionRate >= 70
+									? "green"
+									: taskStats.completionRate >= 40
+										? "yellow"
+										: "red"
+							}
+						>
 							{taskStats.completionRate.toFixed(1)}%
 						</Text>
 					</Text>
@@ -120,23 +141,34 @@ export default function Dashboard() {
 								<Text color="red">❌</Text> Cancelled: {taskStats.cancelled}
 							</Text>
 						)}
+						{taskStats.archived > 0 && (
+							<Text>
+								<Text color="gray">📦</Text> Archived: {taskStats.archived}
+							</Text>
+						)}
 					</Box>
 				</Box>
 			</Box>
 
-			{/* Root Tasks Overview */}
-			{data.rootTasks.length > 0 && (
+			{/* All Tasks Overview */}
+			{data.allTasks.length > 0 && (
 				<Box flexDirection="column">
-					<Text bold>🎯 Top-Level Tasks ({data.rootTasks.length})</Text>
+					<Text bold>📋 All Tasks ({data.allTasks.length})</Text>
 					<Box flexDirection="column" paddingLeft={2}>
-						{data.rootTasks.slice(0, 8).map((task) => (
+						{data.allTasks.slice(0, 8).map((task) => (
 							<Text key={task.id}>
-								{getStatusIcon(task.status)} <Text bold>{task.title}</Text>
-								{task.description && <Text color="gray"> - {task.description}</Text>}
+								{getStatusIcon(task.status)} {task.title}
+								{task.description && (
+									<Text color="gray"> - {task.description}</Text>
+								)}
+								<Text color="magenta"> [{task.priority}]</Text>
+								{task.parentId && <Text color="gray"> (subtask)</Text>}
 							</Text>
 						))}
-						{data.rootTasks.length > 8 && (
-							<Text color="gray">... and {data.rootTasks.length - 8} more tasks</Text>
+						{data.allTasks.length > 8 && (
+							<Text color="gray">
+								... and {data.allTasks.length - 8} more tasks
+							</Text>
 						)}
 					</Box>
 				</Box>
@@ -150,7 +182,10 @@ export default function Dashboard() {
 						{data.recentTasks.slice(0, 5).map((task) => (
 							<Text key={task.id}>
 								{getStatusIcon(task.status)} {task.title}
-								<Text color="gray"> - {formatRelativeTime(task.updatedAt)}</Text>
+								<Text color="gray">
+									{" "}
+									- {formatRelativeTime(task.updatedAt)}
+								</Text>
 							</Text>
 						))}
 					</Box>
@@ -165,11 +200,13 @@ export default function Dashboard() {
 						<Text color="cyan">astrolabe task list</Text> - View all tasks
 					</Text>
 					<Text>
-						<Text color="cyan">astrolabe task add --title="Task name"</Text> - Create a new task
+						<Text color="cyan">astrolabe task add --title="Task name"</Text> -
+						Create a new task
 					</Text>
 					{taskStats.pending > 0 && (
 						<Text>
-							<Text color="yellow">Next:</Text> Work on {taskStats.pending} pending task{taskStats.pending === 1 ? '' : 's'}
+							<Text color="yellow">Next:</Text> Work on {taskStats.pending}{" "}
+							pending task{taskStats.pending === 1 ? "" : "s"}
 						</Text>
 					)}
 				</Box>
@@ -178,7 +215,9 @@ export default function Dashboard() {
 			{/* Footer */}
 			{lastUpdate && (
 				<Box flexDirection="column" marginTop={1}>
-					<Text color="gray">Last updated: {formatRelativeTime(lastUpdate)}</Text>
+					<Text color="gray">
+						Last updated: {formatRelativeTime(lastUpdate)}
+					</Text>
 				</Box>
 			)}
 		</Box>
@@ -187,11 +226,12 @@ export default function Dashboard() {
 
 function calculateTaskStats(tasks: Task[]): TaskStats {
 	const total = tasks.length;
-	const pending = tasks.filter(t => t.status === 'pending').length;
-	const inProgress = tasks.filter(t => t.status === 'in-progress').length;
-	const done = tasks.filter(t => t.status === 'done').length;
-	const cancelled = tasks.filter(t => t.status === 'cancelled').length;
-	
+	const pending = tasks.filter((t) => t.status === "pending").length;
+	const inProgress = tasks.filter((t) => t.status === "in-progress").length;
+	const done = tasks.filter((t) => t.status === "done").length;
+	const cancelled = tasks.filter((t) => t.status === "cancelled").length;
+	const archived = tasks.filter((t) => t.status === "archived").length;
+
 	const completionRate = total > 0 ? (done / total) * 100 : 0;
 
 	return {
@@ -200,30 +240,33 @@ function calculateTaskStats(tasks: Task[]): TaskStats {
 		inProgress,
 		done,
 		cancelled,
+		archived,
 		completionRate,
 	};
 }
 
 function getStatusIcon(status: string): string {
 	switch (status) {
-		case 'pending':
-			return '⏳';
-		case 'in-progress':
-			return '🔄';
-		case 'done':
-			return '✅';
-		case 'cancelled':
-			return '❌';
+		case "pending":
+			return "⏳";
+		case "in-progress":
+			return "🔄";
+		case "done":
+			return "✅";
+		case "cancelled":
+			return "❌";
+		case "archived":
+			return "📦";
 		default:
-			return '📋';
+			return "❓";
 	}
 }
 
 function getLastUpdateTime(tasks: Task[]): Date | null {
 	if (tasks.length === 0) return null;
-	return tasks.reduce((latest, task) => 
-		task.updatedAt > latest ? task.updatedAt : latest, 
-		tasks[0]!.updatedAt
+	return tasks.reduce(
+		(latest, task) => (task.updatedAt > latest ? task.updatedAt : latest),
+		tasks[0]!.updatedAt,
 	);
 }
 
@@ -231,13 +274,11 @@ function formatRelativeTime(date: Date): string {
 	const now = new Date();
 	const diffMs = now.getTime() - date.getTime();
 	const diffMins = Math.floor(diffMs / (1000 * 60));
-	const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-	const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+	const diffHours = Math.floor(diffMins / 60);
+	const diffDays = Math.floor(diffHours / 24);
 
-	if (diffMins < 1) return 'just now';
+	if (diffMins < 1) return "just now";
 	if (diffMins < 60) return `${diffMins}m ago`;
 	if (diffHours < 24) return `${diffHours}h ago`;
-	if (diffDays < 7) return `${diffDays}d ago`;
-	
-	return date.toLocaleDateString();
-} 
+	return `${diffDays}d ago`;
+}

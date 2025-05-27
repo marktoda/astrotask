@@ -8,7 +8,10 @@ export const description = "Visualize task hierarchy as an interactive tree";
 
 export const options = zod.object({
 	root: zod.string().optional().describe("Root task ID to start the tree from"),
-	depth: zod.number().optional().describe("Maximum depth to display (default: unlimited)"),
+	depth: zod
+		.number()
+		.optional()
+		.describe("Maximum depth to display (default: unlimited)"),
 	hideStatus: zod.boolean().default(false).describe("Hide status indicators"),
 });
 
@@ -34,7 +37,7 @@ export default function Tree({ options }: Props) {
 		async function loadTree() {
 			try {
 				let tasks: Task[];
-				
+
 				if (rootId) {
 					// Get specific task and its subtree
 					const rootTask = await db.getTask(rootId);
@@ -54,7 +57,9 @@ export default function Tree({ options }: Props) {
 				const treeData = buildTree(tasks, rootId);
 				setTree(treeData);
 			} catch (err) {
-				setError(err instanceof Error ? err.message : "Failed to load task tree");
+				setError(
+					err instanceof Error ? err.message : "Failed to load task tree",
+				);
 			} finally {
 				setLoading(false);
 			}
@@ -81,7 +86,9 @@ export default function Tree({ options }: Props) {
 		<Box flexDirection="column">
 			<Text bold color="cyan">
 				🌳 Task Tree {rootId ? `(from ${rootId})` : "(All Tasks)"}
-				{maxDepth !== undefined && <Text color="gray"> (max depth: {maxDepth})</Text>}
+				{maxDepth !== undefined && (
+					<Text color="gray"> (max depth: {maxDepth})</Text>
+				)}
 			</Text>
 			<Text> </Text>
 			{tree.map((node, index) => (
@@ -95,14 +102,18 @@ export default function Tree({ options }: Props) {
 					prefix=""
 				/>
 			))}
-			
+
 			{/* Legend */}
 			{showStatus && (
 				<>
 					<Text> </Text>
 					<Box flexDirection="column">
-						<Text color="gray" bold>Legend:</Text>
-						<Text color="gray">⏳ Pending  🔄 In Progress  ✅ Done  ❌ Cancelled</Text>
+						<Text color="gray" bold>
+							Legend:
+						</Text>
+						<Text color="gray">
+							⏳ Pending 🔄 In Progress ✅ Done ❌ Cancelled
+						</Text>
 					</Box>
 				</>
 			)}
@@ -129,7 +140,7 @@ function TreeNodeComponent({
 }: TreeNodeComponentProps) {
 	const shouldShowChildren = maxDepth === undefined || depth < maxDepth;
 	const hasChildren = node.children.length > 0;
-	
+
 	// Tree drawing characters
 	const connector = isLast ? "└── " : "├── ";
 	const childPrefix = prefix + (isLast ? "    " : "│   ");
@@ -138,19 +149,24 @@ function TreeNodeComponent({
 		<Box flexDirection="column">
 			{/* Current node */}
 			<Text>
-				<Text color="gray">{prefix}{connector}</Text>
-				{showStatus && getStatusIcon(node.status)}{showStatus && " "}
-				<Text bold color={getStatusColor(node.status)}>{node.title}</Text>
+				<Text color="gray">
+					{prefix}
+					{connector}
+				</Text>
+				{showStatus && getStatusIcon(node.status)}
+				{showStatus && " "}
+				<Text bold color={getStatusColor(node.status)}>
+					{node.title}
+				</Text>
 				<Text color="gray"> ({node.id})</Text>
-				{showStatus && (
-					<Text color="yellow"> [{node.status}]</Text>
-				)}
+				{showStatus && <Text color="yellow"> [{node.status}]</Text>}
 			</Text>
-			
+
 			{/* Description if present */}
 			{node.description && (
 				<Text color="gray">
-					{prefix}{isLast ? "    " : "│   "}
+					{prefix}
+					{isLast ? "    " : "│   "}
 					{node.description}
 				</Text>
 			)}
@@ -171,7 +187,7 @@ function TreeNodeComponent({
 					))}
 				</>
 			)}
-			
+
 			{/* Show truncation indicator if max depth reached */}
 			{maxDepth !== undefined && depth >= maxDepth && hasChildren && (
 				<Text color="gray">
@@ -184,25 +200,25 @@ function TreeNodeComponent({
 
 function getDescendants(taskId: string, allTasks: Task[]): Task[] {
 	const descendants: Task[] = [];
-	const children = allTasks.filter(task => task.parentId === taskId);
-	
+	const children = allTasks.filter((task) => task.parentId === taskId);
+
 	for (const child of children) {
 		descendants.push(child);
 		descendants.push(...getDescendants(child.id, allTasks));
 	}
-	
+
 	return descendants;
 }
 
 function buildTree(tasks: Task[], rootId?: string): TreeNode[] {
 	// Create a map for quick lookup
 	const taskMap = new Map<string, TreeNode>();
-	
+
 	// Initialize all tasks as tree nodes
 	for (const task of tasks) {
 		taskMap.set(task.id, { ...task, children: [] });
 	}
-	
+
 	// If we have a specific root, start from there
 	if (rootId) {
 		const rootNode = taskMap.get(rootId);
@@ -212,13 +228,13 @@ function buildTree(tasks: Task[], rootId?: string): TreeNode[] {
 		}
 		return [];
 	}
-	
+
 	// Build the tree by linking children to parents
 	const roots: TreeNode[] = [];
-	
+
 	for (const task of tasks) {
 		const node = taskMap.get(task.id)!;
-		
+
 		if (task.parentId) {
 			const parent = taskMap.get(task.parentId);
 			if (parent) {
@@ -232,22 +248,26 @@ function buildTree(tasks: Task[], rootId?: string): TreeNode[] {
 			roots.push(node);
 		}
 	}
-	
+
 	// Sort children by creation date for consistent ordering
 	for (const node of taskMap.values()) {
 		node.children.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
 	}
-	
+
 	// Sort roots by creation date
 	roots.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
-	
+
 	return roots;
 }
 
-function buildChildren(node: TreeNode, taskMap: Map<string, TreeNode>, allTasks: Task[]) {
+function buildChildren(
+	node: TreeNode,
+	taskMap: Map<string, TreeNode>,
+	allTasks: Task[],
+) {
 	// Find all children of this node
-	const children = allTasks.filter(task => task.parentId === node.id);
-	
+	const children = allTasks.filter((task) => task.parentId === node.id);
+
 	for (const child of children) {
 		const childNode = taskMap.get(child.id);
 		if (childNode) {
@@ -256,7 +276,7 @@ function buildChildren(node: TreeNode, taskMap: Map<string, TreeNode>, allTasks:
 			buildChildren(childNode, taskMap, allTasks);
 		}
 	}
-	
+
 	// Sort children by creation date
 	node.children.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
 }
@@ -289,4 +309,4 @@ function getStatusColor(status: string): string {
 		default:
 			return "white";
 	}
-} 
+}

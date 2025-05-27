@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { TaskService } from '../src/core/services/TaskService.js';
+import { TaskService } from '../src/services/TaskService.js';
 import { createDatabase } from '../src/database/index.js';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -17,9 +17,9 @@ function createTask(data: Partial<NewTask> & { id: string }): NewTask {
     title: data.title ?? `Task ${data.id}`,
     description: data.description ?? undefined,
     status: data.status ?? 'pending',
+    priority: data.priority ?? 'medium',
     prd: undefined,
     contextDigest: undefined,
-    projectId: undefined,
   };
 }
 

@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync } from 'node:fs';
 import { PGlite } from '@electric-sql/pglite';
 import { type PgliteDatabase, drizzle } from 'drizzle-orm/pglite';
-import { cfg } from '../config/index.js';
+import { cfg } from '../utils/config.js';
 import { autoMigrate } from './migrate.js';
 import { schema } from './schema.js';
 

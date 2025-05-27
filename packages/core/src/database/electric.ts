@@ -2,7 +2,7 @@ import { Shape, ShapeStream } from '@electric-sql/client';
 import type { ShapeStreamOptions } from '@electric-sql/client';
 import type { PGlite } from '@electric-sql/pglite';
 import type { PgliteDatabase } from 'drizzle-orm/pglite';
-import { cfg } from '../config/index.js';
+import { cfg } from '../utils/config.js';
 import type { schema } from './schema.js';
 import { DatabaseStore, type Store } from './store.js';
 
@@ -59,14 +59,10 @@ export async function createStore(
   // Initialize sync for core tables if enabled
   if (sync && electric.isConnected) {
     try {
-      await Promise.all([
-        electric.sync('projects'),
-        electric.sync('tasks'),
-        electric.sync('context_slices'),
-      ]);
+      await Promise.all([electric.sync('tasks'), electric.sync('context_slices')]);
 
       if (verbose) {
-        console.info('Sync enabled for core tables: projects, tasks, context_slices');
+        console.info('Sync enabled for core tables: tasks, context_slices');
       }
     } catch (error) {
       console.warn('Failed to initialize sync, continuing in local-only mode:', error);
@@ -74,7 +70,7 @@ export async function createStore(
   }
 
   // Create and return the DatabaseStore instance
-  return new DatabaseStore(pgLite, sql, electric, isEncrypted, verbose);
+  return new DatabaseStore(pgLite, sql, electric, isEncrypted);
 }
 
 // ---------------------------------------------------------------------------

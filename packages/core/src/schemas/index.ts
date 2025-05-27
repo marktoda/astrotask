@@ -8,27 +8,17 @@ export {
   createTaskSchema,
   updateTaskSchema,
   taskStatus,
+  taskPriority,
   validateTask,
   taskToApi,
   type Task,
   type CreateTask,
   type UpdateTask,
   type TaskStatus,
+  type TaskPriority,
   type TaskApi,
   type CreateTaskApi,
 } from './task.js';
-
-export {
-  projectSchema,
-  createProjectSchema,
-  updateProjectSchema,
-  projectStatus,
-  validateProject,
-  type Project,
-  type CreateProject,
-  type UpdateProject,
-  type ProjectStatus,
-} from './project.js';
 
 export {
   contextSliceSchema,
@@ -116,15 +106,6 @@ import {
 } from './task.js';
 
 import {
-  type CreateProject,
-  type Project,
-  type UpdateProject,
-  createProjectSchema,
-  projectSchema,
-  updateProjectSchema,
-} from './project.js';
-
-import {
   type ContextSlice,
   type CreateContextSlice,
   type UpdateContextSlice,
@@ -137,9 +118,6 @@ export const schemaRegistry = {
   task: taskSchema,
   createTask: createTaskSchema,
   updateTask: updateTaskSchema,
-  project: projectSchema,
-  createProject: createProjectSchema,
-  updateProject: updateProjectSchema,
   contextSlice: contextSliceSchema,
   createContextSlice: createContextSliceSchema,
   updateContextSlice: updateContextSliceSchema,
@@ -149,9 +127,6 @@ export type SchemaReturnTypeMap = {
   task: Task;
   createTask: CreateTask;
   updateTask: UpdateTask;
-  project: Project;
-  createProject: CreateProject;
-  updateProject: UpdateProject;
   contextSlice: ContextSlice;
   createContextSlice: CreateContextSlice;
   updateContextSlice: UpdateContextSlice;
@@ -186,10 +161,6 @@ export function isTask(data: unknown): data is Task {
   return taskSchema.safeParse(data).success;
 }
 
-export function isProject(data: unknown): data is Project {
-  return projectSchema.safeParse(data).success;
-}
-
 export function isContextSlice(data: unknown): data is ContextSlice {
   return contextSliceSchema.safeParse(data).success;
 }
@@ -204,40 +175,67 @@ function getNestedValue(obj: unknown, path: (string | number)[]): unknown {
   }, obj);
 }
 
-// Common validation patterns as utilities
-export const validationUtils = {
-  // Check if string is valid UUID
-  isValidUuid: (value: string): boolean => uuidPattern.test(value),
+/**
+ * Check if a string is a valid UUID format
+ */
+export function isValidUuid(value: string): boolean {
+  return uuidPattern.test(value);
+}
 
-  // Validate datetime string
-  isValidDateTime: (value: string): boolean => {
-    try {
-      return !Number.isNaN(new Date(value).getTime()) && value.includes('T');
-    } catch {
-      return false;
+/**
+ * Check if a value meets basic string constraints
+ */
+export function validateStringConstraints(
+  value: string,
+  type: 'title' | 'description'
+): ValidationResult<string> {
+  if (type === 'title') {
+    const constraints = CONSTRAINTS.TITLE;
+
+    if (value.length < constraints.MIN_LENGTH) {
+      return {
+        success: false,
+        errors: [
+          {
+            field: type,
+            message: `${type} must be at least ${constraints.MIN_LENGTH} characters`,
+            code: 'too_small',
+            value,
+          },
+        ],
+      };
     }
-  },
 
-  // Check if value meets title constraints
-  isValidTitle: (value: string): boolean => {
-    return (
-      value.length >= CONSTRAINTS.TITLE.MIN_LENGTH && value.length <= CONSTRAINTS.TITLE.MAX_LENGTH
-    );
-  },
+    if (value.length > constraints.MAX_LENGTH) {
+      return {
+        success: false,
+        errors: [
+          {
+            field: type,
+            message: `${type} must be at most ${constraints.MAX_LENGTH} characters`,
+            code: 'too_big',
+            value,
+          },
+        ],
+      };
+    }
+  } else {
+    const constraints = CONSTRAINTS.DESCRIPTION;
 
-  // Check if value meets description constraints
-  isValidDescription: (value: string): boolean => {
-    return value.length <= CONSTRAINTS.DESCRIPTION.MAX_LENGTH;
-  },
-} as const;
+    if (value.length > constraints.MAX_LENGTH) {
+      return {
+        success: false,
+        errors: [
+          {
+            field: type,
+            message: `${type} must be at most ${constraints.MAX_LENGTH} characters`,
+            code: 'too_big',
+            value,
+          },
+        ],
+      };
+    }
+  }
 
-// Export all validation utilities as a single object
-export const validation = {
-  safeParseSchema,
-  validateWithErrors,
-  validateBySchemaKey,
-  isTask,
-  isProject,
-  isContextSlice,
-  ...validationUtils,
-} as const;
+  return { success: true, data: value };
+}

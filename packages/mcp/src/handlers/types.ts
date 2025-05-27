@@ -66,9 +66,17 @@ export interface MCPHandler {
  * Used consistently across all task-related operations.
  * 
  * @constant
- * @type {z.ZodEnum<['pending', 'in-progress', 'done', 'cancelled']>}
+ * @type {z.ZodEnum<['pending', 'in-progress', 'done', 'cancelled', 'archived']>}
  */
-const taskStatus = z.enum(['pending', 'in-progress', 'done', 'cancelled']);
+const taskStatus = z.enum(['pending', 'in-progress', 'done', 'cancelled', 'archived']);
+
+/**
+ * Task priority enumeration for task importance levels.
+ * 
+ * @constant
+ * @type {z.ZodEnum<['low', 'medium', 'high']>}
+ */
+const taskPriority = z.enum(['low', 'medium', 'high']);
 
 /**
  * Schema for creating new tasks via MCP.
@@ -81,8 +89,8 @@ const taskStatus = z.enum(['pending', 'in-progress', 'done', 'cancelled']);
  * const newTask = {
  *   title: "Implement user authentication",
  *   description: "Add JWT-based authentication system",
- *   projectId: "proj_123",
- *   status: "pending"
+ *   status: "pending",
+ *   priority: "high"
  * };
  * 
  * const validated = createTaskSchema.parse(newTask);
@@ -93,12 +101,12 @@ export const createTaskSchema = z.object({
   title: z.string(),
   /** Optional detailed description of the task */
   description: z.string().optional(),
-  /** Optional project ID this task belongs to */
-  projectId: z.string().optional(),
   /** Optional parent task ID for creating subtasks */
   parentId: z.string().optional(),
   /** Task status - defaults to 'pending' if not specified */
   status: taskStatus.default('pending'),
+  /** Task priority - defaults to 'medium' if not specified */
+  priority: taskPriority.default('medium'),
   /** Optional Product Requirements Document content */
   prd: z.string().optional(),
   /** Optional context digest for AI agents */
@@ -131,6 +139,8 @@ export const updateTaskSchema = z.object({
   description: z.string().optional(),
   /** Optional new status for the task */
   status: taskStatus.optional(),
+  /** Optional new priority for the task */
+  priority: taskPriority.optional(),
   /** Optional new parent task ID (for moving tasks) */
   parentId: z.string().optional(),
   /** Optional new PRD content */
@@ -211,7 +221,7 @@ export const getTaskContextSchema = z.object({
 
 /**
  * Schema for listing tasks with filtering via MCP.
- * Supports filtering by status, project, and parent task.
+ * Supports filtering by status and parent task.
  * 
  * @constant
  * @type {z.ZodObject}
@@ -223,16 +233,14 @@ export const getTaskContextSchema = z.object({
  * // List subtasks of a specific task
  * const subtasks = { parentId: "task_123", includeSubtasks: true };
  * 
- * // List all tasks in a project
- * const projectTasks = { projectId: "proj_456" };
+ * // List all root tasks
+ * const rootTasks = { parentId: null };
  * ```
  */
 export const listTasksSchema = z.object({
   /** Optional status filter - only return tasks with this status */
   status: taskStatus.optional(),
-  /** Optional project filter - only return tasks in this project */
-  projectId: z.string().optional(),
-  /** Optional parent filter - only return subtasks of this parent */
+  /** Optional parent filter - only return subtasks of this parent, or null for root tasks */
   parentId: z.string().optional(),
   /** Whether to include nested subtasks in the response (default: false) */
   includeSubtasks: z.boolean().default(false),

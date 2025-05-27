@@ -75,22 +75,7 @@ import type { Task, CreateTask, TaskStatus } from '@astrolabe/core';
 const newTask: CreateTask = {
   title: 'Setup CI/CD pipeline',
   description: 'Configure GitHub Actions for automated testing and deployment',
-  status: 'pending',
-  projectId: 'proj_123'
-};
-```
-
-### Projects
-
-Projects group related tasks and provide organizational structure:
-
-```typescript
-import type { Project, CreateProject } from '@astrolabe/core';
-
-const project: CreateProject = {
-  name: 'Mobile App Redesign',
-  description: 'Complete redesign of the mobile application UI/UX',
-  status: 'active'
+  status: 'pending'
 };
 ```
 
@@ -166,11 +151,6 @@ const pendingTasks = await taskService.listTasks({
 const subtasks = await taskService.listTasks({ 
   parentId: 'task_123' 
 });
-
-// Get all tasks in a project
-const projectTasks = await taskService.listTasks({ 
-  projectId: 'proj_456' 
-});
 ```
 
 ##### `getTaskContext(id: string, options?: ContextOptions): Promise<TaskContext>`
@@ -225,7 +205,6 @@ import {
   taskSchema, 
   createTaskSchema, 
   updateTaskSchema,
-  projectSchema,
   contextSliceSchema 
 } from '@astrolabe/core';
 

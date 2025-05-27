@@ -50,7 +50,7 @@ describe('TaskHandlers', () => {
 
       const result = await taskHandlers.listTasks({ includeSubtasks: false });
 
-      expect(mockStore.listTasks).toHaveBeenCalledWith({ projectId: undefined });
+      expect(mockStore.listTasks).toHaveBeenCalledWith({});
       expect(result).toEqual(mockTasks);
     });
 
@@ -62,17 +62,17 @@ describe('TaskHandlers', () => {
 
       const result = await taskHandlers.listTasks({ status: 'pending', includeSubtasks: false });
 
-      expect(mockStore.listTasks).toHaveBeenCalledWith({ status: 'pending', projectId: undefined });
+      expect(mockStore.listTasks).toHaveBeenCalledWith({ status: 'pending' });
       expect(result).toEqual(mockTasks);
     });
 
-    it('should filter tasks by projectId', async () => {
-      const mockTasks = [{ id: '1', title: 'Task 1' }];
+    it('should filter tasks by parentId', async () => {
+      const mockTasks = [{ id: '1.1', title: 'Subtask 1', parentId: 'parent-1' }];
       mockStore.listTasks.mockResolvedValue(mockTasks);
 
-      await taskHandlers.listTasks({ projectId: 'project-1', includeSubtasks: false });
+      await taskHandlers.listTasks({ parentId: 'parent-1', includeSubtasks: false });
 
-      expect(mockStore.listTasks).toHaveBeenCalledWith({ projectId: 'project-1' });
+      expect(mockStore.listTasks).toHaveBeenCalledWith({ parentId: 'parent-1' });
     });
 
     it('should list subtasks of specific parent', async () => {
@@ -120,7 +120,8 @@ describe('TaskHandlers', () => {
       const taskData = {
         title: 'New Task',
         description: 'Task description',
-        status: 'pending' as const
+        status: 'pending' as const,
+        priority: 'medium' as const
       };
       const createdTask = { id: '1', ...taskData };
       
@@ -131,7 +132,6 @@ describe('TaskHandlers', () => {
       expect(mockStore.addTask).toHaveBeenCalledWith({
         ...taskData,
         parentId: undefined,
-        projectId: undefined,
         prd: undefined,
         contextDigest: undefined,
       });
@@ -139,8 +139,12 @@ describe('TaskHandlers', () => {
     });
 
     it('should create task with default status', async () => {
-      const taskData = { title: 'New Task', status: 'pending' as const };
-      const createdTask = { id: '1', title: 'New Task', status: 'pending' };
+      const taskData = { 
+        title: 'New Task', 
+        status: 'pending' as const,
+        priority: 'medium' as const
+      };
+      const createdTask = { id: '1', title: 'New Task', status: 'pending', priority: 'medium' };
       
       mockStore.addTask.mockResolvedValue(createdTask);
 
@@ -150,7 +154,7 @@ describe('TaskHandlers', () => {
         title: 'New Task',
         description: undefined,
         parentId: undefined,
-        projectId: undefined,
+        priority: 'medium',
         status: 'pending',
         prd: undefined,
         contextDigest: undefined,
@@ -162,7 +166,7 @@ describe('TaskHandlers', () => {
         title: 'New Task',
         description: 'Description',
         parentId: 'parent-1',
-        projectId: 'project-1',
+        priority: 'high' as const,
         status: 'in-progress' as const,
         prd: 'PRD content',
         contextDigest: 'digest-123'

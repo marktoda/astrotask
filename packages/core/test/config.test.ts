@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cfg } from '../src/config/index.js';
+import { cfg } from '../src/utils/config.js';
 
 describe('Configuration System', () => {
   it('should load config with default values', () => {

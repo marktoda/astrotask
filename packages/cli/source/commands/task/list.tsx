@@ -3,7 +3,7 @@ import { Box, Text } from "ink";
 import { useEffect, useState } from "react";
 import { useDatabase } from "../../context/DatabaseContext.js";
 
-export const description = "List tasks, optionally filtered by project";
+export const description = "List tasks with status and priority information";
 
 export default function List() {
 	const db = useDatabase();
@@ -40,19 +40,59 @@ export default function List() {
 		);
 	}
 
+	const rootTasks = tasks.filter((t) => !t.parentId);
+	const subtasks = tasks.filter((t) => t.parentId);
+
 	return (
 		<Box flexDirection="column">
 			<Text bold>Tasks ({tasks.length})</Text>
-			<Text> </Text>
-			{tasks.map((task) => (
-				<Box key={task.id} flexDirection="column" marginBottom={1}>
-					<Text>
-						<Text color="cyan">{task.id}</Text> - <Text bold>{task.title}</Text>
-						{task.status && <Text color="yellow"> [{task.status}]</Text>}
+			{rootTasks.length > 0 && (
+				<>
+					<Text> </Text>
+					<Text bold color="cyan">
+						Root Tasks ({rootTasks.length})
 					</Text>
-					{task.description && <Text color="gray"> {task.description}</Text>}
-				</Box>
-			))}
+					{rootTasks.map((task) => (
+						<Box key={task.id} flexDirection="column" marginBottom={1}>
+							<Text>
+								<Text color="cyan">{task.id}</Text> -{" "}
+								<Text bold>{task.title}</Text>
+								{task.status && <Text color="yellow"> [{task.status}]</Text>}
+								{task.priority && (
+									<Text color="magenta"> [{task.priority}]</Text>
+								)}
+							</Text>
+							{task.description && (
+								<Text color="gray"> {task.description}</Text>
+							)}
+						</Box>
+					))}
+				</>
+			)}
+			{subtasks.length > 0 && (
+				<>
+					<Text> </Text>
+					<Text bold color="green">
+						Subtasks ({subtasks.length})
+					</Text>
+					{subtasks.map((task) => (
+						<Box key={task.id} flexDirection="column" marginBottom={1}>
+							<Text>
+								<Text color="cyan">{task.id}</Text> -{" "}
+								<Text bold>{task.title}</Text>
+								{task.status && <Text color="yellow"> [{task.status}]</Text>}
+								{task.priority && (
+									<Text color="magenta"> [{task.priority}]</Text>
+								)}
+								<Text color="gray"> (parent: {task.parentId})</Text>
+							</Text>
+							{task.description && (
+								<Text color="gray"> {task.description}</Text>
+							)}
+						</Box>
+					))}
+				</>
+			)}
 		</Box>
 	);
 }

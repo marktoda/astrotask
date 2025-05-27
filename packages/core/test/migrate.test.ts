@@ -73,9 +73,10 @@ describe('Database Migration System', () => {
     `);
 
     const tableNames = result.rows.map((row: any) => row.table_name);
-    expect(tableNames).toContain('projects');
     expect(tableNames).toContain('tasks');
     expect(tableNames).toContain('context_slices');
+    // Projects table should no longer exist after migration
+    expect(tableNames).not.toContain('projects');
   });
 
   it('should auto-migrate during database initialization', async () => {
@@ -95,11 +96,11 @@ describe('Database Migration System', () => {
       FROM information_schema.tables 
       WHERE table_schema = 'public' 
       AND table_type = 'BASE TABLE'
-      AND table_name IN ('projects', 'tasks', 'context_slices')
+      AND table_name IN ('tasks', 'context_slices')
     `);
 
     const tableCount = (result.rows[0] as { count: number })?.count || 0;
-    expect(tableCount).toBe(3);
+    expect(tableCount).toBe(2);
   });
 
   it('should skip migrations when database is up to date', async () => {

@@ -2,13 +2,13 @@ import { describe, expect, it, afterEach, beforeEach } from 'vitest';
 import { join } from 'path';
 import { existsSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
-import { 
-  initializeDatabase, 
-  DatabaseError, 
+import {
+  initializeDatabase,
+  DatabaseError,
   EncryptionError,
 } from '../src/database/config';
 import { createDatabase } from '../src/database/index';
-import { cfg } from '../src/config';
+import { cfg } from '../src/utils/config';
 
 describe('Database Configuration', () => {
   const testDbDir = join(tmpdir(), 'astrolabe-test');
@@ -69,7 +69,7 @@ describe('Database Configuration', () => {
       expect(result.rows[0]).toEqual({ test: 1 });
 
       await connection.db.close();
-      
+
       // Clean up environment
       delete process.env.ASTROLABE_DB_KEY;
     }, 10000);
@@ -91,7 +91,7 @@ describe('Database Configuration', () => {
 
     it('should handle database directory creation', async () => {
       const nestedTestDbPath = join(testDbDir, 'nested', 'deep', 'test.db');
-      
+
       const connection = await initializeDatabase({
         dbPath: nestedTestDbPath,
         encrypted: false,
@@ -144,49 +144,18 @@ describe('Database Configuration', () => {
 
       // Verify tables were created by migration
       const result = await store.pgLite.query(`
-        SELECT table_name 
-        FROM information_schema.tables 
-        WHERE table_schema = 'public' 
+        SELECT table_name
+        FROM information_schema.tables
+        WHERE table_schema = 'public'
         AND table_type = 'BASE TABLE'
         ORDER BY table_name
       `);
 
       const tableNames = result.rows.map((row: any) => row.table_name);
-      expect(tableNames).toContain('projects');
       expect(tableNames).toContain('tasks');
       expect(tableNames).toContain('context_slices');
-
-      await store.close();
-    });
-
-    it('should provide business methods for projects', async () => {
-      const store = await createDatabase({
-        dbPath: testDbPath,
-        encrypted: false,
-        verbose: false,
-        autoSync: false,
-      });
-
-      // Test business methods
-      const projects = await store.listProjects();
-      expect(projects).toEqual([]);
-
-      const newProject = await store.addProject({
-        id: 'test-project-1',
-        title: 'Test Project',
-        description: 'A test project',
-      });
-
-      expect(newProject).toBeDefined();
-      expect(newProject.title).toBe('Test Project');
-      expect(newProject.id).toBe('test-project-1');
-
-      const foundProject = await store.getProject(newProject.id);
-      expect(foundProject).toEqual(newProject);
-
-      const allProjects = await store.listProjects();
-      expect(allProjects).toHaveLength(1);
-      expect(allProjects[0]).toEqual(newProject);
+      // projects table should no longer exist after migration
+      expect(tableNames).not.toContain('projects');
 
       await store.close();
     });
@@ -199,40 +168,81 @@ describe('Database Configuration', () => {
         autoSync: false,
       });
 
-      // Create a project first
-      const project = await store.addProject({
-        id: 'test-project-1',
-        title: 'Test Project',
-        description: 'A test project',
-      });
-
       // Test task business methods
       const tasks = await store.listTasks();
       expect(tasks).toEqual([]);
 
       const newTask = await store.addTask({
         id: 'test-task-1',
-        projectId: project.id,
         title: 'Test Task',
         description: 'A test task',
         status: 'pending',
+        priority: 'medium',
       });
 
       expect(newTask).toBeDefined();
       expect(newTask.title).toBe('Test Task');
-      expect(newTask.projectId).toBe(project.id);
+      expect(newTask.priority).toBe('medium');
+      expect(newTask.parentId).toBeNull(); // Root task
 
       const foundTask = await store.getTask(newTask.id);
       expect(foundTask).toEqual(newTask);
 
       // Test status update
-      const updatedTask = await store.updateTaskStatus(newTask.id, 'completed');
-      expect(updatedTask?.status).toBe('completed');
+      const updatedTask = await store.updateTaskStatus(newTask.id, 'done');
+      expect(updatedTask?.status).toBe('done');
 
-      // Test filtering by project
-      const projectTasks = await store.listTasks(project.id);
-      expect(projectTasks).toHaveLength(1);
-      expect(projectTasks[0].status).toBe('completed');
+      // Test filtering by status
+      const doneTasks = await store.listTasksByStatus('done');
+      expect(doneTasks).toHaveLength(1);
+      expect(doneTasks[0].status).toBe('done');
+
+      // Test root tasks filtering
+      const rootTasks = await store.listRootTasks();
+      expect(rootTasks).toHaveLength(1);
+      expect(rootTasks[0].parentId).toBeNull();
+
+      await store.close();
+    });
+
+    it('should provide business methods for task hierarchy', async () => {
+      const store = await createDatabase({
+        dbPath: testDbPath,
+        encrypted: false,
+        verbose: false,
+        autoSync: false,
+      });
+
+      // Create a parent task
+      const parentTask = await store.addTask({
+        id: 'parent-task',
+        title: 'Parent Task',
+        description: 'A parent task',
+        status: 'pending',
+        priority: 'high',
+      });
+
+      // Create a subtask
+      const subtask = await store.addTask({
+        id: 'subtask-1',
+        parentId: parentTask.id,
+        title: 'Subtask 1',
+        description: 'A subtask',
+        status: 'pending',
+        priority: 'medium',
+      });
+
+      expect(subtask.parentId).toBe(parentTask.id);
+
+      // Test subtask filtering
+      const subtasks = await store.listSubtasks(parentTask.id);
+      expect(subtasks).toHaveLength(1);
+      expect(subtasks[0].id).toBe(subtask.id);
+
+      // Test that root tasks don't include subtasks
+      const rootTasks = await store.listRootTasks();
+      expect(rootTasks).toHaveLength(1);
+      expect(rootTasks[0].id).toBe(parentTask.id);
 
       await store.close();
     });
@@ -247,4 +257,4 @@ describe('Database Configuration', () => {
       expect(cfg.DB_SYNCHRONOUS).toBe('NORMAL');
     });
   });
-}); 
+});

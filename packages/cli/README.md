@@ -94,9 +94,6 @@ astrolabe list
 # List only pending tasks
 astrolabe list --status pending
 
-# List tasks in a specific project
-astrolabe list --project proj_123
-
 # List with subtasks
 astrolabe list --tree
 
@@ -106,8 +103,6 @@ astrolabe list --json
 
 **Options:**
 - `--status <status>`: Filter by status (`pending`, `in-progress`, `done`, `cancelled`)
-- `--project <id>`: Filter by project ID
-- `--parent <id>`: Show subtasks of a specific parent
 - `--tree`: Show hierarchical tree view
 - `--json`: Output in JSON format
 - `--limit <n>`: Limit number of results
@@ -133,7 +128,6 @@ astrolabe create "Review PR #456" --status in-progress
 **Options:**
 - `--description <text>`: Task description
 - `--parent <id>`: Parent task ID (creates subtask)
-- `--project <id>`: Project ID
 - `--status <status>`: Initial status
 - `--priority <level>`: Priority level (`high`, `medium`, `low`)
 
@@ -248,44 +242,13 @@ astrolabe search "authentication"
 astrolabe search "JWT" --in-description
 
 # Search with filters
-astrolabe search "bug" --status pending --project proj_123
+astrolabe search "bug" --status pending
 ```
 
 **Options:**
 - `--in-description`: Search in task descriptions
 - `--status <status>`: Filter by status
-- `--project <id>`: Filter by project
 - `--limit <n>`: Limit results
-
-### Project Commands
-
-#### `astrolabe project create <name> [options]`
-
-Create a new project.
-
-```bash
-# Create a project
-astrolabe project create "Mobile App Redesign"
-
-# Create with description
-astrolabe project create "API Refactor" --description "Modernize REST API architecture"
-```
-
-#### `astrolabe project list`
-
-List all projects.
-
-```bash
-astrolabe project list
-```
-
-#### `astrolabe project show <id>`
-
-Show project details and associated tasks.
-
-```bash
-astrolabe project show proj_123
-```
 
 ### Import/Export
 
@@ -299,9 +262,6 @@ astrolabe export --format json --output tasks.json
 
 # Export to Markdown
 astrolabe export --format markdown --output tasks.md
-
-# Export specific project
-astrolabe export --project proj_123 --format json
 ```
 
 #### `astrolabe import <file> [options]`
@@ -311,9 +271,6 @@ Import tasks from file.
 ```bash
 # Import from JSON
 astrolabe import tasks.json
-
-# Import with project assignment
-astrolabe import tasks.json --project proj_123
 ```
 
 ### Configuration

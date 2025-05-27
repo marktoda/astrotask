@@ -1,6 +1,6 @@
 import pino from 'pino';
 import type { LoggerOptions } from 'pino';
-import { cfg } from '../config/index.js';
+import { cfg } from '../utils/config.js';
 
 /**
  * Logger configuration and setup for Astrolabe

@@ -10,6 +10,10 @@ export const options = zod.object({
 	title: zod.string().describe("Task title"),
 	description: zod.string().optional().describe("Task description"),
 	parent: zod.string().optional().describe("Parent task ID"),
+	priority: zod
+		.enum(["low", "medium", "high"])
+		.default("medium")
+		.describe("Task priority"),
 });
 
 type Props = {
@@ -28,11 +32,12 @@ export default function Add({ options }: Props) {
 					title: options.title,
 					description: options.description || "",
 					status: "pending",
+					priority: options.priority,
 					parentId: options.parent,
 				};
 
 				const task = await db.addTask(newTask);
-				setResult(`Task created successfully: ${task.id}`);
+				setResult(`Task created successfully: ${task.id} [${task.priority}]`);
 			} catch (err) {
 				setError(err instanceof Error ? err.message : "Failed to create task");
 			}
