@@ -28,13 +28,13 @@ export class TaskHandlers {
 
     if (args.parentId) {
       // Get subtasks of a specific parent
-      tasks = await this.context.store.listSubtasks(args.parentId);
+      tasks = await this.context.store.listTasks({ parentId: args.parentId });
     } else if (args.status) {
       // Filter by status
-      tasks = await this.context.store.listTasksByStatus(args.status, args.projectId);
+      tasks = await this.context.store.listTasks({ status: args.status, projectId: args.projectId });
     } else {
       // Get all tasks or filter by project
-      tasks = await this.context.store.listTasks(args.projectId);
+      tasks = await this.context.store.listTasks({ projectId: args.projectId });
     }
 
     if (args.includeSubtasks) {
@@ -94,7 +94,7 @@ export class TaskHandlers {
       await this.context.taskService.deleteTaskTree(args.id, true);
     } else {
       // Check if task has subtasks
-      const subtasks = await this.context.store.listSubtasks(args.id);
+      const subtasks = await this.context.store.listTasks({ parentId: args.id });
       if (subtasks.length > 0) {
         throw new Error('Cannot delete task with subtasks without cascade option');
       }
@@ -153,10 +153,10 @@ export class TaskHandlers {
     }
 
     // Calculate metadata
-    const allSubtasks = await this.context.store.listSubtasks(task.id);
+    const allSubtasks = await this.context.store.listTasks({ parentId: task.id });
     context.metadata.totalSubtasks = allSubtasks.length;
-    context.metadata.completedSubtasks = allSubtasks.filter(t => t.status === 'done').length;
-    context.metadata.pendingSubtasks = allSubtasks.filter(t => t.status === 'pending').length;
+    context.metadata.completedSubtasks = allSubtasks.filter((t: Task) => t.status === 'done').length;
+    context.metadata.pendingSubtasks = allSubtasks.filter((t: Task) => t.status === 'pending').length;
 
     return context;
   }

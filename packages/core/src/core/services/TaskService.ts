@@ -23,7 +23,7 @@ export class TaskService {
       const children: TaskTree[] = [];
 
       if (maxDepth === undefined || currentDepth < maxDepth) {
-        const subtasks = await this.store.listSubtasks(task.id);
+        const subtasks = await this.store.listTasks({ parentId: task.id });
         for (const subtask of subtasks) {
           children.push(await buildTree(subtask, currentDepth + 1));
         }
@@ -59,7 +59,7 @@ export class TaskService {
     const descendants: Task[] = [];
 
     const collectDescendants = async (parentId: string): Promise<void> => {
-      const children = await this.store.listSubtasks(parentId);
+      const children = await this.store.listTasks({ parentId });
       for (const child of children) {
         descendants.push(child);
         await collectDescendants(child.id);

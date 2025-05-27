@@ -12,8 +12,10 @@ const mockStore = {
   deleteTask: vi.fn(),
   getTask: vi.fn(),
   listTasks: vi.fn(),
-  listSubtasks: vi.fn(),
   listTasksByStatus: vi.fn(),
+  listRootTasks: vi.fn(),
+  // Keep convenience methods for backward compatibility
+  listSubtasks: vi.fn(),
 };
 
 const mockTaskService = {
@@ -48,7 +50,7 @@ describe('TaskHandlers', () => {
 
       const result = await taskHandlers.listTasks({ includeSubtasks: false });
 
-      expect(mockStore.listTasks).toHaveBeenCalledWith(undefined);
+      expect(mockStore.listTasks).toHaveBeenCalledWith({ projectId: undefined });
       expect(result).toEqual(mockTasks);
     });
 
@@ -56,11 +58,11 @@ describe('TaskHandlers', () => {
       const mockTasks = [
         { id: '1', title: 'Task 1', status: 'pending' }
       ];
-      mockStore.listTasksByStatus.mockResolvedValue(mockTasks);
+      mockStore.listTasks.mockResolvedValue(mockTasks);
 
       const result = await taskHandlers.listTasks({ status: 'pending', includeSubtasks: false });
 
-      expect(mockStore.listTasksByStatus).toHaveBeenCalledWith('pending', undefined);
+      expect(mockStore.listTasks).toHaveBeenCalledWith({ status: 'pending', projectId: undefined });
       expect(result).toEqual(mockTasks);
     });
 
@@ -70,18 +72,18 @@ describe('TaskHandlers', () => {
 
       await taskHandlers.listTasks({ projectId: 'project-1', includeSubtasks: false });
 
-      expect(mockStore.listTasks).toHaveBeenCalledWith('project-1');
+      expect(mockStore.listTasks).toHaveBeenCalledWith({ projectId: 'project-1' });
     });
 
     it('should list subtasks of specific parent', async () => {
       const mockSubtasks = [
         { id: '1.1', title: 'Subtask 1', parentId: '1' }
       ];
-      mockStore.listSubtasks.mockResolvedValue(mockSubtasks);
+      mockStore.listTasks.mockResolvedValue(mockSubtasks);
 
       const result = await taskHandlers.listTasks({ parentId: '1', includeSubtasks: false });
 
-      expect(mockStore.listSubtasks).toHaveBeenCalledWith('1');
+      expect(mockStore.listTasks).toHaveBeenCalledWith({ parentId: '1' });
       expect(result).toEqual(mockSubtasks);
     });
 
@@ -137,7 +139,7 @@ describe('TaskHandlers', () => {
     });
 
     it('should create task with default status', async () => {
-      const taskData = { title: 'New Task' };
+      const taskData = { title: 'New Task', status: 'pending' as const };
       const createdTask = { id: '1', title: 'New Task', status: 'pending' };
       
       mockStore.addTask.mockResolvedValue(createdTask);
@@ -222,13 +224,13 @@ describe('TaskHandlers', () => {
       const existingTask = { id: '1', title: 'Task to delete' };
       
       mockStore.getTask.mockResolvedValue(existingTask);
-      mockStore.listSubtasks.mockResolvedValue([]);
+      mockStore.listTasks.mockResolvedValue([]);
       mockStore.deleteTask.mockResolvedValue(undefined);
 
       const result = await taskHandlers.deleteTask({ id: '1', cascade: false });
 
       expect(mockStore.getTask).toHaveBeenCalledWith('1');
-      expect(mockStore.listSubtasks).toHaveBeenCalledWith('1');
+      expect(mockStore.listTasks).toHaveBeenCalledWith({ parentId: '1' });
       expect(mockStore.deleteTask).toHaveBeenCalledWith('1');
       expect(result).toEqual({
         success: true,
@@ -263,7 +265,7 @@ describe('TaskHandlers', () => {
       const subtasks = [{ id: '1.1', title: 'Subtask' }];
       
       mockStore.getTask.mockResolvedValue(existingTask);
-      mockStore.listSubtasks.mockResolvedValue(subtasks);
+      mockStore.listTasks.mockResolvedValue(subtasks);
 
       await expect(taskHandlers.deleteTask({ id: '1', cascade: false }))
         .rejects.toThrow('Cannot delete task with subtasks without cascade option');
@@ -312,7 +314,7 @@ describe('TaskHandlers', () => {
       ];
 
       mockStore.getTask.mockResolvedValue(task);
-      mockStore.listSubtasks.mockResolvedValue(subtasks);
+      mockStore.listTasks.mockResolvedValue(subtasks);
 
       const result = await taskHandlers.getTaskContext({ 
         id: '1',
@@ -339,7 +341,7 @@ describe('TaskHandlers', () => {
       const ancestors = [{ id: '1', title: 'Parent Task' }];
 
       mockStore.getTask.mockResolvedValue(task);
-      mockStore.listSubtasks.mockResolvedValue([]);
+      mockStore.listTasks.mockResolvedValue([]);
       mockTaskService.getTaskAncestors.mockResolvedValue(ancestors);
 
       const result = await taskHandlers.getTaskContext({ 
@@ -358,7 +360,7 @@ describe('TaskHandlers', () => {
       const descendants = [{ id: '1.1', title: 'Child Task' }];
 
       mockStore.getTask.mockResolvedValue(task);
-      mockStore.listSubtasks.mockResolvedValue([]);
+      mockStore.listTasks.mockResolvedValue([]);
       mockTaskService.getTaskDescendants.mockResolvedValue(descendants);
 
       const result = await taskHandlers.getTaskContext({ 
@@ -394,7 +396,7 @@ describe('TaskHandlers', () => {
       ];
 
       mockStore.getTask.mockResolvedValue(task);
-      mockStore.listSubtasks.mockResolvedValue(subtasks);
+      mockStore.listTasks.mockResolvedValue(subtasks);
 
       const result = await taskHandlers.getTaskContext({ 
         id: '1',

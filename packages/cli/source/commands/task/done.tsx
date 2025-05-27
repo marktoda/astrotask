@@ -21,7 +21,7 @@ export default function Done({ options }: Props) {
 	useEffect(() => {
 		async function markDone() {
 			try {
-				const task = await db.updateTaskStatus(options.id, "done");
+				const task = await db.updateTask(options.id, { status: "done" });
 				if (!task) {
 					throw new Error("Task not found");
 				}

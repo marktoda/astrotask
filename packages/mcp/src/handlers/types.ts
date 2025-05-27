@@ -22,12 +22,15 @@ export interface MCPHandler {
   readonly context: HandlerContext;
 }
 
+// Task status enum for consistency
+const taskStatus = z.enum(['pending', 'in-progress', 'done', 'cancelled']);
+
 export const createTaskSchema = z.object({
   title: z.string(),
   description: z.string().optional(),
   projectId: z.string().optional(),
   parentId: z.string().optional(),
-  status: z.enum(['pending', 'in-progress', 'done', 'cancelled']).default('pending'),
+  status: taskStatus.default('pending'),
   prd: z.string().optional(),
   contextDigest: z.string().optional(),
 });
@@ -36,7 +39,7 @@ export const updateTaskSchema = z.object({
   id: z.string(),
   title: z.string().optional(),
   description: z.string().optional(),
-  status: z.enum(['pending', 'in-progress', 'done', 'cancelled']).optional(),
+  status: taskStatus.optional(),
   parentId: z.string().optional(),
   prd: z.string().optional(),
   contextDigest: z.string().optional(),
@@ -59,7 +62,7 @@ export const getTaskContextSchema = z.object({
 });
 
 export const listTasksSchema = z.object({
-  status: z.enum(['pending', 'in-progress', 'done', 'cancelled']).optional(),
+  status: taskStatus.optional(),
   projectId: z.string().optional(),
   parentId: z.string().optional(),
   includeSubtasks: z.boolean().default(false),

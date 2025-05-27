@@ -1,12 +1,21 @@
-import { z } from 'zod';
+/**
+ * Schema exports - Single source of truth for all Zod schemas and types
+ */
 
-// ===== SCHEMA IMPORTS & EXPORTS =====
+// ===== SCHEMA & TYPE EXPORTS =====
 export {
   taskSchema,
   createTaskSchema,
   updateTaskSchema,
   taskStatus,
   validateTask,
+  taskToApi,
+  type Task,
+  type CreateTask,
+  type UpdateTask,
+  type TaskStatus,
+  type TaskApi,
+  type CreateTaskApi,
 } from './task.js';
 
 export {
@@ -15,6 +24,10 @@ export {
   updateProjectSchema,
   projectStatus,
   validateProject,
+  type Project,
+  type CreateProject,
+  type UpdateProject,
+  type ProjectStatus,
 } from './project.js';
 
 export {
@@ -22,6 +35,9 @@ export {
   createContextSliceSchema,
   updateContextSliceSchema,
   validateContextSlice,
+  type ContextSlice,
+  type CreateContextSlice,
+  type UpdateContextSlice,
 } from './contextSlice.js';
 
 export {
@@ -32,34 +48,14 @@ export {
   uuidPattern,
 } from './base.js';
 
-export { CONSTRAINTS } from './types.js';
+export { CONSTRAINTS, type Priority } from './types.js';
 
-// ===== TYPE EXPORTS =====
-export type {
-  Task,
-  CreateTask,
-  UpdateTask,
-  TaskStatus,
-} from './task.js';
+// ===== VALIDATION UTILITIES =====
+import { z } from 'zod';
+// Import for local use
+import { uuidPattern } from './base.js';
+import { CONSTRAINTS } from './types.js';
 
-export type {
-  Project,
-  CreateProject,
-  UpdateProject,
-  ProjectStatus,
-} from './project.js';
-
-export type {
-  ContextSlice,
-  CreateContextSlice,
-  UpdateContextSlice,
-} from './contextSlice.js';
-
-export type { Priority } from './types.js';
-
-// ===== ENHANCED VALIDATION UTILITIES =====
-
-// Enhanced error handling types
 export interface ValidationError {
   field: string;
   message: string;
@@ -73,15 +69,14 @@ export interface ValidationResult<T> {
   errors?: ValidationError[];
 }
 
-// Safe parsing utility with standardized error format
+/**
+ * Safe parsing utility with standardized error format
+ */
 export function safeParseSchema<T>(schema: z.ZodSchema<T>, data: unknown): ValidationResult<T> {
   const result = schema.safeParse(data);
 
   if (result.success) {
-    return {
-      success: true,
-      data: result.data,
-    };
+    return { success: true, data: result.data };
   }
 
   const errors: ValidationError[] = result.error.errors.map((err) => ({
@@ -91,13 +86,12 @@ export function safeParseSchema<T>(schema: z.ZodSchema<T>, data: unknown): Valid
     value: err.path.length > 0 ? getNestedValue(data, err.path) : data,
   }));
 
-  return {
-    success: false,
-    errors,
-  };
+  return { success: false, errors };
 }
 
-// Validation with detailed error formatting
+/**
+ * Validation with detailed error formatting
+ */
 export function validateWithErrors<T>(schema: z.ZodSchema<T>, data: unknown): T {
   const result = safeParseSchema(schema, data);
 
@@ -108,30 +102,37 @@ export function validateWithErrors<T>(schema: z.ZodSchema<T>, data: unknown): T 
     throw new Error(`Validation failed: ${errorMessages}`);
   }
 
-  // TypeScript knows result.success is true here, so data should be defined
   return result.data as T;
 }
 
-// Import schemas for use in registry
-import { createTaskSchema, taskSchema, updateTaskSchema } from './task.js';
-
-import { createProjectSchema, projectSchema, updateProjectSchema } from './project.js';
+// ===== SCHEMA REGISTRY =====
+import {
+  type CreateTask,
+  type Task,
+  type UpdateTask,
+  createTaskSchema,
+  taskSchema,
+  updateTaskSchema,
+} from './task.js';
 
 import {
+  type CreateProject,
+  type Project,
+  type UpdateProject,
+  createProjectSchema,
+  projectSchema,
+  updateProjectSchema,
+} from './project.js';
+
+import {
+  type ContextSlice,
+  type CreateContextSlice,
+  type UpdateContextSlice,
   contextSliceSchema,
   createContextSliceSchema,
   updateContextSliceSchema,
 } from './contextSlice.js';
 
-import { uuidPattern } from './base.js';
-import { CONSTRAINTS } from './types.js';
-
-import type { ContextSlice, CreateContextSlice, UpdateContextSlice } from './contextSlice.js';
-import type { CreateProject, Project, UpdateProject } from './project.js';
-// Import types directly from source files
-import type { CreateTask, Task, UpdateTask } from './task.js';
-
-// Schema registry with proper typing
 export const schemaRegistry = {
   task: taskSchema,
   createTask: createTaskSchema,
@@ -144,7 +145,6 @@ export const schemaRegistry = {
   updateContextSlice: updateContextSliceSchema,
 } as const;
 
-// Type mapping for schema keys to their return types
 export type SchemaReturnTypeMap = {
   task: Task;
   createTask: CreateTask;
@@ -159,17 +159,17 @@ export type SchemaReturnTypeMap = {
 
 export type SchemaKey = keyof typeof schemaRegistry;
 
-// Type-safe dynamic validation utility
+/**
+ * Type-safe dynamic validation utility
+ */
 export function validateBySchemaKey<K extends SchemaKey>(
   key: K,
   data: unknown
 ): SchemaReturnTypeMap[K] {
   const schema = schemaRegistry[key];
 
-  // Use the schema's parse method directly to maintain proper typing
   try {
-    const result = schema.parse(data);
-    return result as SchemaReturnTypeMap[K];
+    return schema.parse(data) as SchemaReturnTypeMap[K];
   } catch (error) {
     if (error instanceof z.ZodError) {
       const errorMessages = error.errors
@@ -181,55 +181,22 @@ export function validateBySchemaKey<K extends SchemaKey>(
   }
 }
 
-// Batch validation utility with strict typing
-export function validateBatch<T>(schema: z.ZodSchema<T>, items: unknown[]): ValidationResult<T[]> {
-  const results: T[] = [];
-  const errors: ValidationError[] = [];
-
-  for (const [index, item] of items.entries()) {
-    const result = safeParseSchema(schema, item);
-    if (result.success) {
-      // When success is true, data is guaranteed to be defined
-      results.push(result.data as T);
-    } else {
-      const itemErrors =
-        result.errors?.map((err) => ({
-          ...err,
-          field: `[${index}].${err.field}`,
-        })) || [];
-      errors.push(...itemErrors);
-    }
-  }
-
-  if (errors.length > 0) {
-    return {
-      success: false,
-      errors,
-    };
-  }
-
-  return {
-    success: true,
-    data: results,
-  };
-}
-
-// Type guards for runtime type checking
+// ===== TYPE GUARDS =====
 export function isTask(data: unknown): data is Task {
-  return safeParseSchema(taskSchema, data).success;
+  return taskSchema.safeParse(data).success;
 }
 
 export function isProject(data: unknown): data is Project {
-  return safeParseSchema(projectSchema, data).success;
+  return projectSchema.safeParse(data).success;
 }
 
 export function isContextSlice(data: unknown): data is ContextSlice {
-  return safeParseSchema(contextSliceSchema, data).success;
+  return contextSliceSchema.safeParse(data).success;
 }
 
-// Utility function to get nested value from object with proper typing
+// ===== HELPER UTILITIES =====
 function getNestedValue(obj: unknown, path: (string | number)[]): unknown {
-  return path.reduce((current: unknown, key: string | number) => {
+  return path.reduce((current: unknown, key) => {
     if (current && typeof current === 'object' && key in current) {
       return (current as Record<string | number, unknown>)[key];
     }
@@ -269,7 +236,6 @@ export const validation = {
   safeParseSchema,
   validateWithErrors,
   validateBySchemaKey,
-  validateBatch,
   isTask,
   isProject,
   isContextSlice,

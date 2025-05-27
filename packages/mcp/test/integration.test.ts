@@ -120,7 +120,7 @@ describe('MCP Wrapper Integration', () => {
     it('should wrap deleteTask success response in MCP format', async () => {
       const existingTask = { id: '1', title: 'Task to delete' };
       mockStore.getTask.mockResolvedValue(existingTask);
-      mockStore.listSubtasks.mockResolvedValue([]);
+      mockStore.listTasks.mockResolvedValue([]);
       mockStore.deleteTask.mockResolvedValue(undefined);
 
       const wrappedHandler = wrap(taskHandlers.deleteTask.bind(taskHandlers));
@@ -146,7 +146,7 @@ describe('MCP Wrapper Integration', () => {
       const ancestors = [{ id: '0', title: 'Parent' }];
 
       mockStore.getTask.mockResolvedValue(task);
-      mockStore.listSubtasks.mockResolvedValue(subtasks);
+      mockStore.listTasks.mockResolvedValue(subtasks);
       mockTaskService.getTaskAncestors.mockResolvedValue(ancestors);
 
       const wrappedHandler = wrap(taskHandlers.getTaskContext.bind(taskHandlers));
@@ -222,7 +222,7 @@ describe('MCP Wrapper Integration', () => {
       const subtasks = [{ id: '1.1', title: 'Subtask' }];
       
       mockStore.getTask.mockResolvedValue(existingTask);
-      mockStore.listSubtasks.mockResolvedValue(subtasks);
+      mockStore.listTasks.mockResolvedValue(subtasks);
 
       const wrappedHandler = wrap(taskHandlers.deleteTask.bind(taskHandlers));
       const result = await wrappedHandler({ id: '1', cascade: false });
