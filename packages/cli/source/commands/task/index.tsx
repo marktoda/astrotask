@@ -1,1 +1,1 @@
-export const description = 'Task management commands';
+export const description = "Task management commands";

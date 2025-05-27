@@ -11,13 +11,14 @@
 		"build": "tsc",
 		"start": "node ./dist/cli.js",
 		"lint": "biome check source/",
-		"lint:fix": "echo skip lint",
+		"lint:fix": "biome check --write source/",
 		"format": "biome format source/",
-		"format:fix": "echo skip format",
+		"format:fix": "biome format --write source/",
 		"dev": "tsc --watch",
 		"test": "echo test",
 		"test:watch": "echo test",
-		"type-check": "tsc --noEmit"
+		"type-check": "tsc --noEmit",
+		"verify": "pnpm type-check && pnpm lint:fix && pnpm format:fix && pnpm build && pnpm test"
 	},
 	"files": [
 		"dist"

@@ -1,9 +1,9 @@
 import type { Task } from "@astrolabe/core";
 import { Box, Text } from "ink";
 import { useEffect, useState } from "react";
-import { useDatabase } from '../../context/DatabaseContext.js';
+import { useDatabase } from "../../context/DatabaseContext.js";
 
-export const description = 'List tasks, optionally filtered by project';
+export const description = "List tasks, optionally filtered by project";
 
 export default function List() {
 	const db = useDatabase();

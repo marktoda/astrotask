@@ -97,7 +97,7 @@ export function errorHandlingMiddleware(
 
     // Handle validation errors that might not be wrapped
     if (error instanceof Error && error.name === 'ZodError') {
-      /* biome-ignore lint/suspicious/noExplicitAny */
+      // biome-ignore lint/suspicious/noExplicitAny: ValidationError.fromZodError requires any type
       const validationError = ValidationError.fromZodError(error as any);
       logError(requestLogger, validationError, {
         statusCode: validationError.statusCode,
@@ -388,14 +388,14 @@ function sanitizeArgsForLogging(args: unknown): unknown {
   const sensitiveFields = ['password', 'token', 'secret', 'key', 'auth'];
   const sanitized = JSON.parse(JSON.stringify(args));
 
-  /* biome-ignore lint/suspicious/noExplicitAny */
+  // biome-ignore lint/suspicious/noExplicitAny: sanitization function requires flexible typing
   function sanitizeObject(obj: any): any {
     if (Array.isArray(obj)) {
       return obj.map(sanitizeObject);
     }
 
     if (obj && typeof obj === 'object') {
-      /* biome-ignore lint/suspicious/noExplicitAny */
+      // biome-ignore lint/suspicious/noExplicitAny: result object requires flexible typing
       const result: any = {};
       for (const [key, value] of Object.entries(obj)) {
         if (sensitiveFields.some((field) => key.toLowerCase().includes(field))) {

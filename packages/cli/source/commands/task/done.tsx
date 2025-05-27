@@ -1,9 +1,9 @@
 import { Text } from "ink";
 import { useEffect, useState } from "react";
 import zod from "zod";
-import { useDatabase } from '../../context/DatabaseContext.js';
+import { useDatabase } from "../../context/DatabaseContext.js";
 
-export const description = 'Mark a task as completed';
+export const description = "Mark a task as completed";
 
 export const options = zod.object({
 	id: zod.string().describe("Task ID to mark as done"),

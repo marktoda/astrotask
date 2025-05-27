@@ -43,7 +43,7 @@ export const sanitizedString = (
       }
       return true;
     }, 'Contains potentially malicious content')
-    .refine((str) => !pattern || pattern.test(str), `Must match the required pattern`);
+    .refine((str) => !pattern || pattern.test(str), 'Must match the required pattern');
 };
 
 /**

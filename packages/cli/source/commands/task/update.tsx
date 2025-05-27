@@ -1,9 +1,9 @@
 import { Text } from "ink";
-import { useDatabase } from '../../context/DatabaseContext.js';
 import { useEffect, useState } from "react";
 import zod from "zod";
+import { useDatabase } from "../../context/DatabaseContext.js";
 
-export const description = 'Update a task';
+export const description = "Update a task";
 
 export const options = zod.object({
 	id: zod.string().describe("Task ID to update"),
@@ -25,7 +25,7 @@ export default function Update({ options }: Props) {
 	useEffect(() => {
 		async function updateTask() {
 			try {
-				// biome-ignore lint/complexity/useLiteralKeys
+				// biome-ignore lint/complexity/useLiteralKeys: dynamic property assignment needed
 				const updates: Record<string, unknown> = {};
 				if (options.title) updates["title"] = options.title;
 				if (options.description !== undefined)

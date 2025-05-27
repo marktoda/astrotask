@@ -231,7 +231,7 @@ export class TaskMCPServer {
   /**
    * Handle MCP tool calls
    */
-  /* biome-ignore lint/suspicious/noExplicitAny */
+  // biome-ignore lint/suspicious/noExplicitAny: MCP interface requires any for tool args
   async callTool(name: string, args: any): Promise<any> {
     this.ensureInitialized();
 
@@ -268,7 +268,7 @@ export class TaskMCPServer {
   /**
    * List tasks with filtering and pagination
    */
-  /* biome-ignore lint/suspicious/noExplicitAny */
+  // biome-ignore lint/suspicious/noExplicitAny: MCP tool args interface requires any
   private async handleListTasks(args: any) {
     const schema = z.object({
       status: z.enum(['pending', 'in-progress', 'done', 'cancelled']).optional(),
@@ -323,7 +323,7 @@ export class TaskMCPServer {
   /**
    * Create a new task
    */
-  /* biome-ignore lint/suspicious/noExplicitAny */
+  // biome-ignore lint/suspicious/noExplicitAny: MCP tool args interface requires any
   private async handleCreateTask(args: any) {
     const schema = z.object({
       title: z.string().min(1).max(200),
@@ -359,7 +359,7 @@ export class TaskMCPServer {
   /**
    * Update an existing task
    */
-  /* biome-ignore lint/suspicious/noExplicitAny */
+  // biome-ignore lint/suspicious/noExplicitAny: MCP tool args interface requires any
   private async handleUpdateTask(args: any) {
     const schema = z.object({
       id: z.string().uuid(),
@@ -406,7 +406,8 @@ export class TaskMCPServer {
   /**
    * Delete a task (with optional cascade to subtasks)
    */
-  /* biome-ignore lint/suspicious/noExplicitAny */
+  // biome-ignore lint/suspicious/noExplicitAny: MCP tool args interface requires any
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Complex error handling and validation logic required
   private async handleDeleteTask(args: any) {
     // Use new validation framework
     const validatedInput = validateInput(deleteTaskSchema, args);
@@ -463,7 +464,7 @@ export class TaskMCPServer {
   /**
    * Mark a task as complete
    */
-  /* biome-ignore lint/suspicious/noExplicitAny */
+  // biome-ignore lint/suspicious/noExplicitAny: MCP tool args interface requires any
   private async handleCompleteTask(args: any) {
     // Use new validation framework
     const validatedInput = validateInput(completeTaskSchema, args);
@@ -518,7 +519,7 @@ export class TaskMCPServer {
   /**
    * Get task with full context (ancestors and descendants)
    */
-  /* biome-ignore lint/suspicious/noExplicitAny */
+  // biome-ignore lint/suspicious/noExplicitAny: MCP tool args interface requires any
   private async handleGetTaskContext(args: any) {
     const schema = z.object({
       id: z.string().uuid(),
@@ -534,6 +535,7 @@ export class TaskMCPServer {
       throw new Error(`Task with ID ${params.id} not found`);
     }
 
+    // biome-ignore lint/suspicious/noExplicitAny: context object requires flexible structure for MCP response
     const context: any = {
       task: taskToApi(task),
     };
@@ -580,7 +582,6 @@ export class TaskMCPServer {
    * NOTE: You must call `initialize()` before invoking this method so the
    * underlying database service is ready.
    */
-  /* biome-ignore lint/suspicious/noExplicitAny */
   register(mcp: import('@modelcontextprotocol/sdk/server/mcp.js').McpServer): void {
     // Ensure server is ready before registering tools
     this.ensureInitialized();
@@ -593,7 +594,9 @@ export class TaskMCPServer {
       includeSubtasks: z.boolean().default(false),
     } as const;
 
+    // biome-ignore lint/suspicious/noExplicitAny: MCP SDK tool registration requires any for schema shapes
     mcp.tool('listTasks', listTasksShape as any, async (args, _extra) => {
+      // biome-ignore lint/suspicious/noExplicitAny: MCP SDK tool handler return type requires any
       return (await this.handleListTasks(args)) as any;
     });
 
@@ -608,7 +611,9 @@ export class TaskMCPServer {
       contextDigest: z.string().optional(),
     } as const;
 
+    // biome-ignore lint/suspicious/noExplicitAny: MCP SDK tool registration requires any for schema shapes
     mcp.tool('createTask', createTaskShape as any, async (args, _extra) => {
+      // biome-ignore lint/suspicious/noExplicitAny: MCP SDK tool handler return type requires any
       return (await this.handleCreateTask(args)) as any;
     });
 
@@ -623,7 +628,9 @@ export class TaskMCPServer {
       contextDigest: z.string().optional(),
     } as const;
 
+    // biome-ignore lint/suspicious/noExplicitAny: MCP SDK tool registration requires any for schema shapes
     mcp.tool('updateTask', updateTaskShape as any, async (args, _extra) => {
+      // biome-ignore lint/suspicious/noExplicitAny: MCP SDK tool handler return type requires any
       return (await this.handleUpdateTask(args)) as any;
     });
 
@@ -633,7 +640,9 @@ export class TaskMCPServer {
       cascade: z.boolean().default(true),
     } as const;
 
+    // biome-ignore lint/suspicious/noExplicitAny: MCP SDK tool registration requires any for schema shapes
     mcp.tool('deleteTask', deleteTaskShape as any, async (args, _extra) => {
+      // biome-ignore lint/suspicious/noExplicitAny: MCP SDK tool handler return type requires any
       return (await this.handleDeleteTask(args)) as any;
     });
 
@@ -642,7 +651,9 @@ export class TaskMCPServer {
       id: z.string().uuid(),
     } as const;
 
+    // biome-ignore lint/suspicious/noExplicitAny: MCP SDK tool registration requires any for schema shapes
     mcp.tool('completeTask', completeTaskShape as any, async (args, _extra) => {
+      // biome-ignore lint/suspicious/noExplicitAny: MCP SDK tool handler return type requires any
       return (await this.handleCompleteTask(args)) as any;
     });
 
@@ -654,7 +665,9 @@ export class TaskMCPServer {
       maxDepth: z.number().optional(),
     } as const;
 
+    // biome-ignore lint/suspicious/noExplicitAny: MCP SDK tool registration requires any for schema shapes
     mcp.tool('getTaskContext', getTaskContextShape as any, async (args, _extra) => {
+      // biome-ignore lint/suspicious/noExplicitAny: MCP SDK tool handler return type requires any
       return (await this.handleGetTaskContext(args)) as any;
     });
   }

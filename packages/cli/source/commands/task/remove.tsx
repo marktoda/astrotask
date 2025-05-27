@@ -1,9 +1,9 @@
 import { Text } from "ink";
 import { useEffect, useState } from "react";
-import { useDatabase } from '../../context/DatabaseContext.js';
 import zod from "zod";
+import { useDatabase } from "../../context/DatabaseContext.js";
 
-export const description = 'Remove a task';
+export const description = "Remove a task";
 
 export const options = zod.object({
 	id: zod.string().describe("Task ID to remove"),

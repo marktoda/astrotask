@@ -10,14 +10,15 @@
   "scripts": {
     "build": "tsc",
     "lint": "biome check src/",
-    "lint:fix": "echo skip lint",
+    "lint:fix": "biome check --write src/",
     "format": "biome format src/",
-    "format:fix": "echo skip format",
+    "format:fix": "biome format --write src/",
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.js",
     "test": "echo test",
     "test:watch": "echo test",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "verify": "pnpm type-check && pnpm lint:fix && pnpm format:fix && pnpm build && pnpm test"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.0",

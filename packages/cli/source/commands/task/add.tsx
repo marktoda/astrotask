@@ -1,10 +1,10 @@
 import type { NewTask } from "@astrolabe/core";
 import { Text } from "ink";
 import { useEffect, useState } from "react";
-import { useDatabase } from '../../context/DatabaseContext.js';
 import zod from "zod";
+import { useDatabase } from "../../context/DatabaseContext.js";
 
-export const description = 'Add a task';
+export const description = "Add a task";
 
 export const options = zod.object({
 	title: zod.string().describe("Task title"),
