@@ -22,16 +22,22 @@ Welcome to **Astrolabe** – a local-first, MCP-compatible task-navigation platf
 ## 1 · Repository Layout
 
 ```text
-src/                 # TypeScript source code
-  index.ts           # Main entry point
+packages/            # Monorepo packages (pnpm workspace)
+  core/              # Core application library (@astrolabe/core)
+    src/             # TypeScript source code
+      index.ts       # Main exports
+  cli/               # Command-line interface
+    source/          # CLI source code
+  mcp/               # Model Context Protocol server
+    src/             # MCP server source
 tasks/               # Task Master integration files
 scripts/             # Development and build scripts
 docs/                # Project documentation
   design.md          # Architecture and design decisions
-dist/                # Compiled JavaScript output
 .cursor/             # Cursor AI configuration and rules
   rules/             # AI agent guidance rules
 .taskmasterconfig    # Task Master AI configuration
+pnpm-workspace.yaml  # Workspace configuration
 biome.json           # Code formatting and linting rules
 tsconfig.json        # TypeScript configuration
 flake.nix            # Nix development environment

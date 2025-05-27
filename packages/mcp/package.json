@@ -1,0 +1,38 @@
+{
+  "name": "@astrolabe/mcp-server",
+  "version": "0.1.0",
+  "description": "MCP Server for Astrolabe Task Management",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "astrolabe-mcp": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "lint": "biome check src/",
+    "lint:fix": "echo skip lint",
+    "format": "biome format src/",
+    "format:fix": "echo skip format",
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "test": "echo test",
+    "test:watch": "echo test",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.0",
+    "zod": "^3.22.4",
+    "@astrolabe/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.9.4",
+    "@types/node": "^22.0.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.0",
+    "vitest": "^1.2.0"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  }
+}
+

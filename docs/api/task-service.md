@@ -1,6 +1,6 @@
 ---
 description: TaskService – business logic helper for hierarchical task operations
-globs: src/core/services/TaskService.ts, test/taskService.test.ts
+globs: packages/core/src/core/services/TaskService.ts, packages/core/test/taskService.test.ts
 alwaysApply: false
 ---
 
@@ -15,7 +15,7 @@ It builds on top of the lower-level `Store` data-access layer, adding helper met
 * Moving/deleting entire sub-trees
 * Bulk status updates
 
-The service contains **no persistence logic of its own** – all reads and writes are delegated to the injected `Store` instance.  This keeps the service easily testable (see [`taskService.test.ts`](mdc:test/taskService.test.ts)).
+The service contains **no persistence logic of its own** – all reads and writes are delegated to the injected `Store` instance.  This keeps the service easily testable (see [`taskService.test.ts`](mdc:packages/core/test/taskService.test.ts)).
 
 ## Importing
 
@@ -31,7 +31,7 @@ import { TaskService } from '@astrolabe/core/services/TaskService';
 new TaskService(store: Store): TaskService
 ```
 
-* **store** – an implementation of the [`Store`](mdc:src/database/store.ts) interface that knows how to load and persist tasks.
+* **store** – an implementation of the [`Store`](mdc:packages/core/src/database/store.ts) interface that knows how to load and persist tasks.
 
 ---
 
@@ -79,7 +79,7 @@ await tasks.updateTreeStatus('epic-45', 'done');
 
 ## Testing
 
-Unit tests live in [`test/taskService.test.ts`](mdc:test/taskService.test.ts).  They use a tiny in-memory `Store` stub so they run quickly without touching a real database.
+Unit tests live in [`test/taskService.test.ts`](mdc:packages/core/test/taskService.test.ts).  They use a tiny in-memory `Store` stub so they run quickly without touching a real database.
 
 ```bash
 pnpm test --filter taskService
@@ -89,6 +89,6 @@ pnpm test --filter taskService
 
 ## See Also
 
-* [`Store` interface](mdc:src/database/store.ts)
-* [`Task` database schema](mdc:src/database/schema.ts)
+* [`Store` interface](mdc:packages/core/src/database/store.ts)
+* [`Task` database schema](mdc:packages/core/src/database/schema.ts)
 * [Task-related CLI helpers](mdc:.cursor/rules/taskmaster.mdc) 

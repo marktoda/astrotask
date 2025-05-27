@@ -42,7 +42,7 @@ Respond in markdown.
 | --- | --- | --- |
 | Project status | `next_task` MCP tool | "show me the next task" |
 | Append research | `update_subtask` | id=`3.2`, prompt=`Found better CRDT lib…` |
-| Add code | Diff via `edit_file` | target=`src/db.ts` |
+| Add code | Diff via `edit_file` | target=`packages/core/src/database/store.ts` |
 | Generate subtasks | `expand_task` | id=`7`, num=`5`, research=`true` |
 
 For full list, see [dev_workflow.mdc](mdc:.cursor/rules/dev_workflow.mdc).
@@ -69,4 +69,4 @@ For full list, see [dev_workflow.mdc](mdc:.cursor/rules/dev_workflow.mdc).
 
 ---
 
-**Happy hacking, Claude!**  Stay concise, stay safe, and always reference the stars (a.k.a. the rules). 🌌 
+**Happy hacking, Claude!**  Stay concise, stay safe, and always reference the stars (a.k.a. the rules). 🌌

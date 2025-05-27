@@ -57,20 +57,27 @@ pnpm test:watch
 
 ```
 astrolabe/
-├── src/                 # Source code
-│   ├── core/           # Core application modules
-│   ├── types/          # TypeScript type definitions
-│   ├── utils/          # Utility functions
-│   └── index.ts        # Main entry point
-├── test/               # Test files
-├── docs/               # Documentation
-│   ├── api/           # API documentation
-│   └── guides/        # User guides
-├── config/            # Configuration files
-├── examples/          # Example usage and demos
-├── scripts/           # Build and utility scripts
-├── tasks/             # Task management files
-└── dist/              # Compiled output
+├── packages/           # Monorepo packages
+│   ├── core/          # Core application library (@astrolabe/core)
+│   │   ├── src/       # Source code
+│   │   ├── test/      # Core tests
+│   │   └── dist/      # Compiled output
+│   ├── cli/           # Command-line interface
+│   │   ├── source/    # CLI source code
+│   │   └── dist/      # Compiled CLI
+│   └── mcp/           # Model Context Protocol server
+│       ├── src/       # MCP server source
+│       └── dist/      # Compiled server
+├── test/              # Integration tests
+├── docs/              # Documentation
+│   ├── api/          # API documentation
+│   └── guides/       # User guides
+├── config/           # Configuration files
+├── examples/         # Example usage and demos
+├── scripts/          # Build and utility scripts
+├── tasks/            # Task management files
+└── .cursor/          # Cursor AI configuration
+    └── rules/        # AI agent guidance rules
 ```
 
 ## Core Dependencies
