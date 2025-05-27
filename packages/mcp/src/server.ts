@@ -14,12 +14,7 @@ import {
   NotFoundError,
   ValidationError,
 } from './errors/index.js';
-import {
-  completeTaskSchema,
-  deleteTaskSchema,
-  getTaskContextSchema,
-  validateInput,
-} from './validation/index.js';
+import { TaskHandlers, ResponseBuilder, type HandlerContext, type TaskContext } from './handlers/index.js';
 
 /**
  * TaskMCPServer - Core implementation of the MCP server for Astrolabe task management
@@ -37,29 +32,10 @@ import {
 // Local utility types
 // ---------------------------------------------------------------------------
 
-// Full context object returned by handleGetTaskContext before stringification
-export interface TaskContext {
-  task: Task;
-  ancestors: Task[];
-  descendants: Task[];
-  relatedTasks: {
-    dependencies: Task[];
-    dependents: Task[];
-    references: Task[];
-  };
-  metadata: {
-    depth: number;
-    totalDescendants: number;
-    isRoot: boolean;
-    hasChildren: boolean;
-    retrievalTimestamp?: string;
-    maxDepthApplied?: number | undefined;
-  };
-}
-
 export class TaskMCPServer {
   private store!: DatabaseStore;
   private taskService!: TaskService;
+  private taskHandlers!: TaskHandlers;
   private isInitialized = false;
 
   async initialize(): Promise<void> {
@@ -70,6 +46,16 @@ export class TaskMCPServer {
       const store = await createDatabase({ dbPath: './data/mcp-server.db' });
       this.store = store as DatabaseStore;
       this.taskService = new TaskService(this.store);
+      
+      // Initialize handlers with context
+      const context: HandlerContext = {
+        store: this.store,
+        taskService: this.taskService,
+        requestId: '', // Will be set per request
+        timestamp: '', // Will be set per request
+      };
+      this.taskHandlers = new TaskHandlers(context);
+      
       this.isInitialized = true;
     } catch (error) {
       throw new Error(`Failed to initialize TaskMCPServer: ${error}`);
@@ -272,424 +258,31 @@ export class TaskMCPServer {
     this.ensureInitialized();
 
     try {
+      // Update request context
+      this.taskHandlers.context.requestId = `req_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+      this.taskHandlers.context.timestamp = new Date().toISOString();
+
       switch (name) {
         case 'listTasks':
-          return await this.handleListTasks(args);
+          return await this.taskHandlers.listTasks(args);
         case 'createTask':
-          return await this.handleCreateTask(args);
+          return await this.taskHandlers.createTask(args);
         case 'updateTask':
-          return await this.handleUpdateTask(args);
+          return await this.taskHandlers.updateTask(args);
         case 'deleteTask':
-          return await this.handleDeleteTask(args);
+          return await this.taskHandlers.deleteTask(args);
         case 'completeTask':
-          return await this.handleCompleteTask(args);
+          return await this.taskHandlers.completeTask(args);
         case 'getTaskContext':
-          return await this.handleGetTaskContext(args);
+          return await this.taskHandlers.getTaskContext(args);
         default:
           throw new Error(`Unknown tool: ${name}`);
       }
     } catch (error) {
-      return {
-        content: [
-          {
-            type: 'text',
-            text: `Error executing ${name}: ${error instanceof Error ? error.message : String(error)}`,
-          },
-        ],
-        isError: true,
-      };
-    }
-  }
-
-  /**
-   * List tasks with filtering and pagination
-   */
-  // biome-ignore lint/suspicious/noExplicitAny: MCP tool args interface requires any
-  private async handleListTasks(args: any) {
-    const schema = z.object({
-      status: z.enum(['pending', 'in-progress', 'done', 'cancelled']).optional(),
-      projectId: z.string().uuid().optional(),
-      parentId: z.string().uuid().optional(),
-      includeSubtasks: z.boolean().default(false),
-    });
-
-    const params = schema.parse(args);
-    let tasks: Task[];
-
-    if (params.parentId) {
-      // Get subtasks of a specific parent
-      tasks = await this.store.listSubtasks(params.parentId);
-    } else if (params.status) {
-      // Filter by status
-      tasks = await this.store.listTasksByStatus(params.status, params.projectId);
-    } else {
-      // Get all tasks or filter by project
-      tasks = await this.store.listTasks(params.projectId);
-    }
-
-    // If including subtasks, get the task trees
-    let result = tasks;
-    if (params.includeSubtasks) {
-      const taskTrees = await Promise.all(
-        tasks.map((task) => this.taskService.getTaskTree(task.id))
-      );
-      result = taskTrees.filter((tree) => tree !== null) as Task[];
-    }
-
-    // Convert to API format
-    const apiTasks = result.map(taskToApi);
-
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify(
-            {
-              tasks: apiTasks,
-              count: apiTasks.length,
-            },
-            null,
-            2
-          ),
-        },
-      ],
-    };
-  }
-
-  /**
-   * Create a new task
-   */
-  // biome-ignore lint/suspicious/noExplicitAny: MCP tool args interface requires any
-  private async handleCreateTask(args: any) {
-    const schema = z.object({
-      title: z.string().min(1).max(200),
-      description: z.string().optional(),
-      parentId: z.string().uuid().optional(),
-      projectId: z.string().uuid().optional(),
-      status: z.enum(['pending', 'in-progress', 'done', 'cancelled']).default('pending'),
-      prd: z.string().optional(),
-      contextDigest: z.string().optional(),
-    });
-
-    const params = schema.parse(args);
-    const task = await this.store.addTask(params);
-    const apiTask = taskToApi(task);
-
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify(
-            {
-              success: true,
-              task: apiTask,
-            },
-            null,
-            2
-          ),
-        },
-      ],
-    };
-  }
-
-  /**
-   * Update an existing task
-   */
-  // biome-ignore lint/suspicious/noExplicitAny: MCP tool args interface requires any
-  private async handleUpdateTask(args: any) {
-    const schema = z.object({
-      id: z.string().uuid(),
-      title: z.string().min(1).max(200).optional(),
-      description: z.string().optional(),
-      status: z.enum(['pending', 'in-progress', 'done', 'cancelled']).optional(),
-      parentId: z.string().uuid().optional(),
-      prd: z.string().optional(),
-      contextDigest: z.string().optional(),
-    });
-
-    const params = schema.parse(args);
-    const { id, ...updates } = params;
-
-    // Filter out undefined values to avoid TypeScript issues
-    const filteredUpdates = Object.fromEntries(
-      Object.entries(updates).filter(([_, value]) => value !== undefined)
-    ) as Partial<Omit<Task, 'id' | 'createdAt'>>;
-
-    const task = await this.store.updateTask(id, filteredUpdates);
-    if (!task) {
-      throw new Error(`Task with ID ${id} not found`);
-    }
-
-    const apiTask = taskToApi(task);
-
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify(
-            {
-              success: true,
-              task: apiTask,
-            },
-            null,
-            2
-          ),
-        },
-      ],
-    };
-  }
-
-  /**
-   * Delete a task (with optional cascade to subtasks)
-   */
-  // biome-ignore lint/suspicious/noExplicitAny: MCP tool args interface requires any
-  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Complex error handling and validation logic required
-  private async handleDeleteTask(args: any) {
-    // Use new validation framework
-    const validatedInput = validateInput(deleteTaskSchema, args);
-
-    try {
-      let success: boolean;
-      if (validatedInput.cascade) {
-        success = await this.taskService.deleteTaskTree(validatedInput.id, true);
-      } else {
-        success = await this.store.deleteTask(validatedInput.id);
-      }
-
-      if (!success) {
-        throw new NotFoundError('Task', validatedInput.id);
-      }
-
-      return {
-        content: [
-          {
-            type: 'text',
-            text: JSON.stringify(
-              {
-                success: true,
-                message: `Task ${validatedInput.id} deleted${validatedInput.cascade ? ' with all subtasks' : ''}`,
-              },
-              null,
-              2
-            ),
-          },
-        ],
-      };
-    } catch (error) {
-      if (error instanceof MCPError) {
-        throw error;
-      }
-
-      // Convert database errors to appropriate MCP errors
-      if (error instanceof Error) {
-        if (error.message.includes('not found')) {
-          throw new NotFoundError('Task', validatedInput.id);
-        }
-        if (error.message.includes('constraint') || error.message.includes('foreign key')) {
-          throw new ConflictError('Task', 'dependencies', validatedInput.id, {
-            reason: 'Cannot delete task due to existing dependencies',
-          });
-        }
-        throw new DatabaseError('task deletion', error);
-      }
-
-      throw new DatabaseError('task deletion');
-    }
-  }
-
-  /**
-   * Mark a task as complete
-   */
-  // biome-ignore lint/suspicious/noExplicitAny: MCP tool args interface requires any
-  private async handleCompleteTask(args: any) {
-    // Use new validation framework
-    const validatedInput = validateInput(completeTaskSchema, args);
-
-    try {
-      const task = await this.store.updateTaskStatus(validatedInput.id, 'done');
-
-      if (!task) {
-        throw new NotFoundError('Task', validatedInput.id);
-      }
-
-      const apiTask = taskToApi(task);
-
-      return {
-        content: [
-          {
-            type: 'text',
-            text: JSON.stringify(
-              {
-                success: true,
-                task: apiTask,
-              },
-              null,
-              2
-            ),
-          },
-        ],
-      };
-    } catch (error) {
-      if (error instanceof MCPError) {
-        throw error;
-      }
-
-      // Convert database errors to appropriate MCP errors
-      if (error instanceof Error) {
-        if (error.message.includes('not found')) {
-          throw new NotFoundError('Task', validatedInput.id);
-        }
-        if (error.message.includes('constraint') || error.message.includes('foreign key')) {
-          throw new ConflictError('Task', 'status', 'done', {
-            reason: 'Cannot complete task due to existing constraints',
-            taskId: validatedInput.id,
-          });
-        }
-        throw new DatabaseError('task completion', error);
-      }
-
-      throw new DatabaseError('task completion');
-    }
-  }
-
-  /**
-   * Get comprehensive task context including ancestors, descendants, and related tasks
-   */
-  // biome-ignore lint/suspicious/noExplicitAny lint/complexity/noExcessiveCognitiveComplexity: MCP handler is inherently complex due to branching logic
-  private async handleGetTaskContext(args: any) {
-    try {
-      // Use the new validation framework instead of basic Zod
-      const validatedArgs = validateInput(getTaskContextSchema, args);
-
-      const { id, includeAncestors, includeDescendants, maxDepth } = validatedArgs;
-
-      // Check if task exists first
-      const task = await this.store.getTask(id);
-      if (!task) {
-        throw new NotFoundError('Task', id);
-      }
-
-      // Initialize context with the target task
-      const context: TaskContext = {
-        task,
-        ancestors: [],
-        descendants: [],
-        relatedTasks: {
-          dependencies: [], // Tasks this task depends on
-          dependents: [], // Tasks that depend on this task
-          references: [], // Tasks that reference this task
-        },
-        metadata: {
-          depth: 0,
-          totalDescendants: 0,
-          isRoot: !task.parentId,
-          hasChildren: false,
-        },
-      };
-
-      // Circular dependency detection set
-      const visitedIds = new Set<string>();
-      visitedIds.add(id);
-
-      // Get ancestors if requested
-      if (includeAncestors) {
-        try {
-          context.ancestors = await this.taskService.getTaskAncestors(id);
-          context.metadata.depth = context.ancestors.length;
-          context.metadata.isRoot = context.ancestors.length === 0;
-        } catch (error) {
-          console.warn(`Failed to retrieve ancestors for task ${id}:`, error);
-          // Continue with empty ancestors rather than failing
-        }
-      }
-
-      // Get descendants if requested
-      if (includeDescendants) {
-        try {
-          // Use TaskService with maxDepth support for performance
-          const taskTree = await this.taskService.getTaskTree(id, maxDepth);
-          if (taskTree) {
-            // Flatten the tree structure to get all descendants
-            // biome-ignore lint/suspicious/noExplicitAny lint/complexity/noExcessiveCognitiveComplexity: Flatten helper balances readability over strict complexity rules
-            const flattenDescendants = (tree: Task & { children?: Task[] }): Task[] => {
-              const descendants: Task[] = [];
-              const stack = [...((tree.children ?? []) as Task[])];
-
-              while (stack.length > 0) {
-                const current = stack.pop() as Task & { children?: Task[] };
-                // Check for circular references
-                if (!visitedIds.has(current.id)) {
-                  visitedIds.add(current.id);
-                  descendants.push(current);
-                  // Add children to stack for further processing
-                  if (current.children && current.children.length > 0) {
-                    stack.push(...(current.children as Task[]));
-                  }
-                } else {
-                  console.warn(`Circular reference detected: task ${current.id} already visited`);
-                }
-              }
-
-              return descendants;
-            };
-
-            context.descendants = flattenDescendants(taskTree);
-            context.metadata.totalDescendants = context.descendants.length;
-            context.metadata.hasChildren = (taskTree.children ?? []).length > 0;
-          }
-        } catch (error) {
-          console.warn(`Failed to retrieve descendants for task ${id}:`, error);
-          // Continue with empty descendants rather than failing
-        }
-      }
-
-      // Get related tasks through dependencies
-      // Note: This is a placeholder implementation since dependency tables aren't set up yet
-      try {
-        // TODO: Implement when dependency schema is available
-        // const dependencies = await this.getTaskDependencies(id);
-        // const dependents = await this.getTaskDependents(id);
-        // const references = await this.getTaskReferences(id);
-
-        // For now, provide empty arrays but log that this feature is pending
-        console.info(`Dependency relationships not yet implemented for task ${id}`);
-
-        context.relatedTasks = {
-          dependencies: [],
-          dependents: [],
-          references: [],
-        };
-      } catch (error) {
-        console.warn(`Failed to retrieve related tasks for task ${id}:`, error);
-        context.relatedTasks = {
-          dependencies: [],
-          dependents: [],
-          references: [],
-        };
-      }
-
-      // Add performance metadata
-      context.metadata.retrievalTimestamp = new Date().toISOString();
-      context.metadata.maxDepthApplied = maxDepth;
-
-      return {
-        content: [
-          {
-            type: 'text',
-            text: JSON.stringify(context, null, 2),
-          },
-        ],
-      };
-    } catch (error) {
-      // Use proper error handling instead of generic Error
-      if (error instanceof NotFoundError || error instanceof ValidationError) {
-        throw error; // Re-throw known MCP errors
-      }
-
-      // Convert unexpected errors to DatabaseError
-      console.error('Unexpected error in handleGetTaskContext:', error);
-      throw new DatabaseError(
-        `Failed to retrieve context for task: ${error instanceof Error ? error.message : 'Unknown error'}`
+      return ResponseBuilder.error(
+        error instanceof Error ? error.message : String(error),
+        error instanceof MCPError ? error.constructor.name : 'UnknownError',
+        error instanceof Error ? { stack: error.stack } : undefined
       );
     }
   }
@@ -719,7 +312,7 @@ export class TaskMCPServer {
     } as const;
     // biome-ignore lint/suspicious/noExplicitAny: MCP SDK tool registration requires any for schema shapes
     mcp.tool('listTasks', listTasksShape as any, async (args, _extra) => {
-      return (await this.handleListTasks(args)) as any;
+      return (await this.taskHandlers.listTasks(args)) as any;
     });
 
     // createTask tool
@@ -733,7 +326,7 @@ export class TaskMCPServer {
       contextDigest: z.string().optional(),
     } as const;
     mcp.tool('createTask', createTaskShape as any, async (args, _extra) => {
-      return (await this.handleCreateTask(args)) as any;
+      return (await this.taskHandlers.createTask(args)) as any;
     });
 
     // updateTask tool
@@ -747,7 +340,7 @@ export class TaskMCPServer {
       contextDigest: z.string().optional(),
     } as const;
     mcp.tool('updateTask', updateTaskShape as any, async (args, _extra) => {
-      return (await this.handleUpdateTask(args)) as any;
+      return (await this.taskHandlers.updateTask(args)) as any;
     });
 
     // deleteTask tool
@@ -756,7 +349,7 @@ export class TaskMCPServer {
       cascade: z.boolean().default(true),
     } as const;
     mcp.tool('deleteTask', deleteTaskShape as any, async (args, _extra) => {
-      return (await this.handleDeleteTask(args)) as any;
+      return (await this.taskHandlers.deleteTask(args)) as any;
     });
 
     // completeTask tool
@@ -764,7 +357,7 @@ export class TaskMCPServer {
       id: z.string().uuid(),
     } as const;
     mcp.tool('completeTask', completeTaskShape as any, async (args, _extra) => {
-      return (await this.handleCompleteTask(args)) as any;
+      return (await this.taskHandlers.completeTask(args)) as any;
     });
 
     // getTaskContext tool
@@ -775,7 +368,7 @@ export class TaskMCPServer {
       maxDepth: z.number().optional(),
     } as const;
     mcp.tool('getTaskContext', getTaskContextShape as any, async (args, _extra) => {
-      return (await this.handleGetTaskContext(args)) as any;
+      return (await this.taskHandlers.getTaskContext(args)) as any;
     });
   }
 }
