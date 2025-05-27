@@ -15,8 +15,8 @@
 		"format": "biome format source/",
 		"format:fix": "biome format --write source/",
 		"dev": "tsc --watch",
-		"test": "echo test",
-		"test:watch": "echo test",
+		"test": "vitest run",
+		"test:watch": "vitest",
 		"type-check": "tsc --noEmit",
 		"verify": "pnpm type-check && pnpm lint:fix && pnpm format:fix && pnpm build && pnpm test"
 	},

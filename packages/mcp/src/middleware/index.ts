@@ -348,7 +348,10 @@ export function composeMiddleware(
   finalHandler: (context: RequestContext) => Promise<unknown>
 ): (context: RequestContext) => Promise<unknown> {
   return (context: RequestContext) => {
-    let index = 0;
+    // Start at -1 so the first middleware (index 0) can be executed without triggering the
+    // "next() called multiple times" guard. This mirrors the behaviour of Koa's compose
+    // implementation and prevents a false-positive error on the initial dispatch.
+    let index = -1;
 
     function dispatch(i: number): Promise<unknown> {
       if (i <= index) {
@@ -357,11 +360,12 @@ export function composeMiddleware(
 
       index = i;
 
-      let fn = middlewares[i];
+      // If we've reached the end of middlewares, call the final handler
       if (i === middlewares.length) {
-        fn = finalHandler as MiddlewareFunction;
+        return Promise.resolve(finalHandler(context));
       }
 
+      const fn = middlewares[i];
       if (!fn) {
         return Promise.resolve();
       }
