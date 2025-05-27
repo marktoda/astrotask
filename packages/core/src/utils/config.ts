@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { loadConfig } from 'zod-config';
 import { dotEnvAdapter } from 'zod-config/dotenv-adapter';
 import { envAdapter } from 'zod-config/env-adapter';
+import { DEFAULT_MODEL_ID } from './models.js';
 
 /**
  * Centralised configuration schema for Astrolabe.
@@ -46,6 +47,10 @@ export const configSchema = z.object({
 
   // ElectricSQL configuration (optional for local-first operation)
   ELECTRIC_URL: z.string().optional(),
+
+  // LLM/AI Configuration
+  OPENAI_API_KEY: z.string().default(''),
+  LLM_MODEL: z.string().default(DEFAULT_MODEL_ID),
 });
 
 export type AppConfig = z.infer<typeof configSchema>;

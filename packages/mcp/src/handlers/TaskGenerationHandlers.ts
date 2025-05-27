@@ -9,7 +9,7 @@
  */
 
 import type { HandlerContext, MCPHandler } from './types.js';
-import { createPRDTaskGenerator, type GenerationError, createModuleLogger } from '@astrolabe/core';
+import { createPRDTaskGenerator, type GenerationError, createModuleLogger, getCurrentModelConfig } from '@astrolabe/core';
 import { taskToApi } from '@astrolabe/core';
 
 /**
@@ -139,6 +139,8 @@ export class TaskGenerationHandlers implements MCPHandler {
    * List available task generators
    */
   async listGenerators(params: ListGeneratorsInput = {}): Promise<object> {
+    const currentModel = getCurrentModelConfig();
+    
     const generators = [
       {
         type: 'prd',
@@ -146,11 +148,17 @@ export class TaskGenerationHandlers implements MCPHandler {
         description: 'Generate tasks from PRD documents using LangChain and OpenAI',
         ...(params.includeMetadata && {
           metadata: {
-            model: process.env.OPENAI_MODEL || 'gpt-4-turbo-preview',
+            model: currentModel.name,
+            modelId: currentModel.id,
+            provider: currentModel.provider,
             maxInputLength: 50000,
             supportedFormats: ['markdown', 'plain text'],
             estimatedProcessingTime: '30-60 seconds',
             typicalTaskCount: '5-15 tasks',
+            maxTokens: currentModel.maxTokens,
+            temperature: currentModel.temperature,
+            inputCostPer1K: currentModel.inputCostPer1K,
+            outputCostPer1K: currentModel.outputCostPer1K,
           },
         }),
       },

@@ -131,6 +131,66 @@ astrolabe create "Review PR #456" --status in-progress
 - `--status <status>`: Initial status
 - `--priority <level>`: Priority level (`high`, `medium`, `low`)
 
+#### `astrolabe task generate [options]`
+
+Generate multiple tasks from a Product Requirements Document (PRD) using AI.
+
+```bash
+# Generate tasks from inline content
+astrolabe task generate --content "Build a user authentication system with JWT tokens, password reset, and email verification"
+
+# Generate tasks from a PRD file
+astrolabe task generate --file ./docs/prd.md
+
+# Generate tasks as subtasks of an existing task
+astrolabe task generate --file ./feature-spec.md --parent task_123
+
+# Preview tasks without saving (dry run)
+astrolabe task generate --content "Create a dashboard with charts" --dry
+
+# Generate with existing tasks as context
+astrolabe task generate --file ./prd.md --context "task_456,task_789" --verbose
+
+# Generate with detailed output
+astrolabe task generate --file ./requirements.md --verbose
+```
+
+**Options:**
+- `--content <text>`: PRD content to generate tasks from (required if no --file)
+- `--file <path>`: Path to PRD file to read (alternative to --content)
+- `--parent <id>`: Parent task ID for generated tasks (creates subtasks)
+- `--context <ids>`: Comma-separated list of existing task IDs for context
+- `--type <type>`: Generator type (currently only 'prd' supported, default: 'prd')
+- `--dry`: Preview tasks without saving to database
+- `--verbose`: Show detailed generation information and validation feedback
+
+**Features:**
+- **🤖 AI-Powered**: Uses OpenAI to intelligently break down requirements
+- **📋 Context-Aware**: Considers existing tasks to avoid duplication
+- **✅ Validation**: Validates PRD content and provides suggestions
+- **🔍 Preview Mode**: Test generation without saving to database
+- **📊 Detailed Feedback**: Shows generation statistics and warnings
+
+**Example PRD Content:**
+```markdown
+# User Authentication System
+
+## Requirements
+- User registration with email verification
+- Login with JWT tokens
+- Password reset functionality
+- Role-based access control
+- Session management
+
+## Technical Details
+- Use bcrypt for password hashing
+- JWT tokens with 24-hour expiry
+- Email service integration
+- Database schema for users and roles
+```
+
+This command will analyze the PRD and generate actionable implementation tasks like "Implement user registration endpoint", "Create email verification service", "Design user database schema", etc.
+
 #### `astrolabe show <id>`
 
 Show detailed information about a specific task.

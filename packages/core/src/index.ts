@@ -20,8 +20,10 @@ export * from './services/generators/TaskGenerator.js';
 export * from './services/generators/PRDTaskGenerator.js';
 export * from './services/generators/schemas.js';
 
-// Configuration
+// Configuration and models
 export * from './utils/config.js';
+export * from './utils/models.js';
+export * from './utils/llm.js';
 
 // Re-export task types
 export type {

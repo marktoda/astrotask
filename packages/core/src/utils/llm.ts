@@ -9,6 +9,8 @@
  */
 
 import { ChatOpenAI } from '@langchain/openai';
+import { cfg } from './config.js';
+import { type ModelConfig, getModelConfig } from './models.js';
 
 /**
  * Configuration options for LLM instances
@@ -27,15 +29,27 @@ export interface LLMConfig {
 }
 
 /**
- * Default LLM configuration
+ * Get LLM configuration for the currently selected model
+ *
+ * @param overrides - Optional configuration overrides
+ * @returns Complete LLM configuration
  */
-export const DEFAULT_LLM_CONFIG: Required<LLMConfig> = {
-  apiKey: process.env.OPENAI_API_KEY || '',
-  modelName: process.env.OPENAI_MODEL || 'gpt-4-turbo-preview',
-  temperature: Number(process.env.OPENAI_TEMPERATURE) || 0.1,
-  maxTokens: Number(process.env.MAX_GENERATION_TOKENS) || 2000,
-  timeout: Number(process.env.GENERATION_TIMEOUT) || 60000,
-};
+export function getLLMConfig(overrides: Partial<LLMConfig> = {}): Required<LLMConfig> {
+  const modelConfig = getModelConfig(cfg.LLM_MODEL);
+
+  return {
+    apiKey: overrides.apiKey ?? cfg.OPENAI_API_KEY,
+    modelName: overrides.modelName ?? modelConfig.id,
+    temperature: overrides.temperature ?? modelConfig.temperature,
+    maxTokens: overrides.maxTokens ?? modelConfig.maxTokens,
+    timeout: overrides.timeout ?? modelConfig.timeout,
+  };
+}
+
+/**
+ * Default LLM configuration using centralized config and model registry
+ */
+export const DEFAULT_LLM_CONFIG: Required<LLMConfig> = getLLMConfig();
 
 /**
  * Create a configured OpenAI LLM instance
@@ -44,9 +58,10 @@ export const DEFAULT_LLM_CONFIG: Required<LLMConfig> = {
  * @returns Configured ChatOpenAI instance
  *
  * @throws {Error} When API key is missing or invalid
+ * @throws {Error} When model ID is not found in registry
  */
 export function createLLM(config: Partial<LLMConfig> = {}): ChatOpenAI {
-  const finalConfig = { ...DEFAULT_LLM_CONFIG, ...config };
+  const finalConfig = getLLMConfig(config);
 
   if (!finalConfig.apiKey) {
     throw new Error('OpenAI API key is required. Set OPENAI_API_KEY environment variable.');
@@ -101,4 +116,13 @@ export function isLLMConfigured(): boolean {
   } catch {
     return false;
   }
+}
+
+/**
+ * Get current model configuration
+ *
+ * @returns Current model configuration from registry
+ */
+export function getCurrentModelConfig(): ModelConfig {
+  return getModelConfig(cfg.LLM_MODEL);
 }
