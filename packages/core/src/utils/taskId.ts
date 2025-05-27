@@ -111,25 +111,16 @@ export async function generateNextSubtaskId(store: Store, parentId: string): Pro
   }
 
   // Extract the last numeric segment from each subtask and find the highest
-  const usedNumbers = subtasks
-    .map((task) => {
-      const parsed = parseTaskId(task.id);
-      return parsed.segments[parsed.segments.length - 1];
-    })
-    .filter((num): num is number => num !== undefined)
-    .sort((a, b) => a - b);
+  const maxNumber = Math.max(
+    ...subtasks
+      .map((task) => {
+        const parsed = parseTaskId(task.id);
+        return parsed.segments[parsed.segments.length - 1];
+      })
+      .filter((num): num is number => num !== undefined)
+  );
 
-  // Find the next available number
-  let nextNumber = 1;
-  for (const num of usedNumbers) {
-    if (num === nextNumber) {
-      nextNumber++;
-    } else {
-      break;
-    }
-  }
-
-  return `${parentId}.${nextNumber}`;
+  return `${parentId}.${maxNumber + 1}`;
 }
 
 /**
