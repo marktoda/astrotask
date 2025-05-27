@@ -247,6 +247,84 @@ export const listTasksSchema = z.object({
 });
 
 /**
+ * Schema for generating tasks from input content via MCP.
+ * Supports different generator types and context information.
+ * 
+ * @constant
+ * @type {z.ZodObject}
+ * @example
+ * ```typescript
+ * // Generate tasks from PRD
+ * const prdGeneration = {
+ *   type: "prd",
+ *   content: "Product requirements document content...",
+ *   context: {
+ *     parentTaskId: "epic_123",
+ *     existingTasks: ["task_1", "task_2"]
+ *   }
+ * };
+ * ```
+ */
+export const generateTasksSchema = z.object({
+  /** Generator type (currently only 'prd' supported) */
+  type: z.string(),
+  /** Source content to generate tasks from */
+  content: z.string().min(1, "Content cannot be empty"),
+  /** Optional context information */
+  context: z.object({
+    /** Parent task ID for generated tasks */
+    parentTaskId: z.string().optional(),
+    /** Existing task IDs for context */
+    existingTasks: z.array(z.string()).optional(),
+  }).optional(),
+  /** Generator-specific metadata and options */
+  metadata: z.record(z.unknown()).optional(),
+});
+
+/**
+ * Schema for listing available task generators via MCP.
+ * 
+ * @constant
+ * @type {z.ZodObject}
+ * @example
+ * ```typescript
+ * // List generators with metadata
+ * const withDetails = { includeMetadata: true };
+ * 
+ * // List generators without metadata
+ * const simple = { includeMetadata: false };
+ * ```
+ */
+export const listGeneratorsSchema = z.object({
+  /** Whether to include detailed metadata about generators */
+  includeMetadata: z.boolean().default(false),
+});
+
+/**
+ * Schema for validating generation input via MCP.
+ * 
+ * @constant
+ * @type {z.ZodObject}
+ * @example
+ * ```typescript
+ * // Validate PRD content
+ * const validation = {
+ *   type: "prd",
+ *   content: "Product requirements...",
+ *   metadata: { "maxTasks": 10 }
+ * };
+ * ```
+ */
+export const validateGenerationInputSchema = z.object({
+  /** Generator type to validate against */
+  type: z.string(),
+  /** Content to validate */
+  content: z.string(),
+  /** Optional metadata for validation */
+  metadata: z.record(z.unknown()).optional(),
+});
+
+/**
  * TypeScript types inferred from the Zod schemas above.
  * These provide compile-time type safety for all MCP operations.
  * 
@@ -270,3 +348,12 @@ export type GetTaskContextInput = z.infer<typeof getTaskContextSchema>;
 
 /** Input type for task listing operations */
 export type ListTasksInput = z.infer<typeof listTasksSchema>;
+
+/** Input type for task generation operations */
+export type GenerateTasksInput = z.infer<typeof generateTasksSchema>;
+
+/** Input type for listing available generators */
+export type ListGeneratorsInput = z.infer<typeof listGeneratorsSchema>;
+
+/** Input type for validating generation input */
+export type ValidateGenerationInputInput = z.infer<typeof validateGenerationInputSchema>;

@@ -3,7 +3,7 @@ import { PGlite } from '@electric-sql/pglite';
 import { type PgliteDatabase, drizzle } from 'drizzle-orm/pglite';
 import { cfg } from '../utils/config.js';
 import { autoMigrate } from './migrate.js';
-import { schema } from './schema.js';
+import * as schema from './schema.js';
 
 /**
  * Database connection interface for PGlite
@@ -146,7 +146,7 @@ export async function initializeDatabase(
     verifyDatabase(db, dbPath, encrypted, verbose);
 
     // Initialize Drizzle ORM
-    const drizzleDb = drizzle(db, { schema });
+    const drizzleDb = drizzle(db, { schema }) as PgliteDatabase<typeof schema>;
 
     const connection: DatabaseConnection = {
       db,

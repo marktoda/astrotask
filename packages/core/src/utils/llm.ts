@@ -1,0 +1,104 @@
+/**
+ * @fileoverview LLM configuration utilities for task generation
+ *
+ * This module provides utilities for configuring and creating LLM instances
+ * for task generation operations.
+ *
+ * @module utils/llm
+ * @since 1.0.0
+ */
+
+import { ChatOpenAI } from '@langchain/openai';
+
+/**
+ * Configuration options for LLM instances
+ */
+export interface LLMConfig {
+  /** OpenAI API key */
+  apiKey?: string;
+  /** Model name to use */
+  modelName?: string;
+  /** Temperature for generation (0-1) */
+  temperature?: number;
+  /** Maximum tokens to generate */
+  maxTokens?: number;
+  /** Request timeout in milliseconds */
+  timeout?: number;
+}
+
+/**
+ * Default LLM configuration
+ */
+export const DEFAULT_LLM_CONFIG: Required<LLMConfig> = {
+  apiKey: process.env.OPENAI_API_KEY || '',
+  modelName: process.env.OPENAI_MODEL || 'gpt-4-turbo-preview',
+  temperature: Number(process.env.OPENAI_TEMPERATURE) || 0.1,
+  maxTokens: Number(process.env.MAX_GENERATION_TOKENS) || 2000,
+  timeout: Number(process.env.GENERATION_TIMEOUT) || 60000,
+};
+
+/**
+ * Create a configured OpenAI LLM instance
+ *
+ * @param config - Optional configuration overrides
+ * @returns Configured ChatOpenAI instance
+ *
+ * @throws {Error} When API key is missing or invalid
+ */
+export function createLLM(config: Partial<LLMConfig> = {}): ChatOpenAI {
+  const finalConfig = { ...DEFAULT_LLM_CONFIG, ...config };
+
+  if (!finalConfig.apiKey) {
+    throw new Error('OpenAI API key is required. Set OPENAI_API_KEY environment variable.');
+  }
+
+  return new ChatOpenAI({
+    openAIApiKey: finalConfig.apiKey,
+    modelName: finalConfig.modelName,
+    temperature: finalConfig.temperature,
+    maxTokens: finalConfig.maxTokens,
+    timeout: finalConfig.timeout,
+  });
+}
+
+/**
+ * Validate LLM configuration
+ *
+ * @param config - Configuration to validate
+ * @returns Array of validation errors, empty if valid
+ */
+export function validateLLMConfig(config: LLMConfig): string[] {
+  const errors: string[] = [];
+
+  if (!config.apiKey || config.apiKey.trim() === '') {
+    errors.push('API key is required');
+  }
+
+  if (config.temperature !== undefined && (config.temperature < 0 || config.temperature > 1)) {
+    errors.push('Temperature must be between 0 and 1');
+  }
+
+  if (config.maxTokens !== undefined && config.maxTokens <= 0) {
+    errors.push('Max tokens must be positive');
+  }
+
+  if (config.timeout !== undefined && config.timeout <= 0) {
+    errors.push('Timeout must be positive');
+  }
+
+  return errors;
+}
+
+/**
+ * Check if LLM is properly configured
+ *
+ * @returns True if LLM can be created with current environment
+ */
+export function isLLMConfigured(): boolean {
+  try {
+    const errors = validateLLMConfig(DEFAULT_LLM_CONFIG);
+    return errors.length === 0;
+  } catch {
+    return false;
+  }
+}

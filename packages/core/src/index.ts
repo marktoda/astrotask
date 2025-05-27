@@ -15,6 +15,11 @@ export const APP_NAME = 'Astrolabe';
 export * from './database/index.js';
 export * from './services/TaskService.js';
 
+// Task generation exports
+export * from './services/generators/TaskGenerator.js';
+export * from './services/generators/PRDTaskGenerator.js';
+export * from './services/generators/schemas.js';
+
 // Configuration
 export * from './utils/config.js';
 

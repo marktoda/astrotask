@@ -1,12 +1,15 @@
 import { randomUUID } from 'node:crypto';
-import { PGlite } from '@electric-sql/pglite';
-import { drizzle, type PgliteDatabase } from 'drizzle-orm/pglite';
+import type { PGlite } from '@electric-sql/pglite';
 import { and, desc, eq, isNull } from 'drizzle-orm';
-import * as schema from './schema.js';
-import type { ElectricConnection } from './electric.js';
-import type { ContextSlice, CreateContextSlice as NewContextSlice } from '../schemas/contextSlice.js';
+import type { PgliteDatabase } from 'drizzle-orm/pglite';
+import type {
+  ContextSlice,
+  CreateContextSlice as NewContextSlice,
+} from '../schemas/contextSlice.js';
 import type { CreateTask as NewTask, Task, TaskStatus } from '../schemas/task.js';
 import { generateNextTaskId } from '../utils/taskId.js';
+import type { ElectricConnection } from './electric.js';
+import * as schema from './schema.js';
 
 /**
  * Store interface for local-first database operations

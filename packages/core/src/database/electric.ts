@@ -70,7 +70,8 @@ export async function createStore(
   }
 
   // Create and return the DatabaseStore instance
-  return new DatabaseStore(pgLite, sql, electric, isEncrypted);
+  // biome-ignore lint/suspicious/noExplicitAny: Type assertion needed for Drizzle schema compatibility
+  return new DatabaseStore(pgLite, sql as any, electric, isEncrypted);
 }
 
 // ---------------------------------------------------------------------------

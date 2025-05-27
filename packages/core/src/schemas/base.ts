@@ -5,7 +5,12 @@ import { CONSTRAINTS } from './types.js';
 export const taskIdPattern = /^[A-Z]+(\.[1-9]\d*)*$/;
 
 // Task ID validator
-export const taskId = z.string().regex(taskIdPattern, 'Invalid task ID format (must be 4 letters like ABCD, XYZW or dotted numbers like ABCD.1, XYZW.2.1)');
+export const taskId = z
+  .string()
+  .regex(
+    taskIdPattern,
+    'Invalid task ID format (must be 4 letters like ABCD, XYZW or dotted numbers like ABCD.1, XYZW.2.1)'
+  );
 export const optionalTaskId = taskId.optional();
 
 // UUID patterns and validators (for context slices and other non-task entities)

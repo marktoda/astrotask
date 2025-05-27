@@ -89,4 +89,6 @@ export const contextSliceRelations = relations(contextSlices, ({ one }) => ({
 export const schema = {
   tasks,
   contextSlices,
+  taskRelations,
+  contextSliceRelations,
 };

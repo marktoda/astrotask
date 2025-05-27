@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { description, optionalTaskId, title, taskId } from './base.js';
+import { description, optionalTaskId, taskId, title } from './base.js';
 
 // Simple task status enum - adding 'archived' to replace project status
 export const taskStatus = z

@@ -5,12 +5,16 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { createDatabase, type DatabaseOptions, TaskService } from '@astrolabe/core';
 import {
   TaskHandlers,
+  TaskGenerationHandlers,
   listTasksSchema,
   createTaskSchema,
   updateTaskSchema,
   deleteTaskSchema,
   completeTaskSchema,
-  getTaskContextSchema
+  getTaskContextSchema,
+  generateTasksSchema,
+  listGeneratorsSchema,
+  validateGenerationInputSchema
 } from './handlers/index.js';
 
 /**
@@ -78,15 +82,19 @@ async function main() {
   // Create TaskService with the store
   const taskService = new TaskService(store);
 
-  // Create task handlers with context
-  const taskHandlers = new TaskHandlers({
+  // Create handler context
+  const handlerContext = {
     store,
     taskService,
     requestId: 'main',
     timestamp: new Date().toISOString(),
-  });
+  };
 
-  // Register tools using simple object notation as shown in MCP docs
+  // Create task handlers with context
+  const taskHandlers = new TaskHandlers(handlerContext);
+  const taskGenerationHandlers = new TaskGenerationHandlers(handlerContext);
+
+  // Register core task management tools
   server.tool('listTasks',
     listTasksSchema.shape,
     wrap(async (args) => {
@@ -129,11 +137,33 @@ async function main() {
     })
   );
 
+  // Register task generation tools
+  server.tool('generateTasks',
+    generateTasksSchema.shape,
+    wrap(async (args) => {
+      return taskGenerationHandlers.generateTasks(args);
+    })
+  );
+
+  server.tool('listGenerators',
+    listGeneratorsSchema.shape,
+    wrap(async (args) => {
+      return taskGenerationHandlers.listGenerators(args);
+    })
+  );
+
+  server.tool('validateGenerationInput',
+    validateGenerationInputSchema.shape,
+    wrap(async (args) => {
+      return taskGenerationHandlers.validateGenerationInput(args);
+    })
+  );
+
   // Begin listening on stdio
   const transport = new StdioServerTransport();
   await server.connect(transport);
 
-  console.error('Astrolabe MCP Server started successfully');
+  console.error('Astrolabe MCP Server started successfully with task generation support');
 }
 
 // Handle cleanup on process termination
