@@ -1,8 +1,10 @@
 import type { NewTask } from "@astrolabe/core";
 import { Text } from "ink";
 import { useEffect, useState } from "react";
+import { useDatabase } from '../../context/DatabaseContext.js';
 import zod from "zod";
-import type { TaskProps } from "./_app.js";
+
+export const description = 'Add a task';
 
 export const options = zod.object({
 	title: zod.string().describe("Task title"),
@@ -10,11 +12,12 @@ export const options = zod.object({
 	parent: zod.string().optional().describe("Parent task ID"),
 });
 
-type Props = TaskProps<{
+type Props = {
 	options: zod.infer<typeof options>;
-}>;
+};
 
-export default function Add({ options, db }: Props) {
+export default function Add({ options }: Props) {
+	const db = useDatabase();
 	const [result, setResult] = useState<string | null>(null);
 	const [error, setError] = useState<string | null>(null);
 

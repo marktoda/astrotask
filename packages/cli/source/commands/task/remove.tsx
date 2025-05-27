@@ -1,17 +1,20 @@
 import { Text } from "ink";
 import { useEffect, useState } from "react";
+import { useDatabase } from '../../context/DatabaseContext.js';
 import zod from "zod";
-import type { TaskProps } from "./_app.js";
+
+export const description = 'Remove a task';
 
 export const options = zod.object({
 	id: zod.string().describe("Task ID to remove"),
 });
 
-type Props = TaskProps<{
+type Props = {
 	options: zod.infer<typeof options>;
-}>;
+};
 
-export default function Remove({ options, db }: Props) {
+export default function Remove({ options }: Props) {
+	const db = useDatabase();
 	const [result, setResult] = useState<string | null>(null);
 	const [error, setError] = useState<string | null>(null);
 

@@ -1,16 +1,12 @@
 import type { Task } from "@astrolabe/core";
 import { Box, Text } from "ink";
 import { useEffect, useState } from "react";
-import zod from "zod";
-import type { TaskProps } from "./_app.js";
+import { useDatabase } from '../../context/DatabaseContext.js';
 
-export const options = zod.object({});
+export const description = 'List tasks, optionally filtered by project';
 
-type Props = TaskProps<{
-	options: zod.infer<typeof options>;
-}>;
-
-export default function List({ db }: Props) {
+export default function List() {
+	const db = useDatabase();
 	const [tasks, setTasks] = useState<Task[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);

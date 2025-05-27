@@ -1,17 +1,20 @@
 import { Text } from "ink";
 import { useEffect, useState } from "react";
 import zod from "zod";
-import type { TaskProps } from "./_app.js";
+import { useDatabase } from '../../context/DatabaseContext.js';
+
+export const description = 'Mark a task as completed';
 
 export const options = zod.object({
 	id: zod.string().describe("Task ID to mark as done"),
 });
 
-type Props = TaskProps<{
+type Props = {
 	options: zod.infer<typeof options>;
-}>;
+};
 
-export default function Done({ options, db }: Props) {
+export default function Done({ options }: Props) {
+	const db = useDatabase();
 	const [result, setResult] = useState<string | null>(null);
 	const [error, setError] = useState<string | null>(null);
 

@@ -1,5 +1,6 @@
 import { existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 /**
  * Database migration utilities using Drizzle's built-in PGlite migrator
  */
@@ -8,6 +9,33 @@ import { createModuleLogger } from '../utils/logger.js';
 import type { DatabaseConnection } from './config.js';
 
 const logger = createModuleLogger('Migration');
+
+/**
+ * Find the package root by walking up directories until we find package.json
+ */
+function findPackageRoot(startPath: string): string {
+  let currentPath = startPath;
+
+  while (currentPath !== dirname(currentPath)) {
+    if (existsSync(join(currentPath, 'package.json'))) {
+      return currentPath;
+    }
+    currentPath = dirname(currentPath);
+  }
+
+  throw new Error('Could not find package.json in any parent directory');
+}
+
+/**
+ * Resolve the migrations folder path by finding package root
+ */
+function resolveMigrationsPath(): string {
+  const currentFile = fileURLToPath(import.meta.url);
+  const packageRoot = findPackageRoot(dirname(currentFile));
+
+  // Always use the source migrations directory
+  return join(packageRoot, 'src', 'database', 'migrations');
+}
 
 /**
  * Run database migrations using Drizzle's built-in migrator
@@ -23,8 +51,8 @@ export async function runMigrations(
     verbose?: boolean;
   } = {}
 ): Promise<void> {
-  // Locate migrations folder relative to this file to ensure it works regardless of CWD
-  const defaultFolder = join(new URL('.', import.meta.url).pathname, 'migrations');
+  // Use the resolved migrations path as default
+  const defaultFolder = resolveMigrationsPath();
 
   const { migrationsFolder = defaultFolder, verbose = false } = options;
 
