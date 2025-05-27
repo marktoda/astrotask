@@ -123,7 +123,7 @@ describe('TaskHandlers', () => {
         status: 'pending' as const,
         priority: 'medium' as const
       };
-      const createdTask = { id: '1', ...taskData };
+      const createdTask = { id: 'A', ...taskData };
       
       mockStore.addTask.mockResolvedValue(createdTask);
 
@@ -144,7 +144,7 @@ describe('TaskHandlers', () => {
         status: 'pending' as const,
         priority: 'medium' as const
       };
-      const createdTask = { id: '1', title: 'New Task', status: 'pending', priority: 'medium' };
+      const createdTask = { id: 'A', title: 'New Task', status: 'pending', priority: 'medium' };
       
       mockStore.addTask.mockResolvedValue(createdTask);
 
@@ -165,13 +165,13 @@ describe('TaskHandlers', () => {
       const taskData = {
         title: 'New Task',
         description: 'Description',
-        parentId: 'parent-1',
+        parentId: 'A',
         priority: 'high' as const,
         status: 'in-progress' as const,
         prd: 'PRD content',
         contextDigest: 'digest-123'
       };
-      const createdTask = { id: '1', ...taskData };
+      const createdTask = { id: 'A.1', ...taskData };
       
       mockStore.addTask.mockResolvedValue(createdTask);
 
@@ -184,17 +184,17 @@ describe('TaskHandlers', () => {
 
   describe('updateTask', () => {
     it('should update existing task', async () => {
-      const existingTask = { id: '1', title: 'Old Title' };
-      const updateData = { id: '1', title: 'New Title' };
-      const updatedTask = { id: '1', title: 'New Title' };
+      const existingTask = { id: 'A', title: 'Old Title' };
+      const updateData = { id: 'A', title: 'New Title' };
+      const updatedTask = { id: 'A', title: 'New Title' };
 
       mockStore.getTask.mockResolvedValue(existingTask);
       mockStore.updateTask.mockResolvedValue(updatedTask);
 
       const result = await taskHandlers.updateTask(updateData);
 
-      expect(mockStore.getTask).toHaveBeenCalledWith('1');
-      expect(mockStore.updateTask).toHaveBeenCalledWith('1', {
+      expect(mockStore.getTask).toHaveBeenCalledWith('A');
+      expect(mockStore.updateTask).toHaveBeenCalledWith('A', {
         title: 'New Title',
         description: undefined,
         status: undefined,
@@ -208,120 +208,120 @@ describe('TaskHandlers', () => {
     it('should throw error when task not found', async () => {
       mockStore.getTask.mockResolvedValue(null);
 
-      await expect(taskHandlers.updateTask({ id: '1', title: 'New Title' }))
+      await expect(taskHandlers.updateTask({ id: 'A', title: 'New Title' }))
         .rejects.toThrow('Task not found');
     });
 
     it('should throw error when update fails', async () => {
-      const existingTask = { id: '1', title: 'Old Title' };
+      const existingTask = { id: 'A', title: 'Old Title' };
 
       mockStore.getTask.mockResolvedValue(existingTask);
       mockStore.updateTask.mockResolvedValue(null);
 
-      await expect(taskHandlers.updateTask({ id: '1', title: 'New Title' }))
+      await expect(taskHandlers.updateTask({ id: 'A', title: 'New Title' }))
         .rejects.toThrow('Failed to update task');
     });
   });
 
   describe('deleteTask', () => {
     it('should delete task without subtasks', async () => {
-      const existingTask = { id: '1', title: 'Task to delete' };
+      const existingTask = { id: 'A', title: 'Task to delete' };
       
       mockStore.getTask.mockResolvedValue(existingTask);
       mockStore.listTasks.mockResolvedValue([]);
       mockStore.deleteTask.mockResolvedValue(undefined);
 
-      const result = await taskHandlers.deleteTask({ id: '1', cascade: false });
+      const result = await taskHandlers.deleteTask({ id: 'A', cascade: false });
 
-      expect(mockStore.getTask).toHaveBeenCalledWith('1');
-      expect(mockStore.listTasks).toHaveBeenCalledWith({ parentId: '1' });
-      expect(mockStore.deleteTask).toHaveBeenCalledWith('1');
+      expect(mockStore.getTask).toHaveBeenCalledWith('A');
+      expect(mockStore.listTasks).toHaveBeenCalledWith({ parentId: 'A' });
+      expect(mockStore.deleteTask).toHaveBeenCalledWith('A');
       expect(result).toEqual({
         success: true,
-        message: 'Task 1 deleted'
+        message: 'Task A deleted'
       });
     });
 
     it('should delete task with cascade option', async () => {
-      const existingTask = { id: '1', title: 'Task to delete' };
+      const existingTask = { id: 'A', title: 'Task to delete' };
       
       mockStore.getTask.mockResolvedValue(existingTask);
       mockTaskService.deleteTaskTree.mockResolvedValue(undefined);
 
-      const result = await taskHandlers.deleteTask({ id: '1', cascade: true });
+      const result = await taskHandlers.deleteTask({ id: 'A', cascade: true });
 
-      expect(mockTaskService.deleteTaskTree).toHaveBeenCalledWith('1', true);
+      expect(mockTaskService.deleteTaskTree).toHaveBeenCalledWith('A', true);
       expect(result).toEqual({
         success: true,
-        message: 'Task 1 deleted with all subtasks'
+        message: 'Task A deleted with all subtasks'
       });
     });
 
     it('should throw error when task not found', async () => {
       mockStore.getTask.mockResolvedValue(null);
 
-      await expect(taskHandlers.deleteTask({ id: '1', cascade: false }))
+      await expect(taskHandlers.deleteTask({ id: 'A', cascade: false }))
         .rejects.toThrow('Task not found');
     });
 
     it('should throw error when deleting task with subtasks without cascade', async () => {
-      const existingTask = { id: '1', title: 'Task with subtasks' };
-      const subtasks = [{ id: '1.1', title: 'Subtask' }];
+      const existingTask = { id: 'A', title: 'Task with subtasks' };
+      const subtasks = [{ id: 'A.1', title: 'Subtask' }];
       
       mockStore.getTask.mockResolvedValue(existingTask);
       mockStore.listTasks.mockResolvedValue(subtasks);
 
-      await expect(taskHandlers.deleteTask({ id: '1', cascade: false }))
+      await expect(taskHandlers.deleteTask({ id: 'A', cascade: false }))
         .rejects.toThrow('Cannot delete task with subtasks without cascade option');
     });
   });
 
   describe('completeTask', () => {
     it('should mark task as done', async () => {
-      const existingTask = { id: '1', title: 'Task', status: 'pending' };
-      const completedTask = { id: '1', title: 'Task', status: 'done' };
+      const existingTask = { id: 'A', title: 'Task', status: 'pending' };
+      const completedTask = { id: 'A', title: 'Task', status: 'done' };
 
       mockStore.getTask.mockResolvedValue(existingTask);
       mockStore.updateTask.mockResolvedValue(completedTask);
 
-      const result = await taskHandlers.completeTask({ id: '1' });
+      const result = await taskHandlers.completeTask({ id: 'A' });
 
-      expect(mockStore.getTask).toHaveBeenCalledWith('1');
-      expect(mockStore.updateTask).toHaveBeenCalledWith('1', { status: 'done' });
+      expect(mockStore.getTask).toHaveBeenCalledWith('A');
+      expect(mockStore.updateTask).toHaveBeenCalledWith('A', { status: 'done' });
       expect(result).toEqual(completedTask);
     });
 
     it('should throw error when task not found', async () => {
       mockStore.getTask.mockResolvedValue(null);
 
-      await expect(taskHandlers.completeTask({ id: '1' }))
+      await expect(taskHandlers.completeTask({ id: 'A' }))
         .rejects.toThrow('Task not found');
     });
 
     it('should throw error when completion fails', async () => {
-      const existingTask = { id: '1', title: 'Task' };
+      const existingTask = { id: 'A', title: 'Task' };
 
       mockStore.getTask.mockResolvedValue(existingTask);
       mockStore.updateTask.mockResolvedValue(null);
 
-      await expect(taskHandlers.completeTask({ id: '1' }))
+      await expect(taskHandlers.completeTask({ id: 'A' }))
         .rejects.toThrow('Failed to complete task');
     });
   });
 
   describe('getTaskContext', () => {
     it('should return basic task context', async () => {
-      const task = { id: '1', title: 'Test Task' };
+      const task = { id: 'A', title: 'Test Task' };
       const subtasks = [
-        { id: '1.1', status: 'done' },
-        { id: '1.2', status: 'pending' }
+        { id: 'A.1', status: 'done' },
+        { id: 'A.2', status: 'pending' }
       ];
 
       mockStore.getTask.mockResolvedValue(task);
       mockStore.listTasks.mockResolvedValue(subtasks);
 
       const result = await taskHandlers.getTaskContext({ 
-        id: '1',
+        id: 'A',
         includeAncestors: false,
         includeDescendants: false,
         maxDepth: 3
@@ -341,40 +341,40 @@ describe('TaskHandlers', () => {
     });
 
     it('should include ancestors when requested', async () => {
-      const task = { id: '1.1', title: 'Subtask' };
-      const ancestors = [{ id: '1', title: 'Parent Task' }];
+      const task = { id: 'A.1', title: 'Subtask' };
+      const ancestors = [{ id: 'A', title: 'Parent Task' }];
 
       mockStore.getTask.mockResolvedValue(task);
       mockStore.listTasks.mockResolvedValue([]);
       mockTaskService.getTaskAncestors.mockResolvedValue(ancestors);
 
       const result = await taskHandlers.getTaskContext({ 
-        id: '1.1',
+        id: 'A.1',
         includeAncestors: true,
         includeDescendants: false,
         maxDepth: 3
       });
 
-      expect(mockTaskService.getTaskAncestors).toHaveBeenCalledWith('1.1');
+      expect(mockTaskService.getTaskAncestors).toHaveBeenCalledWith('A.1');
       expect(result.ancestors).toEqual(ancestors);
     });
 
     it('should include descendants when requested', async () => {
-      const task = { id: '1', title: 'Parent Task' };
-      const descendants = [{ id: '1.1', title: 'Child Task' }];
+      const task = { id: 'A', title: 'Parent Task' };
+      const descendants = [{ id: 'A.1', title: 'Child Task' }];
 
       mockStore.getTask.mockResolvedValue(task);
       mockStore.listTasks.mockResolvedValue([]);
       mockTaskService.getTaskDescendants.mockResolvedValue(descendants);
 
       const result = await taskHandlers.getTaskContext({ 
-        id: '1',
+        id: 'A',
         includeAncestors: false,
         includeDescendants: true,
         maxDepth: 3
       });
 
-      expect(mockTaskService.getTaskDescendants).toHaveBeenCalledWith('1');
+      expect(mockTaskService.getTaskDescendants).toHaveBeenCalledWith('A');
       expect(result.descendants).toEqual(descendants);
     });
 
@@ -382,7 +382,7 @@ describe('TaskHandlers', () => {
       mockStore.getTask.mockResolvedValue(null);
 
       await expect(taskHandlers.getTaskContext({ 
-        id: '1',
+        id: 'A',
         includeAncestors: false,
         includeDescendants: false,
         maxDepth: 3
@@ -391,19 +391,19 @@ describe('TaskHandlers', () => {
     });
 
     it('should calculate metadata correctly', async () => {
-      const task = { id: '1', title: 'Test Task' };
+      const task = { id: 'A', title: 'Test Task' };
       const subtasks = [
-        { id: '1.1', status: 'done' },
-        { id: '1.2', status: 'done' },
-        { id: '1.3', status: 'pending' },
-        { id: '1.4', status: 'in-progress' }
+        { id: 'A.1', status: 'done' },
+        { id: 'A.2', status: 'done' },
+        { id: 'A.3', status: 'pending' },
+        { id: 'A.4', status: 'in-progress' }
       ];
 
       mockStore.getTask.mockResolvedValue(task);
       mockStore.listTasks.mockResolvedValue(subtasks);
 
       const result = await taskHandlers.getTaskContext({ 
-        id: '1',
+        id: 'A',
         includeAncestors: false,
         includeDescendants: false,
         maxDepth: 3

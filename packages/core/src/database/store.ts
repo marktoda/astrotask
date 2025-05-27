@@ -1,16 +1,12 @@
 import { randomUUID } from 'node:crypto';
-import type { PGlite } from '@electric-sql/pglite';
+import { PGlite } from '@electric-sql/pglite';
+import { drizzle, type PgliteDatabase } from 'drizzle-orm/pglite';
 import { and, desc, eq, isNull } from 'drizzle-orm';
-import type { PgliteDatabase } from 'drizzle-orm/pglite';
+import * as schema from './schema.js';
 import type { ElectricConnection } from './electric.js';
-import { schema } from './schema.js';
-
-// Import types from Zod schemas (single source of truth)
-import type {
-  ContextSlice,
-  CreateContextSlice as NewContextSlice,
-} from '../schemas/contextSlice.js';
+import type { ContextSlice, CreateContextSlice as NewContextSlice } from '../schemas/contextSlice.js';
 import type { CreateTask as NewTask, Task, TaskStatus } from '../schemas/task.js';
+import { generateNextTaskId } from '../utils/taskId.js';
 
 /**
  * Store interface for local-first database operations
@@ -111,7 +107,7 @@ export class DatabaseStore implements Store {
 
   async addTask(data: NewTask): Promise<Task> {
     const taskData = {
-      id: data.id || randomUUID(),
+      id: await generateNextTaskId(this, data.parentId ?? undefined),
       parentId: data.parentId ?? null,
       title: data.title,
       description: data.description ?? null,

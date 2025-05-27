@@ -36,14 +36,9 @@ interface GenerationContext {
 }
 
 interface GenerationResult {
-  tasks: GeneratedTask[];
-  metadata?: Record<string, unknown>;  // Flexible metadata populated by generator
+  tasks: CreateTask[]; // Direct CreateTask objects ready for database
+  metadata?: Record<string, unknown>; // Flexible metadata populated by generator
   warnings?: string[];
-}
-
-interface GeneratedTask extends Omit<CreateTask, 'parentId'> {
-  tempId: string;                    // Temporary ID for hierarchy resolution
-  parentTempId?: string | null;      // Reference to parent's tempId
 }
 
 interface ValidationResult {
@@ -51,6 +46,20 @@ interface ValidationResult {
   errors?: string[];
   warnings?: string[];
   suggestions?: string[];
+}
+
+// LLM chain result structure - outputs CreateTask directly
+interface LLMChainResult {
+  tasks: Omit<CreateTask, 'parentId'>[]; // LLM outputs tasks without parentId
+  confidence: number;
+  warnings?: string[];
+}
+
+// Input parameters for LangChain invoke
+interface LLMChainInput {
+  content: string;
+  existingTasks: Task[];
+  metadata: Record<string, unknown>;
 }
 ```
 
@@ -60,159 +69,131 @@ Since we're starting with just PRD generation, we'll integrate the `PRDTaskGener
 
 ```typescript
 class PRDTaskGenerator {
-  readonly type = 'prd';
+  readonly type = "prd";
   
   private chain: RunnableSequence;
   
   constructor(
-    private llm: ChatOpenAI,
-    private logger: Logger
+    private llm: ChatOpenAI, 
+    private logger: Logger,
+    private store: Store
   ) {
     this.initializeChain();
   }
 
-  async generate(input: GenerationInput): Promise<GenerationResult>;
-  async validate(input: GenerationInput): Promise<ValidationResult>;
-  
-  async createTasks(
-    result: GenerationResult,
-    store: Store,
-    rootParentId?: string | null
-  ): Promise<Task[]>;
-  
-  private resolveTempIds(
-    generatedTasks: GeneratedTask[],
-    rootParentId?: string | null
-  ): CreateTask[];
+  async generate(
+    input: GenerationInput,
+    parentId?: string | null
+  ): Promise<CreateTask[]> {
+    const startTime = Date.now();
+
+    // Parse PRD and generate tasks
+    const chainInput: LLMChainInput = {
+      content: input.content,
+      existingTasks: input.context?.existingTasks || [],
+      metadata: input.metadata || {},
+    };
+
+    const result: LLMChainResult = await this.chain.invoke(chainInput);
+
+    // Just add parentId to complete CreateTask objects
+    const createTasks: CreateTask[] = result.tasks.map(task => ({
+      ...task,
+      parentId, // All tasks get the same parent (or null for root)
+    }));
+
+    // Store metadata for potential use (could be returned or logged)
+    const metadata = {
+      generator: this.type,
+      inputSize: input.content.length,
+      processingTime: Date.now() - startTime,
+      model: this.llm.modelName,
+      confidence: result.confidence,
+      tasksGenerated: createTasks.length,
+      ...input.metadata,
+    };
+
+    this.logger.info('Tasks generated successfully', metadata);
+
+    return createTasks;
+  }
+
+  async validate(input: GenerationInput): Promise<ValidationResult> {
+    // Validate PRD format and content
+    if (input.content.length === 0) {
+      return { valid: false, errors: ["Empty content provided"] };
+    }
+
+    if (input.content.length > 50000) {
+      return {
+        valid: false,
+        errors: ["Content too large (max 50KB)"],
+        suggestions: ["Split into smaller documents"],
+      };
+    }
+
+    return { valid: true };
+  }
+
+  private initializeChain(): void {
+    // Set up LangGraph workflow for PRD analysis
+    // This will include prompts that instruct the LLM to:
+    // 1. Identify main features/requirements
+    // 2. Break down into implementable tasks
+    // 3. Set appropriate priorities
+    // 4. Output tasks in CreateTask format (without parentId)
+  }
 }
 ```
 
-### Hierarchy Resolution
+### Simple Task Creation
 
-The system handles task hierarchy through temporary IDs that get resolved during creation:
+The system generates a flat list of sibling tasks under a single parent:
 
 ```typescript
-// During generation, tasks use temporary IDs
-const generatedTasks: GeneratedTask[] = [
+// LLM outputs CreateTask objects directly (without parentId)
+const llmTasks: Omit<CreateTask, 'parentId'>[] = [
   {
-    tempId: "epic-1",
-    title: "User Authentication System",
-    description: "Implement complete auth system",
-    parentTempId: null,  // Root task
+    title: "Design user authentication API",
+    description: "Create REST endpoints for login/logout/register",
     priority: "high",
-    status: "pending"
+    status: "pending",
+    prd: "Users need secure authentication system",
   },
   {
-    tempId: "task-1-1", 
-    title: "Design login API",
-    description: "Create REST endpoints for authentication",
-    parentTempId: "epic-1",  // Child of epic-1
-    priority: "high",
-    status: "pending"
+    title: "Implement JWT token management",
+    description: "Add JWT generation, validation, and refresh",
+    priority: "high", 
+    status: "pending",
+    prd: "Tokens should expire after 24 hours",
   },
   {
-    tempId: "task-1-2",
-    title: "Implement JWT tokens", 
-    description: "Add JWT token generation and validation",
-    parentTempId: "epic-1",  // Child of epic-1
+    title: "Create user registration form",
+    description: "Build frontend form with validation",
     priority: "medium",
-    status: "pending"
-  }
+    status: "pending",
+    prd: "Form should validate email format and password strength",
+  },
 ];
 
-// Service resolves hierarchy when creating actual tasks
-const createdTasks = await this.createGeneratedTasks(result, "parent-task-uuid");
+// Just add parentId to complete CreateTask objects
+const createTasks: CreateTask[] = llmTasks.map(task => ({
+  ...task,
+  parentId: "parent-task-uuid", // All tasks get the same parent
+}));
 ```
 
 ## Implementation Strategy
 
 ### Simple Start: Direct PRD Generator
 
-We'll implement the PRD generator directly without a complex service layer. If we later need multiple generator types, we can refactor to add a service layer.
-
-```typescript
-class PRDTaskGenerator {
-  readonly type = 'prd';
-  
-  private chain: RunnableSequence;
-  
-  constructor(
-    private llm: ChatOpenAI,
-    private logger: Logger
-  ) {
-    this.initializeChain();
-  }
-
-  async generate(input: GenerationInput): Promise<GenerationResult> {
-    const startTime = Date.now();
-    
-    // Parse PRD and generate hierarchical tasks
-    const result = await this.chain.invoke({
-      content: input.content,
-      existingTasks: input.context?.existingTasks || [],
-      metadata: input.metadata || {}
-    });
-    
-    return {
-      tasks: this.buildTaskHierarchy(result.tasks),
-      metadata: {
-        generator: this.type,
-        inputSize: input.content.length,
-        processingTime: Date.now() - startTime,
-        model: this.llm.modelName,
-        confidence: result.confidence,
-        ...input.metadata
-      },
-      warnings: result.warnings
-    };
-  }
-
-  async validate(input: GenerationInput): Promise<ValidationResult> {
-    // Validate PRD format and content
-    if (input.content.length === 0) {
-      return { valid: false, errors: ['Empty content provided'] };
-    }
-    
-    if (input.content.length > 50000) {
-      return { 
-        valid: false, 
-        errors: ['Content too large (max 50KB)'],
-        suggestions: ['Split into smaller documents']
-      };
-    }
-    
-    return { valid: true };
-  }
-
-  private buildTaskHierarchy(rawTasks: any[]): GeneratedTask[] {
-    // Convert LLM output to structured hierarchy with tempIds
-    return rawTasks.map((task, index) => ({
-      tempId: task.tempId || `task-${index}`,
-      parentTempId: task.parentTempId || null,
-      title: task.title,
-      description: task.description,
-      priority: task.priority || 'medium',
-      status: 'pending' as const,
-      prd: task.requirements,
-      contextDigest: task.context
-    }));
-  }
-
-  private initializeChain(): void {
-    // Set up LangGraph workflow for PRD analysis
-    // This will include prompts that instruct the LLM to:
-    // 1. Identify main epics/features
-    // 2. Break down into implementable tasks  
-    // 3. Create proper hierarchy with tempIds
-    // 4. Set appropriate priorities
-  }
-}
-```
+We'll implement the PRD generator directly without a complex service layer. If we later need multiple generator types, we can refactor to add a service layer. We should use structured output features of langchain.
 
 ### Future Expansion
 
 When we need additional generator types, we can:
-1. Extract the common `TaskGenerator` interface  
+
+1. Extract the common `TaskGenerator` interface
 2. Create a `TaskGenerationService` with registration
 3. Move the MCP handlers to use the service layer
 4. Add new generator implementations
@@ -228,11 +209,13 @@ Add these tools to the existing MCP handler system:
 export const generateTasksSchema = z.object({
   type: z.string(),
   content: z.string(),
-  context: z.object({
-    parentTaskId: z.string().optional(),
-    existingTasks: z.array(z.string()).optional(),  // Task IDs for context
-  }).optional(),
-  metadata: z.record(z.unknown()).optional(),  // Generator-specific options
+  context: z
+    .object({
+      parentTaskId: z.string().optional(),
+      existingTasks: z.array(z.string()).optional(), // Task IDs for context
+    })
+    .optional(),
+  metadata: z.record(z.unknown()).optional(), // Generator-specific options
 });
 
 // List available generators
@@ -254,54 +237,52 @@ export const validateGenerationInputSchema = z.object({
 export class TaskGenerationHandlers implements MCPHandler {
   private prdGenerator: PRDTaskGenerator;
 
-  constructor(
-    public readonly context: HandlerContext
-  ) {
+  constructor(public readonly context: HandlerContext) {
     // Initialize PRD generator with LLM configuration
     const llm = new ChatOpenAI({
       openAIApiKey: process.env.OPENAI_API_KEY,
-      modelName: process.env.OPENAI_MODEL || 'gpt-4-turbo-preview',
+      modelName: process.env.OPENAI_MODEL || "gpt-4-turbo-preview",
       temperature: 0.1,
     });
-    
-    this.prdGenerator = new PRDTaskGenerator(llm, context.logger);
+
+    this.prdGenerator = new PRDTaskGenerator(llm, this.context.logger, this.context.store);
   }
 
   async generateTasks(params: GenerateTasksInput): Promise<object> {
     // Only support PRD generation for now
-    if (params.type !== 'prd') {
-      throw new Error(`Unsupported generator type: ${params.type}. Only 'prd' is currently supported.`);
+    if (params.type !== "prd") {
+      throw new Error(
+        `Unsupported generator type: ${params.type}. Only 'prd' is currently supported.`
+      );
     }
 
     // Load existing tasks for context if requested
     let existingTasks: Task[] = [];
     if (params.context?.existingTasks) {
       existingTasks = await Promise.all(
-        params.context.existingTasks.map(id => this.context.store.getTask(id))
-      ).then(tasks => tasks.filter(Boolean) as Task[]);
+        params.context.existingTasks.map((id) => this.context.store.getTask(id))
+      ).then((tasks) => tasks.filter(Boolean) as Task[]);
     }
 
     // Generate tasks
-    const result = await this.prdGenerator.generate({
-      content: params.content,
-      context: {
-        ...params.context,
-        existingTasks
+    const createTasks = await this.prdGenerator.generate(
+      {
+        content: params.content,
+        context: {
+          ...params.context,
+          existingTasks,
+        },
+        metadata: params.metadata,
       },
-      metadata: params.metadata,
-    });
-
-    // Create tasks in the database with proper hierarchy
-    const createdTasks = await this.prdGenerator.createTasks(
-      result,
-      this.context.store,
       params.context?.parentTaskId
     );
 
     return {
-      tasks: createdTasks.map(taskToApi),
-      metadata: result.metadata,
-      warnings: result.warnings,
+      tasks: createTasks.map(taskToApi),
+      metadata: {
+        generator: "prd",
+        tasksGenerated: createTasks.length,
+      },
     };
   }
 
@@ -309,24 +290,28 @@ export class TaskGenerationHandlers implements MCPHandler {
     return {
       generators: [
         {
-          type: 'prd',
-          name: 'Product Requirements Document Generator',
-          description: 'Generate tasks from PRD documents using LangChain',
+          type: "prd",
+          name: "Product Requirements Document Generator",
+          description: "Generate tasks from PRD documents using LangChain",
           ...(params.includeMetadata && {
             metadata: {
-              model: process.env.OPENAI_MODEL || 'gpt-4-turbo-preview',
+              model: process.env.OPENAI_MODEL || "gpt-4-turbo-preview",
               maxInputLength: 50000,
-              supportedFormats: ['markdown', 'plain text']
-            }
-          })
-        }
-      ]
+              supportedFormats: ["markdown", "plain text"],
+            },
+          }),
+        },
+      ],
     };
   }
 
-  async validateGenerationInput(params: ValidateGenerationInputInput): Promise<object> {
-    if (params.type !== 'prd') {
-      throw new Error(`Unsupported generator type: ${params.type}. Only 'prd' is currently supported.`);
+  async validateGenerationInput(
+    params: ValidateGenerationInputInput
+  ): Promise<object> {
+    if (params.type !== "prd") {
+      throw new Error(
+        `Unsupported generator type: ${params.type}. Only 'prd' is currently supported.`
+      );
     }
 
     return this.prdGenerator.validate({
@@ -342,91 +327,16 @@ export class TaskGenerationHandlers implements MCPHandler {
 ```
 packages/core/src/
 ├── services/
-│   └── TaskService.ts                    # Existing (no new service needed)
-├── generators/
-│   ├── index.ts                          # Export PRDTaskGenerator
-│   ├── base/
-│   │   └── types.ts                      # Shared types and interfaces
-│   ├── prd/
-│   │   ├── PRDTaskGenerator.ts           # Main implementation
-│   │   ├── prompts.ts                    # LLM prompts
-│   │   └── validator.ts                  # Input validation
-│   └── schemas/
-│       └── generation.ts                 # Zod schemas
+│   ├── TaskService.ts                    # Existing
+│   └── generators/
+│       ├── PRDTaskGenerator.ts           # Main PRD generator implementation
+│       └── schemas.ts                    # Zod schemas for generation
 └── utils/
-    └── llm.ts                            # LLM configuration utilities
+    ├── llm.ts                            # LLM configuration utilities
+    └── prompts.ts                        # Shared LLM prompts
 
 packages/mcp/src/handlers/
-└── TaskGenerationHandlers.ts             # MCP integration with PRDTaskGenerator
-```
-
-## Hierarchy Resolution Algorithm
-
-```typescript
-class PRDTaskGenerator {
-  private resolveTempIds(
-    generatedTasks: GeneratedTask[],
-    rootParentId?: string | null
-  ): CreateTask[] {
-    const idMapping = new Map<string, string>();
-    
-    // Generate UUIDs for all tasks
-    for (const task of generatedTasks) {
-      idMapping.set(task.tempId, crypto.randomUUID());
-    }
-    
-    // Build final tasks with resolved parent relationships
-    const resolvedTasks: CreateTask[] = [];
-    
-    for (const task of generatedTasks) {
-      const actualId = idMapping.get(task.tempId)!;
-      let actualParentId: string | null = null;
-      
-      if (task.parentTempId) {
-        // Child of another generated task
-        actualParentId = idMapping.get(task.parentTempId) || null;
-      } else if (rootParentId) {
-        // Root task gets the provided parent
-        actualParentId = rootParentId;
-      }
-      
-      resolvedTasks.push({
-        id: actualId,
-        parentId: actualParentId,
-        title: task.title,
-        description: task.description,
-        status: task.status,
-        priority: task.priority,
-        prd: task.prd,
-        contextDigest: task.contextDigest,
-      });
-    }
-    
-    return resolvedTasks;
-  }
-
-  async createTasks(
-    result: GenerationResult,
-    store: Store,
-    rootParentId?: string | null
-  ): Promise<Task[]> {
-    // Resolve temp IDs to actual CreateTask objects
-    const createTaskRequests = this.resolveTempIds(result.tasks, rootParentId);
-    
-    // Create tasks in database (parents before children)
-    const createdTasks: Task[] = [];
-    
-    // Simple approach: create all tasks (store should handle ordering)
-    for (const taskRequest of createTaskRequests) {
-      const task = await store.createTask(taskRequest);
-      if (task) {
-        createdTasks.push(task);
-      }
-    }
-    
-    return createdTasks;
-  }
-}
+└── TaskGenerationHandlers.ts             # MCP integration with generators
 ```
 
 ## Configuration
@@ -487,20 +397,20 @@ Add to `packages/core/package.json`:
 
 ```typescript
 // Generator testing
-describe('PRDTaskGenerator', () => {
-  it('should generate tasks with proper hierarchy');
-  it('should assign meaningful tempIds');
-  it('should validate PRD format');
-  it('should handle malformed input gracefully');
-  it('should respect metadata options');
+describe("PRDTaskGenerator", () => {
+  it("should generate tasks with proper hierarchy");
+  it("should assign meaningful tempIds");
+  it("should validate PRD format");
+  it("should handle malformed input gracefully");
+  it("should respect metadata options");
 });
 
 // Service testing  
-describe('TaskGenerationService', () => {
-  it('should resolve tempIds to UUIDs correctly');
-  it('should maintain parent-child relationships');
-  it('should handle circular references gracefully');
-  it('should create tasks in correct order');
+describe("TaskGenerationService", () => {
+  it("should resolve tempIds to UUIDs correctly");
+  it("should maintain parent-child relationships");
+  it("should handle circular references gracefully");
+  it("should create tasks in correct order");
 });
 ```
 
@@ -508,11 +418,11 @@ describe('TaskGenerationService', () => {
 
 ```typescript
 // MCP handler testing
-describe('TaskGenerationHandlers', () => {
-  it('should generate hierarchical tasks via MCP');
-  it('should link generated tasks to specified parent');
-  it('should return proper error responses');
-  it('should validate input parameters');
+describe("TaskGenerationHandlers", () => {
+  it("should generate hierarchical tasks via MCP");
+  it("should link generated tasks to specified parent");
+  it("should return proper error responses");
+  it("should validate input parameters");
 });
 ```
 
@@ -520,12 +430,12 @@ describe('TaskGenerationHandlers', () => {
 
 ```typescript
 enum GenerationErrorType {
-  INVALID_INPUT = 'invalid_input',
-  GENERATOR_NOT_FOUND = 'generator_not_found', 
-  LLM_ERROR = 'llm_error',
-  TIMEOUT = 'timeout',
-  RATE_LIMIT = 'rate_limit',
-  HIERARCHY_ERROR = 'hierarchy_error',
+  INVALID_INPUT = "invalid_input",
+  GENERATOR_NOT_FOUND = "generator_not_found",
+  LLM_ERROR = "llm_error",
+  TIMEOUT = "timeout",
+  RATE_LIMIT = "rate_limit",
+  HIERARCHY_ERROR = "hierarchy_error",
 }
 
 class GenerationError extends Error {

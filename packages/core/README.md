@@ -43,19 +43,25 @@ const taskService = new TaskService(store);
 
 // Create a new task
 const task = await taskService.createTask({
-  title: 'Implement user authentication',
-  description: 'Add JWT-based auth with refresh tokens',
-  status: 'pending'
+  title: 'Fix login bug',
+  description: 'Users cannot login with special characters in password',
+  status: 'pending',
+  parentId: 'A' // Optional: make this a subtask
 });
 
 // List all tasks
 const tasks = await taskService.listTasks();
 
 // Get task with full context
-const context = await taskService.getTaskContext(task.id, {
+const context = await taskService.getTaskContext('A', {
+  includeAncestors: true,
   includeDescendants: true,
   maxDepth: 3
 });
+
+console.log(context.task);      // The main task
+console.log(context.ancestors); // Parent tasks up the hierarchy
+console.log(context.descendants); // Child tasks down the hierarchy
 ```
 
 ## Core Concepts
@@ -110,7 +116,7 @@ const task = await taskService.createTask({
   title: 'Fix login bug',
   description: 'Users cannot login with special characters in password',
   status: 'pending',
-  parentId: 'task_parent_123' // Optional: make this a subtask
+  parentId: 'A' // Optional: make this a subtask
 });
 ```
 
@@ -119,7 +125,7 @@ const task = await taskService.createTask({
 Updates an existing task.
 
 ```typescript
-const updatedTask = await taskService.updateTask('task_123', {
+const updatedTask = await taskService.updateTask('A', {
   status: 'done',
   description: 'Updated description with solution details'
 });
@@ -131,10 +137,10 @@ Deletes a task, optionally including all subtasks.
 
 ```typescript
 // Delete just the task
-await taskService.deleteTask('task_123');
+await taskService.deleteTask('A');
 
 // Delete task and all subtasks
-await taskService.deleteTask('task_123', { cascade: true });
+await taskService.deleteTask('A', { cascade: true });
 ```
 
 ##### `listTasks(filters?: ListTasksFilter): Promise<Task[]>`
@@ -149,7 +155,7 @@ const pendingTasks = await taskService.listTasks({
 
 // Get all subtasks of a parent
 const subtasks = await taskService.listTasks({ 
-  parentId: 'task_123' 
+  parentId: 'A' 
 });
 ```
 
@@ -158,7 +164,7 @@ const subtasks = await taskService.listTasks({
 Retrieves a task with its full context including ancestors and descendants.
 
 ```typescript
-const context = await taskService.getTaskContext('task_123', {
+const context = await taskService.getTaskContext('A', {
   includeAncestors: true,
   includeDescendants: true,
   maxDepth: 3
@@ -226,7 +232,7 @@ import { createModuleLogger } from '@astrolabe/core';
 
 const logger = createModuleLogger('MyModule');
 
-logger.info('Task created', { taskId: 'task_123' });
+logger.info('Task created', { taskId: 'A' });
 logger.error('Database error', { error: error.message });
 logger.debug('Detailed debug info', { details: complexObject });
 ```
@@ -307,6 +313,7 @@ describe('Task operations', () => {
 - Task status `todo` is now `pending`
 - Database schema includes new `contextDigest` field
 - `NewTask` type is deprecated, use `CreateTask` instead
+- **Task IDs are now human-readable**: Instead of UUIDs, tasks use letter-based IDs (A, B, AA) for root tasks and dotted numbers (A.1, A.2) for subtasks
 
 ## Contributing
 
@@ -324,4 +331,4 @@ MIT License - see [LICENSE](../../LICENSE) for details.
 ## Related Packages
 
 - [`@astrolabe/mcp`](../mcp/README.md) - MCP server for AI agent integration
-- [`@astrolabe/cli`](../cli/README.md) - Command-line interface 
+- [`@astrolabe/cli`](../cli/README.md) - Command-line interface

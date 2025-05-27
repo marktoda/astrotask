@@ -10,11 +10,10 @@ import type { Store } from '../src/database/store.js';
 /**
  * Helper to create a NewTask object for insertion during tests.
  */
-function createTask(data: Partial<NewTask> & { id: string }): NewTask {
+function createTask(data: Partial<NewTask> & { title: string }): NewTask {
   return {
-    id: data.id,
     parentId: data.parentId,
-    title: data.title ?? `Task ${data.id}`,
+    title: data.title,
     description: data.description ?? undefined,
     status: data.status ?? 'pending',
     priority: data.priority ?? 'medium',
@@ -33,20 +32,19 @@ beforeEach(async () => {
   dbPath = join(tmpdir(), `taskservice-test-${Date.now()}.db`);
   store = await createDatabase({ dbPath, verbose: false });
 
-  // Seed a small task hierarchy:
-  //   1
-  //   ├─ 1.1
-  //   │   └─ 1.1.1
-  //   └─ 1.2
-  const tasks = [
-    createTask({ id: '1' }),
-    createTask({ id: '1.1', parentId: '1' }),
-    createTask({ id: '1.2', parentId: '1' }),
-    createTask({ id: '1.1.1', parentId: '1.1' }),
-  ];
-  for (const t of tasks) {
-    await store.addTask(t);
-  }
+  // Seed a small task hierarchy - create them one by one to get the auto-generated IDs
+  const taskA = await store.addTask(createTask({ title: 'Task A' }));
+  const taskA1 = await store.addTask(createTask({ title: 'Task A.1', parentId: taskA.id }));
+  const taskA2 = await store.addTask(createTask({ title: 'Task A.2', parentId: taskA.id }));
+  const taskA11 = await store.addTask(createTask({ title: 'Task A.1.1', parentId: taskA1.id }));
+
+  // Store the IDs for use in tests
+  (global as any).testTaskIds = {
+    A: taskA.id,
+    A1: taskA1.id,
+    A2: taskA2.id,
+    A11: taskA11.id,
+  };
 
   service = new TaskService(store);
 });
@@ -63,65 +61,129 @@ afterEach(async () => {
 
 describe('TaskService', () => {
   it('builds a complete task tree', async () => {
-    const tree = await service.getTaskTree('1');
+    const { A } = (global as any).testTaskIds;
+    const tree = await service.getTaskTree(A);
     expect(tree).not.toBeNull();
     if (!tree) return;
-    expect(tree.id).toBe('1');
+    expect(tree.id).toBe(A);
     expect(tree.children.length).toBe(2);
-    const childIds = tree.children.map((c) => c.id).sort();
-    expect(childIds).toEqual(['1.1', '1.2']);
-    const grandchildNode = tree.children.find((c) => c.id === '1.1')!;
-    expect(grandchildNode.children[0].id).toBe('1.1.1');
+    const childA1 = tree.children.find(c => c.title === 'Task A.1');
+    const childA2 = tree.children.find(c => c.title === 'Task A.2');
+    expect(childA1).toBeTruthy();
+    expect(childA2).toBeTruthy();
+    const grandchildNode = childA1!;
+    expect(grandchildNode.children.length).toBe(1);
+    expect(grandchildNode.children[0].title).toBe('Task A.1.1');
   });
 
   it('honours maxDepth when building tree', async () => {
-    const tree = await service.getTaskTree('1', 1);
+    const { A } = (global as any).testTaskIds;
+    const tree = await service.getTaskTree(A, 1);
     expect(tree!.children.length).toBe(2);
     expect(tree!.children[0].children.length).toBe(0); // depth limited – grandchildren excluded
   });
 
   it('returns ordered ancestors (root first)', async () => {
-    const ancestors = await service.getTaskAncestors('1.1.1');
-    expect(ancestors.map((a) => a.id)).toEqual(['1', '1.1']);
+    const { A11, A, A1 } = (global as any).testTaskIds;
+    const ancestors = await service.getTaskAncestors(A11);
+    expect(ancestors.map((a) => a.id)).toEqual([A, A1]);
   });
 
   it('lists all descendants', async () => {
-    const descendants = await service.getTaskDescendants('1');
+    const { A, A1, A2, A11 } = (global as any).testTaskIds;
+    const descendants = await service.getTaskDescendants(A);
     const ids = descendants.map((d) => d.id).sort();
-    expect(ids).toEqual(['1.1', '1.1.1', '1.2']);
+    expect(ids).toEqual([A1, A11, A2].sort());
   });
 
   it('calculates correct task depth', async () => {
-    expect(await service.getTaskDepth('1')).toBe(0);
-    expect(await service.getTaskDepth('1.1')).toBe(1);
-    expect(await service.getTaskDepth('1.1.1')).toBe(2);
+    const { A, A1, A11 } = (global as any).testTaskIds;
+    expect(await service.getTaskDepth(A)).toBe(0);
+    expect(await service.getTaskDepth(A1)).toBe(1);
+    expect(await service.getTaskDepth(A11)).toBe(2);
   });
 
   it('moves task subtree to a new parent', async () => {
-    const moved = await service.moveTaskTree('1.2', '1.1');
+    const { A2, A1 } = (global as any).testTaskIds;
+    const moved = await service.moveTaskTree(A2, A1);
     expect(moved).toBe(true);
-    const updated = await store.getTask('1.2');
-    expect(updated?.parentId).toBe('1.1');
+    const updated = await store.getTask(A2);
+    expect(updated?.parentId).toBe(A1);
   });
 
   it('prevents moving a task under its own descendant (circular)', async () => {
-    const moved = await service.moveTaskTree('1', '1.1'); // would create circular reference
+    const { A, A1 } = (global as any).testTaskIds;
+    const moved = await service.moveTaskTree(A, A1); // would create circular reference
     expect(moved).toBe(false);
   });
 
   it('deletes a task subtree with cascade', async () => {
-    const deleted = await service.deleteTaskTree('1.1', true);
+    const { A1, A11 } = (global as any).testTaskIds;
+    const deleted = await service.deleteTaskTree(A1, true);
     expect(deleted).toBe(true);
-    expect(await store.getTask('1.1')).toBeNull();
-    expect(await store.getTask('1.1.1')).toBeNull();
+    expect(await store.getTask(A1)).toBeNull();
+    expect(await store.getTask(A11)).toBeNull();
   });
 
   it('updates status across entire subtree', async () => {
-    const updatedCount = await service.updateTreeStatus('1', 'done');
+    const { A, A1, A2, A11 } = (global as any).testTaskIds;
+    const updatedCount = await service.updateTreeStatus(A, 'done');
     expect(updatedCount).toBe(4); // root + 3 descendants
     const statuses = (
-      await Promise.all(['1', '1.1', '1.1.1', '1.2'].map((id) => store.getTask(id)))
+      await Promise.all([A, A1, A11, A2].map((id) => store.getTask(id)))
     ).map((t) => t!.status);
     expect(new Set(statuses)).toEqual(new Set(['done']));
+  });
+
+  describe('Store operations', () => {
+    it('should list all tasks', async () => {
+      const tasks = await store.listTasks();
+      expect(tasks).toHaveLength(4);
+    });
+
+    it('should list root tasks', async () => {
+      const rootTasks = await store.listRootTasks();
+      expect(rootTasks).toHaveLength(1);
+      expect(rootTasks[0].title).toBe('Task A');
+    });
+
+    it('should list subtasks for a given parent', async () => {
+      const { A } = (global as any).testTaskIds;
+      const subtasks = await store.listSubtasks(A);
+      expect(subtasks).toHaveLength(2);
+      expect(subtasks.map(t => t.title)).toEqual(expect.arrayContaining(['Task A.1', 'Task A.2']));
+    });
+
+    it('should add a new root task', async () => {
+      const data = createTask({ title: 'New Task' });
+      const newTask = await store.addTask(data);
+
+      expect(newTask.id).toBeDefined();
+      expect(newTask.title).toBe('New Task');
+      expect(newTask.parentId).toBeNull();
+      expect(newTask.status).toBe('pending');
+    });
+
+    it('should update an existing task', async () => {
+      const { A } = (global as any).testTaskIds;
+      const updatedTask = await store.updateTask(A, {
+        title: 'Updated Task A',
+        status: 'done',
+      });
+
+      expect(updatedTask).toBeTruthy();
+      expect(updatedTask?.title).toBe('Updated Task A');
+      expect(updatedTask?.status).toBe('done');
+    });
+
+    it('should delete an existing task', async () => {
+      const { A11 } = (global as any).testTaskIds;
+      const deleted = await store.deleteTask(A11);
+      expect(deleted).toBe(true);
+
+      // Verify it's actually deleted
+      const task = await store.getTask(A11);
+      expect(task).toBeNull();
+    });
   });
 }); 

@@ -140,7 +140,7 @@ Update an existing task.
 {
   "name": "updateTask",
   "arguments": {
-    "id": "task_123",
+    "id": "A",
     "status": "done",
     "description": "Completed: Added JWT auth with bcrypt password hashing"
   }
@@ -160,7 +160,7 @@ Delete a task.
 {
   "name": "deleteTask",
   "arguments": {
-    "id": "task_123",
+    "id": "A",
     "cascade": true
   }
 }
@@ -178,7 +178,7 @@ Mark a task as complete. This is a convenience tool that sets status to `done`.
 {
   "name": "completeTask",
   "arguments": {
-    "id": "task_123"
+    "id": "A"
   }
 }
 ```
@@ -198,7 +198,7 @@ Retrieve a task with its full context including related tasks.
 {
   "name": "getTaskContext",
   "arguments": {
-    "id": "task_123",
+    "id": "A",
     "includeAncestors": true,
     "includeDescendants": true,
     "maxDepth": 5

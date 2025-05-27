@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { description, optionalUuid, title, uuid } from './base.js';
+import { description, optionalTaskId, title, taskId } from './base.js';
 
 // Simple task status enum - adding 'archived' to replace project status
 export const taskStatus = z
@@ -11,8 +11,8 @@ export const taskPriority = z.enum(['low', 'medium', 'high']).default('medium');
 
 // Database Task schema - matches what Drizzle returns (Date objects, nullable fields)
 export const taskSchema = z.object({
-  id: uuid,
-  parentId: optionalUuid.nullable(), // Database returns null, not undefined
+  id: taskId,
+  parentId: optionalTaskId.nullable(), // Database returns null, not undefined
   title: title,
   description: description.nullable(), // Database returns null, not undefined
   status: taskStatus,
@@ -35,8 +35,7 @@ export const createTaskSchema = taskSchema
     updatedAt: true,
   })
   .extend({
-    id: uuid.optional(), // Allow optional ID for creation
-    parentId: optionalUuid.optional(), // API uses optional, transform to null for DB
+    parentId: optionalTaskId.optional(), // API uses optional, transform to null for DB
     description: description.optional(), // API uses optional, transform to null for DB
     prd: z.string().optional(),
     contextDigest: z.string().optional(),
@@ -44,12 +43,12 @@ export const createTaskSchema = taskSchema
 
 // Task update schema (all fields optional except id)
 export const updateTaskSchema = taskSchema.partial().extend({
-  id: uuid, // ID is required for updates
+  id: taskId, // ID is required for updates
 });
 
 // API Task schema - for serialization (ISO string timestamps, optional fields)
 export const taskApiSchema = taskSchema.extend({
-  parentId: optionalUuid.optional(), // API uses optional instead of null
+  parentId: optionalTaskId.optional(), // API uses optional instead of null
   description: description.optional(), // API uses optional instead of null
   prd: z.string().optional(),
   contextDigest: z.string().optional(),
@@ -58,7 +57,7 @@ export const taskApiSchema = taskSchema.extend({
 });
 
 export const createTaskApiSchema = createTaskSchema.extend({
-  parentId: optionalUuid.optional(),
+  parentId: optionalTaskId.optional(),
   description: description.optional(),
   prd: z.string().optional(),
   contextDigest: z.string().optional(),
