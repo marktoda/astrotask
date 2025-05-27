@@ -10,7 +10,8 @@
     "lint:fix": "pnpm -r lint:fix",
     "format": "pnpm -r format",
     "format:fix": "pnpm -r format:fix",
-    "verify": "pnpm -r build && pnpm -r lint:fix && pnpm -r format:fix && pnpm -r test"
+    "verify": "pnpm -r build && pnpm -r lint:fix && pnpm -r format:fix && pnpm -r test",
+    "cli": "node packages/cli/dist/cli.js"
   },
   "engines": {
     "node": ">=16",
