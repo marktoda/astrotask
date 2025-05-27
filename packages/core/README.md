@@ -313,7 +313,22 @@ describe('Task operations', () => {
 - Task status `todo` is now `pending`
 - Database schema includes new `contextDigest` field
 - `NewTask` type is deprecated, use `CreateTask` instead
-- **Task IDs are now human-readable**: Instead of UUIDs, tasks use letter-based IDs (A, B, AA) for root tasks and dotted numbers (A.1, A.2) for subtasks
+- **Task IDs are now human-readable**: Instead of UUIDs, tasks use random 4-letter combinations (ABCD, XYZW) for root tasks and dotted numbers (ABCD.1, ABCD.2) for subtasks
+
+## Migration from UUID to Human-Readable IDs
+
+**Previous UUID format:**
+- Tasks had UUIDs like `550e8400-e29b-41d4-a716-446655440000`
+- Difficult for humans to remember and type
+- No hierarchical meaning
+
+**New human-readable format:**
+- Root tasks: Random 4-letter combinations (e.g., `ABCD`, `XYZW`, `QRST`)
+- Subtasks: `ABCD.1`, `ABCD.2`, `XYZW.1`
+- Sub-subtasks: `ABCD.1.1`, `ABCD.1.2`
+- Much easier for humans and AI agents to work with
+- Clear hierarchical structure
+- Low collision probability (456,976 possible root IDs)
 
 ## Contributing
 
