@@ -6,7 +6,8 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "build": "tsc",
+    "build": "rimraf dist && tsc",
+    "start": "node dist/packages/mcp/src/index.js",
     "type-check": "tsc --noEmit",
     "lint": "biome lint src/",
     "lint:fix": "biome lint --write src/",
@@ -33,6 +34,7 @@
     "tsup": "^8.3.5",
     "typescript": "^5.7.2",
     "vitest": "^2.1.8",
+    "rimraf": "^5.0.5",
     "biome": "^0.3.3"
   },
   "files": [
