@@ -1,5 +1,5 @@
-import type { Store } from '../../database/store.js';
-import type { Task, TaskStatus } from '../../schemas/task.js';
+import type { Store } from '../database/store.js';
+import type { Task, TaskStatus } from '../schemas/task.js';
 
 /**
  * TaskService - Business logic layer for hierarchical task operations

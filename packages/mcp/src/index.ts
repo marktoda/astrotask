@@ -34,7 +34,7 @@ function wrapMCPResponse<T>(data: T, isError: boolean = false) {
 function wrapMCPError(error: unknown, context?: string) {
   const errorMessage = error instanceof Error ? error.message : String(error);
   const fullMessage = context ? `${context}: ${errorMessage}` : errorMessage;
-  
+
   return {
     content: [
       {
@@ -72,7 +72,7 @@ async function main() {
   });
 
   // Initialize database and services - createDatabase returns a Store directly
-  const dbOptions: DatabaseOptions = { dbPath: ':memory:' };
+  const dbOptions: DatabaseOptions = { dbPath: 'mcp.db' };
   const store = await createDatabase(dbOptions);
 
   // Create TaskService with the store

@@ -18,8 +18,7 @@ export type { Store } from './database/store.js';
 export type { DatabaseOptions } from './database/index.js';
 
 // Re-export TaskService for hierarchical operations
-export { TaskService } from './core/services/TaskService.js';
-export type { TaskTree } from './core/services/TaskService.js';
+export { TaskService, type TaskTree } from './services/TaskService.js';
 
 // Re-export task types
 export type {
