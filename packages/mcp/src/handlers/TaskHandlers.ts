@@ -24,6 +24,14 @@ export class TaskHandlers {
   constructor(readonly context: HandlerContext) { }
 
   async listTasks(args: ListTasksInput): Promise<Task[] | any[]> {
+    // Optimize for the common case: all tasks with subtrees
+    if (args.includeSubtasks && !args.parentId && !args.status) {
+      // Use synthetic root to get the complete task hierarchy in one call
+      const syntheticTree = await this.context.taskService.getTaskTree();
+      return syntheticTree ? [syntheticTree.toPlainObject()] : [];
+    }
+
+    // Handle filtered queries with existing logic
     let tasks: Task[];
 
     if (args.parentId) {
@@ -38,7 +46,7 @@ export class TaskHandlers {
     }
 
     if (args.includeSubtasks) {
-      // Use the optimized batch tree loading method
+      // Use the optimized batch tree loading method for filtered results
       const taskTrees = await this.context.taskService.getTaskTrees(
         tasks.map(task => task.id)
       );

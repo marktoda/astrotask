@@ -1,4 +1,5 @@
 import type { Task } from "@astrolabe/core";
+import { TaskService } from "@astrolabe/core";
 import { Box, Text } from "ink";
 import { useEffect, useState } from "react";
 import { useDatabase } from "../../context/DatabaseContext.js";
@@ -14,8 +15,21 @@ export default function List() {
 	useEffect(() => {
 		async function loadTasks() {
 			try {
-				const allTasks = await db.listTasks();
-				setTasks(allTasks);
+				const taskService = new TaskService(db);
+				const syntheticTree = await taskService.getTaskTree();
+
+				if (syntheticTree) {
+					// Extract all tasks from the tree, excluding the synthetic root
+					const allTasks: Task[] = [];
+					syntheticTree.walkDepthFirst((node) => {
+						if (node.task.id !== "__SYNTHETIC_ROOT__") {
+							allTasks.push(node.task);
+						}
+					});
+					setTasks(allTasks);
+				} else {
+					setTasks([]);
+				}
 			} catch (err) {
 				setError(err instanceof Error ? err.message : "Failed to load tasks");
 			} finally {
