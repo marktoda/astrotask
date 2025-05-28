@@ -31,6 +31,25 @@ export {
 } from './contextSlice.js';
 
 export {
+  taskDependencySchema,
+  createTaskDependencySchema,
+  taskDependencyGraphSchema,
+  taskWithDependenciesSchema,
+  dependencyValidationResultSchema,
+  taskDependencyApiSchema,
+  createTaskDependencyApiSchema,
+  taskDependencyToApi,
+  taskDependencyFromApi,
+  type TaskDependency,
+  type CreateTaskDependency,
+  type TaskDependencyGraph,
+  type TaskWithDependencies,
+  type DependencyValidationResult,
+  type TaskDependencyApi,
+  type CreateTaskDependencyApi,
+} from './dependency.js';
+
+export {
   uuid,
   optionalUuid,
   title,

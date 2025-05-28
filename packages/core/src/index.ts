@@ -14,6 +14,7 @@ export const APP_NAME = 'Astrolabe';
 // Core functionality
 export * from './database/index.js';
 export { TaskService } from './services/TaskService.js';
+export { DependencyService } from './services/DependencyService.js';
 
 // Schema exports
 export {
@@ -27,6 +28,15 @@ export {
   createContextSliceSchema,
   updateContextSliceSchema,
   validateContextSlice,
+  taskDependencySchema,
+  createTaskDependencySchema,
+  taskDependencyGraphSchema,
+  taskWithDependenciesSchema,
+  dependencyValidationResultSchema,
+  taskDependencyApiSchema,
+  createTaskDependencyApiSchema,
+  taskDependencyToApi,
+  taskDependencyFromApi,
   uuid,
   optionalUuid,
   title,
@@ -106,6 +116,17 @@ export type {
   ContextSlice,
   CreateContextSlice as NewContextSlice,
 } from './schemas/contextSlice.js';
+
+// Re-export dependency types
+export type {
+  TaskDependency,
+  CreateTaskDependency,
+  TaskDependencyGraph,
+  TaskWithDependencies,
+  DependencyValidationResult,
+  TaskDependencyApi,
+  CreateTaskDependencyApi,
+} from './schemas/dependency.js';
 
 // Create application logger
 const logger = createModuleLogger('App');

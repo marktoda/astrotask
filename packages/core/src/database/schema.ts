@@ -1,6 +1,6 @@
 // @ts-nocheck
 import { relations, sql } from 'drizzle-orm';
-import { check, foreignKey, pgTable, text, timestamp } from 'drizzle-orm/pg-core';
+import { check, foreignKey, pgTable, text, timestamp, unique } from 'drizzle-orm/pg-core';
 
 /*
   Drizzle ORM schema definition for Astrolabe using PostgreSQL (PGlite).
@@ -50,6 +50,28 @@ export const tasks = pgTable(
 );
 
 // ---------------------------------------------------------------------------
+// task_dependencies
+// ---------------------------------------------------------------------------
+export const taskDependencies = pgTable(
+  'task_dependencies',
+  {
+    id: text('id').primaryKey(),
+    dependentTaskId: text('dependent_task_id').notNull().references(() => tasks.id, { onDelete: 'cascade' }),
+    dependencyTaskId: text('dependency_task_id').notNull().references(() => tasks.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    // Ensure no duplicate dependencies
+    unique('unique_dependency').on(table.dependentTaskId, table.dependencyTaskId),
+    // Prevent self-dependencies
+    check(
+      'no_self_dependency',
+      sql`${table.dependentTaskId} != ${table.dependencyTaskId}`
+    ),
+  ]
+);
+
+// ---------------------------------------------------------------------------
 // context_slices
 // ---------------------------------------------------------------------------
 export const contextSlices = pgTable('context_slices', {
@@ -76,6 +98,28 @@ export const taskRelations = relations(tasks, ({ one, many }) => ({
   }),
   children: many(tasks),
   contextSlices: many(contextSlices),
+  // Dependencies where this task is the dependent (tasks this task depends on)
+  dependencies: many(taskDependencies, {
+    relationName: 'taskDependencies',
+  }),
+  // Dependencies where this task is the dependency (tasks that depend on this task)
+  dependents: many(taskDependencies, {
+    relationName: 'taskDependents',
+  }),
+}));
+
+// @ts-expect-error - Drizzle relation type inference issue under exactOptionalPropertyTypes
+export const taskDependencyRelations = relations(taskDependencies, ({ one }) => ({
+  dependentTask: one(tasks, {
+    fields: [taskDependencies.dependentTaskId],
+    references: [tasks.id],
+    relationName: 'taskDependencies',
+  }),
+  dependencyTask: one(tasks, {
+    fields: [taskDependencies.dependencyTaskId],
+    references: [tasks.id],
+    relationName: 'taskDependents',
+  }),
 }));
 
 // @ts-expect-error - Drizzle relation type inference issue under exactOptionalPropertyTypes
@@ -91,7 +135,9 @@ export const contextSliceRelations = relations(contextSlices, ({ one }) => ({
 // ---------------------------------------------------------------------------
 export const schema = {
   tasks,
+  taskDependencies,
   contextSlices,
   taskRelations,
+  taskDependencyRelations,
   contextSliceRelations,
 };
