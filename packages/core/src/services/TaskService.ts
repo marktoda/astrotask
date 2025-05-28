@@ -1,6 +1,6 @@
 import type { Store } from '../database/store.js';
 import type { Task, TaskStatus } from '../schemas/task.js';
-import { type BatchUpdateOperation, TaskTree, type TaskTreeData } from '../utils/TaskTree.js';
+import { TaskTree, type TaskTreeData } from '../utils/TaskTree.js';
 import { CachedTaskTreeOperations, TaskTreeCache } from '../utils/TaskTreeCache.js';
 import {
   type ValidationResult,
@@ -287,76 +287,6 @@ export class TaskService {
   private async findRootTask(taskId: string): Promise<string | null> {
     const ancestors = await this.getTaskAncestors(taskId);
     return ancestors.length > 0 && ancestors[0] ? ancestors[0].id : taskId;
-  }
-
-  /**
-   * Enhanced batch operations with caching
-   */
-  async batchUpdateTasks(
-    operations: BatchUpdateOperation[]
-  ): Promise<{ success: boolean; errors: string[] }> {
-    const errors: string[] = [];
-
-    try {
-      const operationsByRoot = await this.groupOperationsByRoot(operations);
-      await this.applyGroupedOperations(operationsByRoot, errors);
-
-      return { success: errors.length === 0, errors };
-    } catch (error) {
-      return { success: false, errors: [error instanceof Error ? error.message : 'Unknown error'] };
-    }
-  }
-
-  private async groupOperationsByRoot(
-    operations: BatchUpdateOperation[]
-  ): Promise<Map<string, BatchUpdateOperation[]>> {
-    const operationsByRoot = new Map<string, BatchUpdateOperation[]>();
-
-    for (const op of operations) {
-      const rootId = await this.getRootIdForOperation(op);
-
-      if (rootId) {
-        if (!operationsByRoot.has(rootId)) {
-          operationsByRoot.set(rootId, []);
-        }
-        const rootOps = operationsByRoot.get(rootId);
-        if (rootOps) {
-          rootOps.push(op);
-        }
-      }
-    }
-
-    return operationsByRoot;
-  }
-
-  private async getRootIdForOperation(op: BatchUpdateOperation): Promise<string | null> {
-    switch (op.type) {
-      case 'update_task':
-        return this.findRootTask(op.taskId);
-      case 'bulk_status_update':
-        if (op.taskIds.length > 0 && op.taskIds[0]) {
-          return this.findRootTask(op.taskIds[0]);
-        }
-        return null;
-      default:
-        return null;
-    }
-  }
-
-  private async applyGroupedOperations(
-    operationsByRoot: Map<string, BatchUpdateOperation[]>,
-    errors: string[]
-  ): Promise<void> {
-    for (const [rootId, rootOperations] of operationsByRoot) {
-      const tree = await this.getTaskTree(rootId);
-      if (!tree) {
-        errors.push(`Root tree not found: ${rootId}`);
-        continue;
-      }
-
-      tree.batchUpdate(rootOperations);
-      this.cache.invalidateTree(rootId);
-    }
   }
 
   /**
