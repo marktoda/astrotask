@@ -42,16 +42,17 @@ export default function Tree({ options }: Props) {
 					}
 					setTree([rootTree]);
 				} else {
-					// Get all root tasks (tasks without parents) as TaskTree instances
-					const allTasks = await db.listTasks();
-					const rootTasks = allTasks.filter((task) => !task.parentId);
-
-					// Use batch loading for efficiency
-					const rootTrees = await taskService.getTaskTrees(
-						rootTasks.map((task) => task.id),
+					// Use synthetic root to get all tasks as a single tree
+					const syntheticTree = await taskService.getTaskTree(
+						undefined,
 						maxDepth,
 					);
-					setTree(rootTrees);
+					if (syntheticTree) {
+						// Extract the root tasks from synthetic root children
+						setTree([...syntheticTree.getChildren()]);
+					} else {
+						setTree([]);
+					}
 				}
 			} catch (err) {
 				setError(

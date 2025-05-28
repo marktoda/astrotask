@@ -24,29 +24,37 @@ export class TaskHandlers {
   constructor(readonly context: HandlerContext) { }
 
   async listTasks(args: ListTasksInput): Promise<Task[] | any[]> {
-    let tasks: Task[];
-
-    if (args.parentId) {
-      // Get subtasks of a specific parent
-      tasks = await this.context.store.listTasks({ parentId: args.parentId });
-    } else if (args.status) {
-      // Filter by status
-      tasks = await this.context.store.listTasks({ status: args.status });
-    } else {
-      // Get all tasks
-      tasks = await this.context.store.listTasks({});
+    // Use synthetic root with predicate filtering for all cases
+    const syntheticTree = await this.context.taskService.getTaskTree();
+    if (!syntheticTree) {
+      return [];
     }
+
+    // Build predicate based on filter arguments
+    let predicate: (task: Task) => boolean = () => true;
+    
+    if (args.parentId && args.status) {
+      // Both parentId and status filters
+      predicate = (task: Task) => task.parentId === args.parentId && task.status === args.status;
+    } else if (args.parentId) {
+      // Filter by parentId only
+      predicate = (task: Task) => task.parentId === args.parentId;
+    } else if (args.status) {
+      // Filter by status only
+      predicate = (task: Task) => task.status === args.status;
+    }
+    // For no filters, predicate remains () => true
+
+    // Apply predicate filtering to get matching TaskTree instances
+    const filteredTrees = syntheticTree.filter(predicate);
 
     if (args.includeSubtasks) {
-      // Use the optimized batch tree loading method
-      const taskTrees = await this.context.taskService.getTaskTrees(
-        tasks.map(task => task.id)
-      );
-      // Convert TaskTree instances to plain objects for MCP serialization
-      return taskTrees.map(tree => tree.toPlainObject());
+      // Return TaskTree objects converted to plain objects for MCP serialization
+      return filteredTrees.map(tree => tree.toPlainObject());
+    } else {
+      // Return just the tasks (without subtree structure)
+      return filteredTrees.map(tree => tree.task);
     }
-
-    return tasks;
   }
 
   async createTask(args: CreateTaskInput): Promise<Task> {
