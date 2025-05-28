@@ -9,7 +9,7 @@
  */
 
 import type { HandlerContext, MCPHandler } from './types.js';
-import { createPRDTaskGenerator, type GenerationError, createModuleLogger, getCurrentModelConfig } from '@astrolabe/core';
+import { createPRDTaskGenerator, type GenerationError, createModuleLogger, getCurrentModelConfig, type Task } from '@astrolabe/core';
 import { taskToApi } from '@astrolabe/core';
 
 /**
@@ -74,13 +74,13 @@ export class TaskGenerationHandlers implements MCPHandler {
       );
 
       // Load existing tasks for context if requested
-      let existingTasks: any[] = [];
+      let existingTasks: Task[] = [];
       if (params.context?.existingTasks) {
         const taskPromises = params.context.existingTasks.map((id) => 
           this.context.store.getTask(id)
         );
         const tasks = await Promise.all(taskPromises);
-        existingTasks = tasks.filter(Boolean);
+        existingTasks = tasks.filter((task): task is Task => task !== null);
       }
 
       // Generate tasks
@@ -96,10 +96,10 @@ export class TaskGenerationHandlers implements MCPHandler {
         params.context?.parentTaskId ?? null
       );
 
-      // Convert to API format
-      const apiTasks = createTasks.map((task: any) => taskToApi({
+      // Convert to API format by creating complete Task objects with required fields
+      const apiTasks = createTasks.map((task) => taskToApi({
         ...task,
-        id: 'generated-' + Math.random().toString(36).substr(2, 9), // Temporary ID
+        id: 'generated-' + Math.random().toString(36).substring(2, 11), // Temporary ID
         createdAt: new Date(),
         updatedAt: new Date(),
         parentId: task.parentId ?? null,
