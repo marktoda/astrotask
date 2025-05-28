@@ -3,8 +3,11 @@ import type { ShapeStreamOptions } from '@electric-sql/client';
 import type { PGlite } from '@electric-sql/pglite';
 import type { PgliteDatabase } from 'drizzle-orm/pglite';
 import { cfg } from '../utils/config.js';
+import { createModuleLogger } from '../utils/logger.js';
 import type { schema } from './schema.js';
 import { DatabaseStore, type Store } from './store.js';
+
+const logger = createModuleLogger('electric-sql');
 
 /**
  * Store initialization options
@@ -50,7 +53,7 @@ export async function createStore(
   const { sync = false, verbose = cfg.DB_VERBOSE } = options;
 
   if (verbose) {
-    console.info(`Creating store with sync: ${sync}, encrypted: ${isEncrypted}`);
+    logger.info({ sync, encrypted: isEncrypted }, 'Creating store');
   }
 
   // Create ElectricSQL connection
@@ -62,10 +65,10 @@ export async function createStore(
       await Promise.all([electric.sync('tasks'), electric.sync('context_slices')]);
 
       if (verbose) {
-        console.info('Sync enabled for core tables: tasks, context_slices');
+        logger.info('Sync enabled for core tables: tasks, context_slices');
       }
     } catch (error) {
-      console.warn('Failed to initialize sync, continuing in local-only mode:', error);
+      logger.warn({ error }, 'Failed to initialize sync, continuing in local-only mode');
     }
   }
 
@@ -143,7 +146,7 @@ export async function createElectricConnection(
   // Return no-op connection if ElectricSQL is not configured
   if (!config.isEnabled || !config.url) {
     if (verbose) {
-      console.info('ElectricSQL not configured - running in local-only mode');
+      logger.info('ElectricSQL not configured - running in local-only mode');
     }
     return new NoOpElectricConnection();
   }
@@ -162,7 +165,7 @@ export async function createElectricConnection(
         try {
           isConnected = true;
           if (verbose) {
-            console.info('ElectricSQL connected');
+            logger.info('ElectricSQL connected');
           }
         } catch (error) {
           throw new ElectricError(
@@ -182,7 +185,7 @@ export async function createElectricConnection(
           shapes.clear();
           isConnected = false;
           if (verbose) {
-            console.info('ElectricSQL disconnected');
+            logger.info('ElectricSQL disconnected');
           }
         } catch (error) {
           throw new ElectricError(
@@ -243,7 +246,7 @@ export async function createElectricConnection(
           shapes.set(table, shape);
 
           if (verbose) {
-            console.info(`Started syncing table: ${table}`);
+            logger.info({ table }, 'Started syncing table');
           }
         } catch (error) {
           throw new SyncError(

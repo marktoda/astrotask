@@ -80,4 +80,4 @@ if (isEntrypoint) {
 }
 
 // Re-export logger utilities
-export { createModuleLogger, logError, startTimer } from './utils/logger.js';
+export { createModuleLogger, logError, logShutdown, startTimer } from './utils/logger.js';

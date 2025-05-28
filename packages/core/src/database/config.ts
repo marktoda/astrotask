@@ -2,8 +2,11 @@ import { existsSync, mkdirSync } from 'node:fs';
 import { PGlite } from '@electric-sql/pglite';
 import { type PgliteDatabase, drizzle } from 'drizzle-orm/pglite';
 import { cfg } from '../utils/config.js';
+import { createModuleLogger } from '../utils/logger.js';
 import { autoMigrate } from './migrate.js';
 import * as schema from './schema.js';
+
+const logger = createModuleLogger('database-config');
 
 /**
  * Database connection interface for PGlite
@@ -40,7 +43,7 @@ function configureEncryption(_db: PGlite, verbose: boolean): void {
   // PGlite doesn't support SQLCipher-style encryption
   // For now, we'll just log a warning that encryption is not available
   if (verbose) {
-    console.warn(
+    logger.warn(
       'Note: PGlite does not support SQLCipher-style encryption. Consider application-level encryption if needed.'
     );
   }
@@ -92,8 +95,9 @@ function verifyDatabase(_db: PGlite, dbPath: string, encrypted: boolean, verbose
     // Note: PGlite doesn't have sync query methods like better-sqlite3
     // We'll need to use async verification in the calling code
     if (verbose) {
-      console.info(`PGlite database verified at: ${dbPath}`);
-      console.info(
+      logger.info({ dbPath }, 'PGlite database verified');
+      logger.info(
+        { encrypted },
         `Encryption: ${encrypted ? 'enabled' : 'disabled'} (note: PGlite uses different encryption approach)`
       );
     }
