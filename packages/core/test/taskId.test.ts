@@ -45,9 +45,9 @@ describe('Task ID Utilities', () => {
 
   describe('parseTaskId', () => {
     it('should parse root task IDs correctly', () => {
-      const parsed = parseTaskId('A');
+      const parsed = parseTaskId('ABCD');
       expect(parsed).toEqual({
-        rootId: 'A',
+        rootId: 'ABCD',
         segments: [],
         depth: 0,
         isRoot: true,
@@ -55,21 +55,21 @@ describe('Task ID Utilities', () => {
     });
 
     it('should parse subtask IDs correctly', () => {
-      const parsed = parseTaskId('A.1');
+      const parsed = parseTaskId('ABCD-EFGH');
       expect(parsed).toEqual({
-        rootId: 'A',
-        segments: [1],
+        rootId: 'ABCD',
+        segments: ['EFGH'],
         depth: 1,
         isRoot: false,
       });
     });
 
     it('should parse nested subtask IDs correctly', () => {
-      const parsed = parseTaskId('BB.5.2.1');
+      const parsed = parseTaskId('ABCD-EFGH-IJKL');
       expect(parsed).toEqual({
-        rootId: 'BB',
-        segments: [5, 2, 1],
-        depth: 3,
+        rootId: 'ABCD',
+        segments: ['EFGH', 'IJKL'],
+        depth: 2,
         isRoot: false,
       });
     });
@@ -77,45 +77,44 @@ describe('Task ID Utilities', () => {
 
   describe('validateTaskId', () => {
     it('should validate root task IDs', () => {
-      expect(validateTaskId('A')).toBe(true);
-      expect(validateTaskId('Z')).toBe(true);
-      expect(validateTaskId('AA')).toBe(true);
-      expect(validateTaskId('ZZ')).toBe(true);
-      expect(validateTaskId('AAA')).toBe(true);
+      expect(validateTaskId('ABCD')).toBe(true);
+      expect(validateTaskId('ZYXW')).toBe(true);
+      expect(validateTaskId('QRST')).toBe(true);
     });
 
     it('should validate subtask IDs', () => {
-      expect(validateTaskId('A.1')).toBe(true);
-      expect(validateTaskId('A.10')).toBe(true);
-      expect(validateTaskId('BB.1.2')).toBe(true);
-      expect(validateTaskId('A.1.2.3.4')).toBe(true);
+      expect(validateTaskId('ABCD-EFGH')).toBe(true);
+      expect(validateTaskId('ABCD-EFGH-IJKL')).toBe(true);
+      expect(validateTaskId('ABCD-EFGH-IJKL-MNOP')).toBe(true);
     });
 
     it('should reject invalid task IDs', () => {
-      expect(validateTaskId('a')).toBe(false); // lowercase
-      expect(validateTaskId('1')).toBe(false); // starts with number
-      expect(validateTaskId('A.')).toBe(false); // trailing dot
-      expect(validateTaskId('A.0')).toBe(false); // zero segment
-      expect(validateTaskId('A..1')).toBe(false); // double dot
-      expect(validateTaskId('A.1.')).toBe(false); // trailing dot
+      expect(validateTaskId('abc')).toBe(false); // lowercase
+      expect(validateTaskId('1234')).toBe(false); // numbers
+      expect(validateTaskId('A')).toBe(false); // too short
+      expect(validateTaskId('ABCDE')).toBe(false); // too long
+      expect(validateTaskId('ABCD-')).toBe(false); // trailing dash
+      expect(validateTaskId('ABCD-EFG')).toBe(false); // short segment
+      expect(validateTaskId('ABCD--EFGH')).toBe(false); // double dash
+      expect(validateTaskId('ABCD-EFGH-')).toBe(false); // trailing dash
       expect(validateTaskId('')).toBe(false); // empty
-      expect(validateTaskId('A1')).toBe(false); // mixed letters and numbers without dot
+      expect(validateTaskId('ABCD.EFGH')).toBe(false); // dot instead of dash
     });
   });
 
   describe('validateSubtaskId', () => {
     it('should validate correct parent-child relationships', () => {
-      expect(validateSubtaskId('A.1', 'A')).toBe(true);
-      expect(validateSubtaskId('A.1.2', 'A.1')).toBe(true);
-      expect(validateSubtaskId('BB.5.2', 'BB.5')).toBe(true);
+      expect(validateSubtaskId('ABCD-EFGH', 'ABCD')).toBe(true);
+      expect(validateSubtaskId('ABCD-EFGH-IJKL', 'ABCD-EFGH')).toBe(true);
+      expect(validateSubtaskId('ABCD-EFGH-IJKL-MNOP', 'ABCD-EFGH-IJKL')).toBe(true);
     });
 
     it('should reject incorrect parent-child relationships', () => {
-      expect(validateSubtaskId('A.1', 'B')).toBe(false); // wrong parent
-      expect(validateSubtaskId('A.1.2', 'A')).toBe(false); // skipping level
-      expect(validateSubtaskId('A', 'A.1')).toBe(false); // parent is child
-      expect(validateSubtaskId('A.1', 'A.1')).toBe(false); // same ID
-      expect(validateSubtaskId('A.2', 'A.1')).toBe(false); // sibling, not child
+      expect(validateSubtaskId('ABCD-EFGH', 'ZYXW')).toBe(false); // wrong parent
+      expect(validateSubtaskId('ABCD-EFGH-IJKL', 'ABCD')).toBe(false); // skipping level
+      expect(validateSubtaskId('ABCD', 'ABCD-EFGH')).toBe(false); // parent is child
+      expect(validateSubtaskId('ABCD-EFGH', 'ABCD-EFGH')).toBe(false); // same ID
+      expect(validateSubtaskId('ABCD-IJKL', 'ABCD-EFGH')).toBe(false); // sibling, not child
     });
   });
 }); 

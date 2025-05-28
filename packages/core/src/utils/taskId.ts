@@ -2,8 +2,8 @@
  * Task ID generation utilities for human-readable, hierarchical task identifiers.
  *
  * Root tasks use random 4-letter combinations: ABCD, XYZW, QRST, etc.
- * Subtasks use dotted numbers: ABCD.1, ABCD.2, XYZW.1, etc.
- * Sub-subtasks continue the pattern: ABCD.1.1, ABCD.1.2, etc.
+ * Subtasks use dash-separated random 4-letter suffixes: ABCD-EFGH, ABCD-IJKL, etc.
+ * Sub-subtasks continue the pattern: ABCD-EFGH-MNOP, ABCD-EFGH-QRST, etc.
  */
 
 import type { Store } from '../database/store.js';
@@ -42,16 +42,13 @@ export function lettersToNumber(letters: string): number {
  */
 export function parseTaskId(taskId: string): {
   rootId: string;
-  segments: number[];
+  segments: string[];
   depth: number;
   isRoot: boolean;
 } {
-  const parts = taskId.split('.');
+  const parts = taskId.split('-');
   const rootId = parts[0] || '';
-  const segments = parts
-    .slice(1)
-    .map((s) => Number.parseInt(s, 10))
-    .filter((n) => !Number.isNaN(n));
+  const segments = parts.slice(1);
 
   return {
     rootId,
@@ -82,45 +79,44 @@ export async function generateNextRootTaskId(store: Store): Promise<string> {
     }
   }
 
-  // Fallback: if we can't find a unique random ID after many attempts,
-  // fall back to sequential generation starting from AAAA
-  const rootTasks = await store.listRootTasks();
-  const usedNumbers = rootTasks
-    .map((task) => parseTaskId(task.id).rootId)
-    .map(lettersToNumber)
-    .sort((a, b) => a - b);
+  // If we can't find a unique random ID after many attempts, fail
+  throw new Error(`Failed to generate unique root task ID after ${maxAttempts} attempts`);
+}
 
-  let nextNumber = lettersToNumber('AAAA');
-  for (const num of usedNumbers) {
-    if (num >= nextNumber && num === nextNumber) {
-      nextNumber++;
-    }
+/**
+ * Generates a random 4-letter suffix for a subtask.
+ */
+function generateRandomSuffix(): string {
+  let suffix = '';
+  for (let i = 0; i < 4; i++) {
+    suffix += String.fromCharCode(65 + Math.floor(Math.random() * 26)); // A-Z
   }
-
-  return numberToLetters(nextNumber);
+  return suffix;
 }
 
 /**
  * Generates the next available subtask ID for a given parent.
+ * Uses randomized 4-letter suffixes to prevent async collisions.
  */
 export async function generateNextSubtaskId(store: Store, parentId: string): Promise<string> {
+  const maxAttempts = 100; // Prevent infinite loops
   const subtasks = await store.listSubtasks(parentId);
+  const existingIds = new Set(subtasks.map((task) => task.id));
 
-  if (subtasks.length === 0) {
-    return `${parentId}.1`;
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const suffix = generateRandomSuffix();
+    const newId = `${parentId}-${suffix}`;
+
+    // Check if this ID already exists
+    if (!existingIds.has(newId)) {
+      return newId;
+    }
   }
 
-  // Extract the last numeric segment from each subtask and find the highest
-  const maxNumber = Math.max(
-    ...subtasks
-      .map((task) => {
-        const parsed = parseTaskId(task.id);
-        return parsed.segments[parsed.segments.length - 1];
-      })
-      .filter((num): num is number => num !== undefined)
+  // If we can't find a unique random ID after many attempts, fail
+  throw new Error(
+    `Failed to generate unique subtask ID for parent ${parentId} after ${maxAttempts} attempts`
   );
-
-  return `${parentId}.${maxNumber + 1}`;
 }
 
 /**
@@ -137,10 +133,10 @@ export async function generateNextTaskId(store: Store, parentId?: string): Promi
  * Validates that a task ID follows the correct format.
  */
 export function validateTaskId(taskId: string): boolean {
-  // Root task: one or more uppercase letters
-  const rootPattern = /^[A-Z]+$/;
-  // Subtask: root pattern followed by one or more ".number" segments (no zero)
-  const subtaskPattern = /^[A-Z]+(\.[1-9]\d*)+$/;
+  // Root task: exactly 4 uppercase letters
+  const rootPattern = /^[A-Z]{4}$/;
+  // Subtask: root pattern followed by one or more "-XXXX" segments (4 letters each)
+  const subtaskPattern = /^[A-Z]{4}(-[A-Z]{4})+$/;
 
   return rootPattern.test(taskId) || subtaskPattern.test(taskId);
 }
@@ -161,7 +157,7 @@ export function validateSubtaskId(taskId: string, parentId: string): boolean {
     return false;
   }
 
-  // Child must start with parent ID
-  const parentPrefix = `${parentId}.`;
+  // Child must start with parent ID followed by dash
+  const parentPrefix = `${parentId}-`;
   return taskId.startsWith(parentPrefix);
 }
