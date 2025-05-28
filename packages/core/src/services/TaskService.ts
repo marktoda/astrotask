@@ -339,31 +339,9 @@ export class TaskService {
   }
 
   /**
-   * Create a complete task tree atomically (storage layer interface)
+   * Create a complete task tree atomically from scratch (brand new trees)
    */
   async createTaskTree(trackingTree: TrackingTaskTree): Promise<TaskTree> {
-    // Create reconciliation plan
-    const plan = trackingTree.createReconciliationPlan();
-
-    // Execute the reconciliation plan atomically
-    const persistedTree = await this.reconcileTaskTree(plan, trackingTree);
-
-    // Clear cache since we've added new tasks
-    this.clearCache();
-
-    return persistedTree;
-  }
-
-  /**
-   * Reconcile a TrackingTaskTree with the store based on a reconciliation plan
-   */
-  private async reconcileTaskTree(
-    _plan: ReconciliationPlan,
-    trackingTree: TrackingTaskTree
-  ): Promise<TaskTree> {
-    // For this implementation, we'll create all tasks from the tree
-    // In the future, this could be more sophisticated with partial updates
-
     const createdTasks: Task[] = [];
     const taskMap = new Map<string, string>(); // temp ID -> real ID
 
@@ -387,6 +365,9 @@ export class TaskService {
         throw new Error('Failed to retrieve created tree');
       }
 
+      // Clear cache since we've added new tasks
+      this.clearCache();
+
       return finalTree;
     } catch (error) {
       // Rollback - delete any created tasks
@@ -399,6 +380,51 @@ export class TaskService {
         }
       }
 
+      throw new Error(
+        `Task tree creation failed: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+  }
+
+  /**
+   * Reconcile incremental changes to an existing task tree using a reconciliation plan
+   */
+  private async reconcileTaskTree(plan: ReconciliationPlan): Promise<TaskTree> {
+    // This method handles incremental updates to existing trees
+    const updatedTaskIds = new Set<string>();
+
+    try {
+      // Process operations in order
+      for (const operation of plan.operations) {
+        switch (operation.type) {
+          case 'task_update': {
+            const taskId = operation.taskId;
+            await this.store.updateTask(taskId, operation.updates as Partial<Task>);
+            updatedTaskIds.add(taskId);
+            break;
+          }
+          case 'child_add':
+            // Handle child addition - would need full implementation
+            throw new Error('Child add operations not yet implemented in reconciliation');
+          case 'child_remove':
+            // Handle child removal - would need full implementation
+            throw new Error('Child remove operations not yet implemented in reconciliation');
+        }
+      }
+
+      // Get the updated tree
+      const finalTree = await this.getTaskTree(plan.treeId);
+      if (!finalTree) {
+        throw new Error('Failed to retrieve updated tree after reconciliation');
+      }
+
+      // Clear cache for affected tasks
+      if (updatedTaskIds.size > 0) {
+        this.clearCache();
+      }
+
+      return finalTree;
+    } catch (error) {
       throw new Error(
         `Task tree reconciliation failed: ${error instanceof Error ? error.message : String(error)}`
       );
@@ -474,6 +500,6 @@ export class TaskService {
     }
 
     const plan = trackingTree.createReconciliationPlan();
-    return this.reconcileTaskTree(plan, trackingTree);
+    return this.reconcileTaskTree(plan);
   }
 }
