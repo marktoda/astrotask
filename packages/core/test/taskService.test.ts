@@ -216,7 +216,7 @@ describe('TaskService', () => {
       expect(foundC).toBeTruthy();
     });
 
-    it('returns null for project tree when database is empty', async () => {
+    it('returns project tree even when database has no user tasks', async () => {
       // Delete all tasks in proper order (children before parents to avoid foreign key constraints)
       const { A, A1, A2, A11, B } = (global as any).testTaskIds;
       await store.deleteTask(A11); // Child first
@@ -226,7 +226,11 @@ describe('TaskService', () => {
       await store.deleteTask(B);   // Independent root task
 
       const projectTree = await service.getTaskTree();
-      expect(projectTree).toBe(null);
+      // Should still return a project tree with PROJECT_ROOT, even with no child tasks
+      expect(projectTree).toBeTruthy();
+      expect(projectTree!.task.id).toBe(TASK_IDENTIFIERS.PROJECT_ROOT);
+      expect(projectTree!.task.title).toBe('Project Tasks');
+      expect(projectTree!.getChildren()).toHaveLength(0); // No child tasks
     });
   });
 

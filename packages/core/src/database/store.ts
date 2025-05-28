@@ -113,12 +113,12 @@ export class DatabaseStore implements Store {
   async addTask(data: NewTask): Promise<Task> {
     // Determine the actual parentId for database storage
     // If no parentId is specified, use PROJECT_ROOT as the parent
-    // but still generate a root-level task ID (not a subtask ID)
     const actualParentId = data.parentId ?? TASK_IDENTIFIERS.PROJECT_ROOT;
 
-    // For task ID generation, treat tasks with no explicit parent as root tasks
-    // even though they will be stored with PROJECT_ROOT as parentId
-    const taskIdParent = data.parentId ?? undefined;
+    // For task ID generation, treat PROJECT_ROOT as "silent" - don't include it in task IDs
+    // Tasks with PROJECT_ROOT as parent should get root-level task IDs
+    const taskIdParent =
+      data.parentId === TASK_IDENTIFIERS.PROJECT_ROOT ? undefined : data.parentId;
 
     const taskData = {
       id: await generateNextTaskId(this, taskIdParent),

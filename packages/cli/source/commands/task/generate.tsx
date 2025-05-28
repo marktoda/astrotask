@@ -13,7 +13,7 @@ import { useDatabase } from "../../context/DatabaseContext.js";
 export const description = "Generate tasks from PRD content using AI";
 
 export const options = zod.object({
-	content: zod.string().describe("PRD content to generate tasks from"),
+	content: zod.string().optional().describe("PRD content to generate tasks from"),
 	file: zod.string().optional().describe("Path to PRD file to read"),
 	parent: zod
 		.string()
@@ -73,7 +73,7 @@ export default function Generate({ options }: Props) {
 		async function generateTasks() {
 			try {
 				// Determine content source
-				let content = options.content;
+				let content: string;
 				if (options.file) {
 					setState((prev) => ({
 						...prev,
@@ -91,6 +91,16 @@ export default function Generate({ options }: Props) {
 						}));
 						return;
 					}
+				} else if (options.content) {
+					content = options.content;
+				} else {
+					setState((prev) => ({
+						...prev,
+						phase: "error",
+						error:
+							"No content provided. Use --content or --file to specify PRD content.",
+					}));
+					return;
 				}
 
 				if (!content.trim()) {
@@ -98,7 +108,7 @@ export default function Generate({ options }: Props) {
 						...prev,
 						phase: "error",
 						error:
-							"No content provided. Use --content or --file to specify PRD content.",
+							"Content is empty. Please provide valid PRD content.",
 					}));
 					return;
 				}

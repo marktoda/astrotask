@@ -27,6 +27,12 @@ export const prdMetadataSchema = z.object({
   sourceType: z.enum(['prd', 'requirements', 'specification']).optional(),
   /** Language of the content */
   language: z.string().optional(),
+  /** Source of the generation request (e.g., 'cli', 'mcp', 'web') */
+  source: z.string().optional(),
+  /** Source file path if applicable */
+  file: z.string().optional(),
+  /** Generator type used */
+  generator: z.string().optional(),
 });
 
 /**
@@ -40,11 +46,13 @@ export const generationMetadataSchema = z.object({
   /** Processing time in milliseconds */
   processingTime: z.number().optional(),
   /** Token usage statistics */
-  tokenUsage: z.object({
-    input: z.number(),
-    output: z.number(),
-    total: z.number(),
-  }).optional(),
+  tokenUsage: z
+    .object({
+      input: z.number(),
+      output: z.number(),
+      total: z.number(),
+    })
+    .optional(),
   /** Confidence score */
   confidence: z.number().min(0).max(1).optional(),
 });

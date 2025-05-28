@@ -359,6 +359,79 @@ describe('Task ID Generation', () => {
     });
   });
 
+  describe('PROJECT_ROOT handling', () => {
+    it('should generate root-level IDs for tasks with PROJECT_ROOT as parent', async () => {
+      // Create a task with PROJECT_ROOT as explicit parent
+      const task = await store.addTask({
+        title: 'Test Task',
+        description: 'Test task with PROJECT_ROOT parent',
+        status: 'pending',
+        priority: 'medium',
+        parentId: TASK_IDENTIFIERS.PROJECT_ROOT,
+      });
+
+      // Should get a root-level task ID (4 uppercase letters)
+      expect(task.id).toMatch(/^[A-Z]{4}$/);
+      expect(task.id).not.toContain(TASK_IDENTIFIERS.PROJECT_ROOT);
+      expect(task.parentId).toBe(TASK_IDENTIFIERS.PROJECT_ROOT);
+    });
+
+    it('should generate subtask IDs for tasks with non-PROJECT_ROOT parent', async () => {
+      // First create a root task
+      const rootTask = await store.addTask({
+        title: 'Root Task',
+        description: 'Root task',
+        status: 'pending',
+        priority: 'medium',
+      });
+
+      // Then create a subtask
+      const subtask = await store.addTask({
+        title: 'Subtask',
+        description: 'Subtask of root task',
+        status: 'pending',
+        priority: 'medium',
+        parentId: rootTask.id,
+      });
+
+      // Should get a subtask ID (parent-XXXX format)
+      expect(subtask.id).toMatch(new RegExp(`^${rootTask.id}-[A-Z]{4}$`));
+      expect(subtask.parentId).toBe(rootTask.id);
+    });
+
+    it('should treat undefined parentId same as PROJECT_ROOT for ID generation', async () => {
+      // Create task with undefined parentId
+      const task1 = await store.addTask({
+        title: 'Task 1',
+        description: 'Task with undefined parent',
+        status: 'pending',
+        priority: 'medium',
+        // parentId is undefined
+      });
+
+      // Create task with explicit PROJECT_ROOT parentId
+      const task2 = await store.addTask({
+        title: 'Task 2',
+        description: 'Task with PROJECT_ROOT parent',
+        status: 'pending',
+        priority: 'medium',
+        parentId: TASK_IDENTIFIERS.PROJECT_ROOT,
+      });
+
+      // Both should get root-level task IDs
+      expect(task1.id).toMatch(/^[A-Z]{4}$/);
+      expect(task2.id).toMatch(/^[A-Z]{4}$/);
+      
+      // Both should have PROJECT_ROOT as parent in database
+      expect(task1.parentId).toBe(TASK_IDENTIFIERS.PROJECT_ROOT);
+      expect(task2.parentId).toBe(TASK_IDENTIFIERS.PROJECT_ROOT);
+      
+      // Neither should contain PROJECT_ROOT in their ID
+      expect(task1.id).not.toContain(TASK_IDENTIFIERS.PROJECT_ROOT);
+      expect(task2.id).not.toContain(TASK_IDENTIFIERS.PROJECT_ROOT);
+    });
+  });
+
   describe('Performance and Scalability', () => {
     it('should generate IDs efficiently', async () => {
       const startTime = Date.now();

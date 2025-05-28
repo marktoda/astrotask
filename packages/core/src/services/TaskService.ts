@@ -53,11 +53,7 @@ export class TaskService {
     // Get all tasks with PROJECT_ROOT as parent (root tasks)
     const rootTasks = await this.store.listTasks({ parentId: TASK_IDENTIFIERS.PROJECT_ROOT });
 
-    if (rootTasks.length === 0) {
-      return null; // No tasks exist
-    }
-
-    // Create project root task
+    // Create project root task - always return this even if no child tasks exist
     const projectRoot: Task = {
       id: TASK_IDENTIFIERS.PROJECT_ROOT,
       parentId: null,
@@ -71,14 +67,16 @@ export class TaskService {
       updatedAt: new Date(),
     };
 
-    // Build tree data for all root tasks
+    // Build tree data for all root tasks (if any exist)
     const children: TaskTreeData[] = [];
-    const adjustedMaxDepth = maxDepth === undefined ? undefined : maxDepth - 1;
+    if (rootTasks.length > 0) {
+      const adjustedMaxDepth = maxDepth === undefined ? undefined : maxDepth - 1;
 
-    for (const rootTask of rootTasks) {
-      const childData = await this.buildTaskTreeData(rootTask.id, adjustedMaxDepth);
-      if (childData) {
-        children.push(childData);
+      for (const rootTask of rootTasks) {
+        const childData = await this.buildTaskTreeData(rootTask.id, adjustedMaxDepth);
+        if (childData) {
+          children.push(childData);
+        }
       }
     }
 
