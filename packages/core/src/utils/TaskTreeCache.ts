@@ -1,5 +1,6 @@
 import type { Task } from '../schemas/task.js';
 import type { TaskTree } from './TaskTree.js';
+import { CACHE_CONFIG } from './TaskTreeConstants.js';
 
 /**
  * TaskTreeCache - LRU cache for TaskTree instances and computed properties
@@ -46,6 +47,20 @@ export class LRUCache<K, V> {
 
   constructor(private options: CacheOptions) {}
 
+  /**
+   * Retrieves a value from the cache with LRU and TTL validation
+   * 
+   * @param key - The cache key to retrieve
+   * @returns The cached value if found and valid, undefined otherwise
+   * 
+   * @complexity O(1) average case for HashMap lookup, O(n) worst case for access order update
+   * 
+   * @sideEffects 
+   * - Updates access statistics (hits/misses)
+   * - Updates LRU order for accessed entries  
+   * - Removes expired entries automatically
+   * - Modifies entry access metadata (count, timestamp)
+   */
   get(key: K): V | undefined {
     const entry = this.cache.get(key);
 
@@ -146,6 +161,19 @@ export class LRUCache<K, V> {
     }
   }
 
+  /**
+   * Evicts the least recently used entry from the cache
+   * 
+   * Uses the access order array to identify the LRU entry and removes it
+   * from both the cache map and access tracking array.
+   * 
+   * @complexity O(1) - removes from beginning of access order array
+   * 
+   * @sideEffects
+   * - Removes one entry from cache and access order tracking
+   * - Increments eviction statistics counter
+   * - May trigger garbage collection for evicted objects
+   */
   private evictLRU(): void {
     if (this.accessOrder.length === 0) return;
 
@@ -167,20 +195,20 @@ export class TaskTreeCache {
 
   constructor(options: Partial<CacheOptions> = {}) {
     const cacheOptions: CacheOptions = {
-      maxSize: 100,
-      ttlMs: 5 * 60 * 1000, // 5 minutes
-      maxAge: 30 * 60 * 1000, // 30 minutes
+      maxSize: CACHE_CONFIG.DEFAULT_MAX_SIZE,
+      ttlMs: CACHE_CONFIG.DEFAULT_TTL_MS,
+      maxAge: CACHE_CONFIG.DEFAULT_MAX_AGE_MS,
       ...options,
     };
 
     this.treeCache = new LRUCache(cacheOptions);
     this.metadataCache = new LRUCache({
       ...cacheOptions,
-      maxSize: cacheOptions.maxSize * 2, // More metadata entries
+      maxSize: cacheOptions.maxSize * CACHE_CONFIG.METADATA_CACHE_SIZE_MULTIPLIER,
     });
     this.queryCache = new LRUCache({
       ...cacheOptions,
-      maxSize: cacheOptions.maxSize / 2, // Fewer query results
+      maxSize: Math.floor(cacheOptions.maxSize / CACHE_CONFIG.QUERY_CACHE_SIZE_DIVISOR),
     });
   }
 
@@ -317,7 +345,25 @@ export interface TaskTreeCacheStats {
 export class CachedTaskTreeOperations {
   constructor(private cache: TaskTreeCache) {}
 
-  // Cached tree building with fallback
+  /**
+   * Retrieves a TaskTree from cache or builds it using the provided builder function
+   * 
+   * Implements the cache-aside pattern with intelligent cache key generation
+   * based on task ID and optional depth limit. Falls back to the builder
+   * function if cache miss occurs.
+   * 
+   * @param taskId - The root task ID for the tree
+   * @param maxDepth - Optional depth limit for tree traversal 
+   * @param builder - Async function to build the tree if not cached
+   * @returns Promise resolving to TaskTree or null if not found
+   * 
+   * @complexity O(1) for cache hit, O(n*m) for cache miss where n=tree nodes, m=avg depth
+   * 
+   * @sideEffects
+   * - Updates cache with newly built trees
+   * - Triggers metadata extraction and caching for new trees
+   * - May cause cache eviction if at capacity
+   */
   async getOrBuildTree(
     taskId: string,
     maxDepth: number | undefined,
