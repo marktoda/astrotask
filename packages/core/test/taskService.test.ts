@@ -62,25 +62,27 @@ afterEach(async () => {
 describe('TaskService', () => {
   it('builds a complete task tree', async () => {
     const { A } = (global as any).testTaskIds;
-    const tree = await service.getTaskTree(A);
+    const tree = await service.getTaskTreeClass(A);
     expect(tree).not.toBeNull();
     if (!tree) return;
-    expect(tree.id).toBe(A);
-    expect(tree.children.length).toBe(2);
-    const childA1 = tree.children.find(c => c.title === 'Task A.1');
-    const childA2 = tree.children.find(c => c.title === 'Task A.2');
+    expect(tree.task.id).toBe(A);
+    const children = tree.getChildren();
+    expect(children.length).toBe(2);
+    const childA1 = children.find(c => c.task.title === 'Task A.1');
+    const childA2 = children.find(c => c.task.title === 'Task A.2');
     expect(childA1).toBeTruthy();
     expect(childA2).toBeTruthy();
-    const grandchildNode = childA1!;
-    expect(grandchildNode.children.length).toBe(1);
-    expect(grandchildNode.children[0].title).toBe('Task A.1.1');
+    const grandchildren = childA1!.getChildren();
+    expect(grandchildren.length).toBe(1);
+    expect(grandchildren[0].task.title).toBe('Task A.1.1');
   });
 
   it('honours maxDepth when building tree', async () => {
     const { A } = (global as any).testTaskIds;
-    const tree = await service.getTaskTree(A, 1);
-    expect(tree!.children.length).toBe(2);
-    expect(tree!.children[0].children.length).toBe(0); // depth limited – grandchildren excluded
+    const tree = await service.getTaskTreeClass(A, 1);
+    const children = tree!.getChildren();
+    expect(children.length).toBe(2);
+    expect(children[0].getChildren().length).toBe(0); // depth limited – grandchildren excluded
   });
 
   it('returns ordered ancestors (root first)', async () => {
