@@ -221,6 +221,106 @@ export class TaskTree {
     return updateTree(this);
   }
 
+  // Enhanced batch operations
+  batchUpdate(updates: BatchUpdateOperation[]): TaskTree {
+    let current: TaskTree = this;
+
+    for (const operation of updates) {
+      current = current.applyBatchOperation(current, operation);
+    }
+
+    return current;
+  }
+
+  private applyBatchOperation(tree: TaskTree, operation: BatchUpdateOperation): TaskTree {
+    switch (operation.type) {
+      case 'update_task':
+        return operation.taskId === tree.id
+          ? tree.withTask(operation.updates)
+          : tree.updateDescendants((task) => task.id === operation.taskId, operation.updates);
+
+      case 'update_by_predicate':
+        return tree.updateDescendants(operation.predicate, operation.updates);
+
+      case 'add_child':
+        return operation.parentId === tree.id
+          ? tree.addChild(operation.child)
+          : tree.updateDescendants(
+              (task) => task.id === operation.parentId,
+              {} // No task updates, just structural change
+            );
+
+      case 'remove_child':
+        return operation.parentId === tree.id
+          ? tree.removeChild(operation.childId)
+          : tree.updateDescendants(
+              (task) => task.id === operation.parentId,
+              {} // No task updates, just structural change
+            );
+
+      case 'bulk_status_update':
+        return tree.updateDescendants((task) => operation.taskIds.includes(task.id), {
+          status: operation.status,
+        });
+
+      default:
+        return tree;
+    }
+  }
+
+  // Batch query operations
+  static batchFind(trees: TaskTree[], predicate: (task: Task) => boolean): Map<string, TaskTree[]> {
+    const results = new Map<string, TaskTree[]>();
+
+    for (const tree of trees) {
+      const found = tree.filter(predicate);
+      if (found.length > 0) {
+        results.set(tree.id, found);
+      }
+    }
+
+    return results;
+  }
+
+  static batchTransform(trees: TaskTree[], transformer: (tree: TaskTree) => TaskTree): TaskTree[] {
+    return trees.map(transformer);
+  }
+
+  // Tree aggregation operations
+  static aggregateMetrics(trees: TaskTree[]): TreeMetrics {
+    let totalTasks = 0;
+    let totalDepth = 0;
+    let maxDepth = 0;
+    const statusCounts = new Map<string, number>();
+    const priorityCounts = new Map<string, number>();
+
+    for (const tree of trees) {
+      tree.walkDepthFirst((node) => {
+        totalTasks++;
+        const depth = node.getDepth();
+        totalDepth += depth;
+        maxDepth = Math.max(maxDepth, depth);
+
+        // Count statuses
+        const statusCount = statusCounts.get(node.status) || 0;
+        statusCounts.set(node.status, statusCount + 1);
+
+        // Count priorities
+        const priorityCount = priorityCounts.get(node.task.priority) || 0;
+        priorityCounts.set(node.task.priority, priorityCount + 1);
+      });
+    }
+
+    return {
+      totalTasks,
+      averageDepth: totalTasks > 0 ? totalDepth / totalTasks : 0,
+      maxDepth,
+      treeCount: trees.length,
+      statusDistribution: Object.fromEntries(statusCounts),
+      priorityDistribution: Object.fromEntries(priorityCounts),
+    };
+  }
+
   // Serialization methods
   toPlainObject(): TaskTreeData {
     return {
@@ -301,4 +401,21 @@ export function validateTaskTree(data: unknown): data is TaskTreeData {
   } catch {
     return false;
   }
+}
+
+// Enhanced batch operation types
+export type BatchUpdateOperation =
+  | { type: 'update_task'; taskId: string; updates: Partial<Task> }
+  | { type: 'update_by_predicate'; predicate: (task: Task) => boolean; updates: Partial<Task> }
+  | { type: 'add_child'; parentId: string; child: TaskTree }
+  | { type: 'remove_child'; parentId: string; childId: string }
+  | { type: 'bulk_status_update'; taskIds: string[]; status: TaskStatus };
+
+export interface TreeMetrics {
+  totalTasks: number;
+  averageDepth: number;
+  maxDepth: number;
+  treeCount: number;
+  statusDistribution: Record<string, number>;
+  priorityDistribution: Record<string, number>;
 }
