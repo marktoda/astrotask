@@ -4,37 +4,32 @@
  * Root tasks use random 4-letter combinations: ABCD, XYZW, QRST, etc.
  * Subtasks use dash-separated random 4-letter suffixes: ABCD-EFGH, ABCD-IJKL, etc.
  * Sub-subtasks continue the pattern: ABCD-EFGH-MNOP, ABCD-EFGH-QRST, etc.
+ *
+ * ID generation is purely random with collision detection. If a unique ID cannot be
+ * generated after reasonable attempts, the operation fails to maintain consistency.
  */
 
 import type { Store } from '../database/store.js';
 
 /**
- * Converts a number to a letter-based identifier.
- * 0 -> A, 1 -> B, ..., 25 -> Z, 26 -> AA, 27 -> AB, etc.
+ * Error thrown when a unique task ID cannot be generated after reasonable attempts.
  */
-export function numberToLetters(num: number): string {
-  let result = '';
-  let current = num + 1; // Convert 0-based to 1-based for easier calculation
-
-  while (current > 0) {
-    current -= 1; // Convert back to 0-based for modulo
-    result = String.fromCharCode(65 + (current % 26)) + result;
-    current = Math.floor(current / 26);
+export class TaskIdGenerationError extends Error {
+  constructor(type: 'root' | 'subtask', attempts: number) {
+    super(`Failed to generate unique ${type} task ID after ${attempts} attempts`);
+    this.name = 'TaskIdGenerationError';
   }
-
-  return result;
 }
 
 /**
- * Converts a letter-based identifier back to a number.
- * A -> 0, B -> 1, ..., Z -> 25, AA -> 26, AB -> 27, etc.
+ * Generates a random 4-letter combination.
  */
-export function lettersToNumber(letters: string): number {
-  let result = 0;
-  for (let i = 0; i < letters.length; i++) {
-    result = result * 26 + (letters.charCodeAt(i) - 64);
+function generateRandomLetters(): string {
+  let result = '';
+  for (let i = 0; i < 4; i++) {
+    result += String.fromCharCode(65 + Math.floor(Math.random() * 26)); // A-Z
   }
-  return result - 1; // Convert back to 0-based
+  return result;
 }
 
 /**
@@ -61,16 +56,13 @@ export function parseTaskId(taskId: string): {
 /**
  * Generates a random 4-letter root task ID.
  * Uses collision detection to ensure uniqueness.
+ * Throws TaskIdGenerationError if no unique ID can be generated.
  */
 export async function generateNextRootTaskId(store: Store): Promise<string> {
-  const maxAttempts = 100; // Prevent infinite loops
+  const maxAttempts = 100;
 
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    // Generate random 4-letter ID
-    let id = '';
-    for (let i = 0; i < 4; i++) {
-      id += String.fromCharCode(65 + Math.floor(Math.random() * 26)); // A-Z
-    }
+    const id = generateRandomLetters();
 
     // Check if this ID already exists
     const existingTask = await store.getTask(id);
@@ -79,44 +71,18 @@ export async function generateNextRootTaskId(store: Store): Promise<string> {
     }
   }
 
-  // Fallback: if we can't find a unique random ID after many attempts,
-  // fall back to sequential generation starting from AAAA
-  const rootTasks = await store.listRootTasks();
-  const usedNumbers = rootTasks
-    .map((task) => parseTaskId(task.id).rootId)
-    .map(lettersToNumber)
-    .sort((a, b) => a - b);
-
-  let nextNumber = lettersToNumber('AAAA');
-  for (const num of usedNumbers) {
-    if (num >= nextNumber && num === nextNumber) {
-      nextNumber++;
-    }
-  }
-
-  return numberToLetters(nextNumber);
-}
-
-/**
- * Generates a random 4-letter combination for subtask IDs.
- */
-function generateRandomLetters(): string {
-  let result = '';
-  for (let i = 0; i < 4; i++) {
-    result += String.fromCharCode(65 + Math.floor(Math.random() * 26)); // A-Z
-  }
-  return result;
+  throw new TaskIdGenerationError('root', maxAttempts);
 }
 
 /**
  * Generates the next available subtask ID for a given parent.
  * Uses random 4-letter suffixes to avoid async collisions.
+ * Throws TaskIdGenerationError if no unique ID can be generated.
  */
 export async function generateNextSubtaskId(store: Store, parentId: string): Promise<string> {
-  const maxAttempts = 100; // Prevent infinite loops
+  const maxAttempts = 100;
 
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    // Generate random 4-letter suffix
     const suffix = generateRandomLetters();
     const candidateId = `${parentId}-${suffix}`;
 
@@ -127,26 +93,7 @@ export async function generateNextSubtaskId(store: Store, parentId: string): Pro
     }
   }
 
-  // Fallback: if we can't find a unique random ID after many attempts,
-  // fall back to sequential generation using letters
-  const subtasks = await store.listSubtasks(parentId);
-  const usedSuffixes = subtasks
-    .map((task) => {
-      const parsed = parseTaskId(task.id);
-      return parsed.segments[parsed.segments.length - 1];
-    })
-    .filter((suffix): suffix is string => suffix !== undefined)
-    .map(lettersToNumber)
-    .sort((a, b) => a - b);
-
-  let nextNumber = lettersToNumber('AAAA');
-  for (const num of usedSuffixes) {
-    if (num >= nextNumber && num === nextNumber) {
-      nextNumber++;
-    }
-  }
-
-  return `${parentId}-${numberToLetters(nextNumber)}`;
+  throw new TaskIdGenerationError('subtask', maxAttempts);
 }
 
 /**

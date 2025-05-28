@@ -1,48 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import {
-  numberToLetters,
-  lettersToNumber,
   parseTaskId,
   validateTaskId,
   validateSubtaskId,
 } from '../src/utils/taskId.js';
 
 describe('Task ID Utilities', () => {
-  describe('numberToLetters', () => {
-    it('should convert numbers to letters correctly', () => {
-      expect(numberToLetters(0)).toBe('A');
-      expect(numberToLetters(1)).toBe('B');
-      expect(numberToLetters(25)).toBe('Z');
-      expect(numberToLetters(26)).toBe('AA');
-      expect(numberToLetters(27)).toBe('AB');
-      expect(numberToLetters(51)).toBe('AZ');
-      expect(numberToLetters(52)).toBe('BA');
-      expect(numberToLetters(701)).toBe('ZZ');
-      expect(numberToLetters(702)).toBe('AAA');
-    });
-  });
-
-  describe('lettersToNumber', () => {
-    it('should convert letters to numbers correctly', () => {
-      expect(lettersToNumber('A')).toBe(0);
-      expect(lettersToNumber('B')).toBe(1);
-      expect(lettersToNumber('Z')).toBe(25);
-      expect(lettersToNumber('AA')).toBe(26);
-      expect(lettersToNumber('AB')).toBe(27);
-      expect(lettersToNumber('AZ')).toBe(51);
-      expect(lettersToNumber('BA')).toBe(52);
-      expect(lettersToNumber('ZZ')).toBe(701);
-      expect(lettersToNumber('AAA')).toBe(702);
-    });
-
-    it('should be inverse of numberToLetters', () => {
-      const testNumbers = [0, 1, 25, 26, 27, 51, 52, 100, 701, 702];
-      testNumbers.forEach(num => {
-        expect(lettersToNumber(numberToLetters(num))).toBe(num);
-      });
-    });
-  });
-
   describe('parseTaskId', () => {
     it('should parse root task IDs correctly', () => {
       const parsed = parseTaskId('A');
