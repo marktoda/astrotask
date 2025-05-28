@@ -40,6 +40,15 @@ export {
 
 export { CONSTRAINTS, type Priority } from './types.js';
 
+// Simple transformation utilities (inline implementations used instead)
+export function nullToUndefined<T>(value: T | null): T | undefined {
+  return value ?? undefined;
+}
+
+export function undefinedToNull<T>(value: T | undefined): T | null {
+  return value ?? null;
+}
+
 // ===== VALIDATION UTILITIES =====
 import { z } from 'zod';
 // Import for local use

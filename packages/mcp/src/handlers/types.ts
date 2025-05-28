@@ -11,7 +11,8 @@
  */
 
 import { z } from 'zod';
-import type { Store, TaskService } from '@astrolabe/core';
+import type { Store, TaskService, TaskStatus, TaskPriority } from '@astrolabe/core';
+import { taskStatus, taskPriority } from '@astrolabe/core/src/schemas/index.js';
 
 /**
  * Context object passed to all MCP handlers containing shared dependencies
@@ -61,22 +62,7 @@ export interface MCPHandler {
   readonly context: HandlerContext;
 }
 
-/**
- * Task status enumeration that defines all possible states a task can be in.
- * Used consistently across all task-related operations.
- * 
- * @constant
- * @type {z.ZodEnum<['pending', 'in-progress', 'done', 'cancelled', 'archived']>}
- */
-const taskStatus = z.enum(['pending', 'in-progress', 'done', 'cancelled', 'archived']);
-
-/**
- * Task priority enumeration for task importance levels.
- * 
- * @constant
- * @type {z.ZodEnum<['low', 'medium', 'high']>}
- */
-const taskPriority = z.enum(['low', 'medium', 'high']);
+// Task status and priority enums are imported from @astrolabe/core to avoid duplication
 
 /**
  * Schema for creating new tasks via MCP.

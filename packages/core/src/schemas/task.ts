@@ -63,7 +63,7 @@ export const createTaskApiSchema = createTaskSchema.extend({
   contextDigest: z.string().optional(),
 });
 
-// Transformation utilities for database <-> API compatibility
+// Transformation utilities for database <-> API compatibility  
 export function taskToApi(task: Task): TaskApi {
   return {
     ...task,
