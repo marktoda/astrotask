@@ -156,10 +156,11 @@ export class TaskTree {
 
   getAllDescendants(): TaskTree[] {
     const descendants: TaskTree[] = [];
-    for (const child of this._children) {
-      descendants.push(child);
-      descendants.push(...child.getAllDescendants());
-    }
+    this.walkDepthFirst((node) => {
+      if (node !== this) {
+        descendants.push(node);
+      }
+    });
     return descendants;
   }
 
@@ -234,16 +235,16 @@ export class TaskTree {
 
   private applyBatchOperation(tree: TaskTree, operation: BatchUpdateOperation): TaskTree {
     switch (operation.type) {
-      case 'update_task':
+      case 'update_task': {
+        const predicate = (task: Task) => task.id === operation.taskId;
         return operation.taskId === tree.id
           ? tree.withTask(operation.updates)
-          : tree.updateDescendants((task) => task.id === operation.taskId, operation.updates);
-
-      case 'bulk_status_update':
-        return tree.updateDescendants((task) => operation.taskIds.includes(task.id), {
-          status: operation.status,
-        });
-
+          : tree.updateDescendants(predicate, operation.updates);
+      }
+      case 'bulk_status_update': {
+        const predicate = (task: Task) => operation.taskIds.includes(task.id);
+        return tree.updateDescendants(predicate, { status: operation.status });
+      }
       default:
         return tree;
     }

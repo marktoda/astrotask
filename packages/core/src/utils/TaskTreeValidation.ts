@@ -354,10 +354,5 @@ const defaultValidationOptions: ValidationOptions = {
  * Validation helper for TaskTreeData schema validation
  */
 export function validateTaskTreeData(data: unknown): data is TaskTreeData {
-  try {
-    taskTreeSchema.parse(data);
-    return true;
-  } catch {
-    return false;
-  }
+  return taskTreeSchema.safeParse(data).success;
 }

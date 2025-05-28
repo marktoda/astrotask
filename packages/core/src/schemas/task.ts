@@ -68,7 +68,7 @@ export function taskToApi(task: Task): TaskApi {
   return {
     ...task,
     parentId: task.parentId ?? undefined,
-    description: task.description ?? undefined, 
+    description: task.description ?? undefined,
     prd: task.prd ?? undefined,
     contextDigest: task.contextDigest ?? undefined,
     createdAt: task.createdAt.toISOString(),

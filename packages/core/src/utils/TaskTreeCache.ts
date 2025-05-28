@@ -284,11 +284,12 @@ export class TaskTreeCache {
   }
 
   static generateQueryKey(operation: string, params: Record<string, unknown>): string {
-    const sortedParams = Object.keys(params)
-      .sort()
-      .map((key) => `${key}:${JSON.stringify(params[key])}`)
+    // Create a stable key from sorted parameters
+    const paramEntries = Object.entries(params).sort(([a], [b]) => a.localeCompare(b));
+    const paramString = paramEntries
+      .map(([key, value]) => `${key}:${JSON.stringify(value)}`)
       .join('|');
-    return `query:${operation}:${sortedParams}`;
+    return `query:${operation}:${paramString}`;
   }
 
   static generateMetadataKey(taskId: string): string {
