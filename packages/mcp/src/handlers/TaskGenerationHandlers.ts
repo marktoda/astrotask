@@ -97,6 +97,13 @@ export class TaskGenerationHandlers implements MCPHandler {
           const plan = trackingTree.createReconciliationPlan();
           const updatedTree = await this.context.taskService.applyReconciliationPlan(plan);
           
+          // Process dependencies if they were generated
+          if (prdGenerator.processPendingDependencies) {
+            // Extract child task IDs from the updated tree
+            const childTaskIds = updatedTree.getChildren().map(child => child.id);
+            await prdGenerator.processPendingDependencies(childTaskIds);
+          }
+          
           // Return persisted tree with real IDs
           const metadata: GenerationMetadata = {
             generator: generatorType,

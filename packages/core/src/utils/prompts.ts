@@ -13,7 +13,7 @@ import type { Task } from '../schemas/task.js';
 /**
  * System prompt for PRD-based task generation
  */
-export const PRD_SYSTEM_PROMPT = `You are an expert software project manager and technical lead. Your job is to analyze Product Requirements Documents (PRDs) and generate actionable, implementable tasks.
+export const PRD_SYSTEM_PROMPT = `You are an expert software project manager and technical lead. Your job is to analyze Product Requirements Documents (PRDs) and generate actionable, implementable tasks with their dependency relationships.
 
 TASK GENERATION GUIDELINES:
 1. Break down requirements into concrete, implementable tasks
@@ -23,6 +23,7 @@ TASK GENERATION GUIDELINES:
 5. Include enough context in descriptions for developers to understand the work
 6. Set appropriate priorities based on dependencies and business value
 7. Extract relevant PRD content for the prd field
+8. Identify logical dependencies between tasks
 
 TASK STRUCTURE:
 - title: Clear, actionable task name (3-80 characters)
@@ -31,13 +32,30 @@ TASK STRUCTURE:
 - status: Always "pending" for new tasks
 - prd: Relevant excerpt from the original PRD that relates to this task
 
+DEPENDENCY IDENTIFICATION:
+Analyze the generated tasks and identify logical dependencies where:
+- One task's output is required as input for another task
+- Infrastructure/setup tasks must complete before feature implementation
+- Database schema changes must happen before code that uses them
+- Authentication/authorization must be implemented before protected features
+- Core APIs must exist before frontend components that consume them
+- Testing infrastructure should be set up before writing tests
+
 PRIORITIES:
 - high: Core functionality, security features, critical user flows
 - medium: Standard features, UI/UX improvements, integrations
 - low: Optional features, optimizations, documentation
 
 OUTPUT FORMAT:
-Return a JSON object with a "tasks" array containing task objects. Each task must have title, priority, and status fields. Description and prd fields are optional but recommended.
+Return a JSON object with:
+1. "tasks" array containing task objects
+2. "dependencies" array containing dependency relationships (optional)
+3. "confidence" score and optional "warnings"
+
+Each dependency object should specify:
+- dependentTaskIndex: Index of task that depends on another (0-based)
+- dependencyTaskIndex: Index of task that must be completed first (0-based)
+- reason: Brief explanation of why this dependency exists (optional)
 
 Example:
 {{
@@ -48,6 +66,37 @@ Example:
       "priority": "high",
       "status": "pending",
       "prd": "Users should be able to register with email/password and log in securely"
+    }},
+    {{
+      "title": "Implement JWT token generation",
+      "description": "Create service for generating and validating JWT tokens",
+      "priority": "high",
+      "status": "pending",
+      "prd": "Tokens should expire after 24 hours"
+    }},
+    {{
+      "title": "Build user registration API endpoint",
+      "description": "Create POST /api/auth/register endpoint with validation",
+      "priority": "high",
+      "status": "pending",
+      "prd": "Users should be able to register with email/password"
+    }}
+  ],
+  "dependencies": [
+    {{
+      "dependentTaskIndex": 1,
+      "dependencyTaskIndex": 0,
+      "reason": "JWT service needs user table to validate credentials"
+    }},
+    {{
+      "dependentTaskIndex": 2,
+      "dependencyTaskIndex": 0,
+      "reason": "Registration endpoint needs user table to store new users"
+    }},
+    {{
+      "dependentTaskIndex": 2,
+      "dependencyTaskIndex": 1,
+      "reason": "Registration endpoint needs JWT service to create login tokens"
     }}
   ],
   "confidence": 0.95,

@@ -128,6 +128,16 @@ export type {
   CreateTaskDependencyApi,
 } from './schemas/dependency.js';
 
+// Status transition validation
+export {
+  isValidStatusTransition,
+  canTransitionStatus,
+  getTransitionRejectionReason,
+  validateStatusTransition,
+  taskStatusTransitions,
+  type StatusTransitionResult,
+} from './utils/statusTransitions.js';
+
 // Create application logger
 const logger = createModuleLogger('App');
 

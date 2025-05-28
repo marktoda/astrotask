@@ -208,6 +208,10 @@ export default function Generate({ options }: Props) {
 				const taskService = new TaskService(db);
 				const updatedTree = await taskService.applyReconciliationPlan(plan);
 
+				// Process dependencies if they were generated
+				const childTaskIds = updatedTree.getChildren().map(child => child.id);
+				await (generator as any).processPendingDependencies(childTaskIds);
+
 				// Get all tasks from the updated tree (root + children)
 				const allTasks = [updatedTree.task];
 				const addChildrenRecursively = (tree: any) => {

@@ -6,6 +6,7 @@ import { createDatabase, type DatabaseOptions, TaskService, createModuleLogger, 
 import {
   TaskHandlers,
   TaskGenerationHandlers,
+  DependencyHandlers,
   listTasksSchema,
   createTaskSchema,
   updateTaskSchema,
@@ -14,7 +15,15 @@ import {
   getTaskContextSchema,
   generateTasksSchema,
   listGeneratorsSchema,
-  validateGenerationInputSchema
+  validateGenerationInputSchema,
+  addTaskDependencySchema,
+  removeTaskDependencySchema,
+  getTaskDependenciesSchema,
+  validateTaskDependencySchema,
+  getAvailableTasksSchema,
+  updateTaskStatusSchema,
+  getTasksWithDependenciesSchema,
+  getTopologicalOrderSchema
 } from './handlers/index.js';
 import { wrapMCPHandler } from './utils/response.js';
 
@@ -49,6 +58,7 @@ async function main() {
   // Create task handlers with context
   const taskHandlers = new TaskHandlers(handlerContext);
   const taskGenerationHandlers = new TaskGenerationHandlers(handlerContext);
+  const dependencyHandlers = new DependencyHandlers(handlerContext);
 
   // Register core task management tools
   server.tool('listTasks',
@@ -93,6 +103,77 @@ async function main() {
     })
   );
 
+  // Register dependency management tools
+  server.tool('addTaskDependency',
+    addTaskDependencySchema.shape,
+    wrapMCPHandler(async (args) => {
+      return dependencyHandlers.addTaskDependency(args);
+    })
+  );
+
+  server.tool('removeTaskDependency',
+    removeTaskDependencySchema.shape,
+    wrapMCPHandler(async (args) => {
+      return dependencyHandlers.removeTaskDependency(args);
+    })
+  );
+
+  server.tool('getTaskDependencies',
+    getTaskDependenciesSchema.shape,
+    wrapMCPHandler(async (args) => {
+      return dependencyHandlers.getTaskDependencies(args);
+    })
+  );
+
+  server.tool('validateTaskDependency',
+    validateTaskDependencySchema.shape,
+    wrapMCPHandler(async (args) => {
+      return dependencyHandlers.validateTaskDependency(args);
+    })
+  );
+
+  server.tool('getAvailableTasks',
+    getAvailableTasksSchema.shape,
+    wrapMCPHandler(async (args) => {
+      return dependencyHandlers.getAvailableTasks(args);
+    })
+  );
+
+  server.tool('updateTaskStatus',
+    updateTaskStatusSchema.shape,
+    wrapMCPHandler(async (args) => {
+      return dependencyHandlers.updateTaskStatus(args);
+    })
+  );
+
+  server.tool('getTasksWithDependencies',
+    getTasksWithDependenciesSchema.shape,
+    wrapMCPHandler(async (args) => {
+      return dependencyHandlers.getTasksWithDependencies(args);
+    })
+  );
+
+  server.tool('getTaskContextWithDependencies',
+    getTaskDependenciesSchema.shape,
+    wrapMCPHandler(async (args) => {
+      return dependencyHandlers.getTaskContextWithDependencies(args);
+    })
+  );
+
+  server.tool('getBlockedTasks',
+    {},
+    wrapMCPHandler(async () => {
+      return dependencyHandlers.getBlockedTasks();
+    })
+  );
+
+  server.tool('getTopologicalOrder',
+    getTopologicalOrderSchema.shape,
+    wrapMCPHandler(async (args) => {
+      return dependencyHandlers.getTopologicalOrder(args);
+    })
+  );
+
   // Register task generation tools
   server.tool('generateTasks',
     generateTasksSchema.shape,
@@ -119,7 +200,7 @@ async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
 
-  logger.info('Astrolabe MCP Server started successfully with task generation support');
+  logger.info('Astrolabe MCP Server started successfully with task generation and dependency management support');
 }
 
 // Handle cleanup on process termination

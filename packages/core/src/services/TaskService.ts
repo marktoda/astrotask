@@ -1,4 +1,5 @@
 import type { Store } from '../database/store.js';
+import type { TaskDependencyGraph, TaskWithDependencies } from '../schemas/dependency.js';
 import type { CreateTask, Task, TaskStatus } from '../schemas/task.js';
 import { TaskTree, type TaskTreeData } from '../utils/TaskTree.js';
 import { CachedTaskTreeOperations, TaskTreeCache } from '../utils/TaskTreeCache.js';
@@ -9,15 +10,22 @@ import {
   validateTaskTree,
 } from '../utils/TaskTreeValidation.js';
 import type { ReconciliationPlan } from '../utils/TrackingTaskTree.js';
+import {
+  type StatusTransitionResult,
+  validateStatusTransition,
+} from '../utils/statusTransitions.js';
+import { DependencyService } from './DependencyService.js';
 
 /**
  * TaskService - Business logic layer for hierarchical task operations
  * Uses Store for data access but handles complex tree operations and aggregations
+ * Now includes dependency-aware operations for task status management
  */
 
 export class TaskService {
   private cache: TaskTreeCache;
   private cachedOps: CachedTaskTreeOperations;
+  private dependencyService: DependencyService;
 
   constructor(
     private store: Store,
@@ -25,6 +33,7 @@ export class TaskService {
   ) {
     this.cache = new TaskTreeCache(cacheOptions);
     this.cachedOps = new CachedTaskTreeOperations(this.cache);
+    this.dependencyService = new DependencyService(store);
   }
 
   /**
@@ -230,20 +239,25 @@ export class TaskService {
   }
 
   /**
-   * Get task with full tree context (ancestors + descendants)
+   * Get task with full tree context (ancestors + descendants) and dependency information
    */
   async getTaskWithContext(taskId: string): Promise<{
     task: Task;
     ancestors: Task[];
     descendants: TaskTree[];
     root: TaskTree | null;
+    dependencies: Task[];
+    dependents: Task[];
+    isBlocked: boolean;
+    blockedBy: Task[];
   } | null> {
     const task = await this.store.getTask(taskId);
     if (!task) return null;
 
-    const [ancestors, descendants] = await Promise.all([
+    const [ancestors, descendants, dependencyGraph] = await Promise.all([
       this.getTaskAncestors(taskId),
       this.getTaskDescendants(taskId),
+      this.dependencyService.getDependencyGraph(taskId),
     ]);
 
     // Get the root task tree for full context
@@ -257,11 +271,22 @@ export class TaskService {
         .map((d) => this.getTaskTree(d.id))
     );
 
+    // Get dependency and dependent tasks
+    const [dependencyTasks, dependentTasks, blockedByTasks] = await Promise.all([
+      Promise.all(dependencyGraph.dependencies.map((id) => this.store.getTask(id))),
+      Promise.all(dependencyGraph.dependents.map((id) => this.store.getTask(id))),
+      Promise.all(dependencyGraph.blockedBy.map((id) => this.store.getTask(id))),
+    ]);
+
     return {
       task,
       ancestors,
       descendants: descendantTrees.filter((tree): tree is TaskTree => tree !== null),
       root,
+      dependencies: dependencyTasks.filter((t): t is Task => t !== null),
+      dependents: dependentTasks.filter((t): t is Task => t !== null),
+      isBlocked: dependencyGraph.isBlocked,
+      blockedBy: blockedByTasks.filter((t): t is Task => t !== null),
     };
   }
 
@@ -575,5 +600,142 @@ export class TaskService {
     }
 
     return updatedCount;
+  }
+
+  /**
+   * Update task status with dependency validation.
+   * Prevents starting tasks that are blocked by incomplete dependencies.
+   */
+  async updateTaskStatus(
+    taskId: string,
+    status: TaskStatus,
+    options?: { force?: boolean }
+  ): Promise<{ success: boolean; blocked?: Task[]; validation?: StatusTransitionResult }> {
+    const task = await this.store.getTask(taskId);
+    if (!task) {
+      return { success: false };
+    }
+
+    // Get dependency information
+    const dependencyGraph = await this.dependencyService.getDependencyGraph(taskId);
+
+    // Validate the status transition
+    const validation = validateStatusTransition(
+      task.status,
+      status,
+      dependencyGraph.isBlocked,
+      dependencyGraph.blockedBy
+    );
+
+    // If validation fails and force is not enabled, return the validation result
+    if (!validation.allowed && !options?.force) {
+      const blockedByTasks = validation.blockedBy
+        ? await Promise.all(validation.blockedBy.map((id) => this.store.getTask(id)))
+        : [];
+
+      return {
+        success: false,
+        blocked: blockedByTasks.filter((t): t is Task => t !== null),
+        validation,
+      };
+    }
+
+    // Perform the status update
+    const updatedTask = await this.store.updateTask(taskId, { status });
+    const success = !!updatedTask;
+
+    if (success) {
+      // Clear cache for this task and its dependents (status change may unblock them)
+      const dependents = await this.dependencyService.getDependents(taskId);
+      this.cache.invalidateTreeFamily(taskId, [], dependents);
+    }
+
+    return { success, validation };
+  }
+
+  /**
+   * Get tasks that can be started immediately (no incomplete dependencies).
+   */
+  async getAvailableTasks(filter?: { status?: TaskStatus; priority?: string }): Promise<Task[]> {
+    const executableTasks = await this.dependencyService.getExecutableTasks();
+
+    if (!filter) {
+      return executableTasks;
+    }
+
+    return executableTasks.filter((task) => {
+      if (filter.status && task.status !== filter.status) {
+        return false;
+      }
+      if (filter.priority && task.priority !== filter.priority) {
+        return false;
+      }
+      return true;
+    });
+  }
+
+  /**
+   * Get tasks with their dependency information for enhanced context.
+   */
+  async getTasksWithDependencies(taskIds: string[]): Promise<TaskWithDependencies[]> {
+    const tasks = await Promise.all(taskIds.map((id) => this.store.getTask(id)));
+    const validTasks = tasks.filter((t): t is Task => t !== null);
+
+    const tasksWithDeps = await Promise.all(
+      validTasks.map(async (task) => {
+        const dependencyGraph = await this.dependencyService.getDependencyGraph(task.id);
+        return {
+          ...task,
+          dependencies: dependencyGraph.dependencies,
+          dependents: dependencyGraph.dependents,
+          isBlocked: dependencyGraph.isBlocked,
+          blockedBy: dependencyGraph.blockedBy,
+        };
+      })
+    );
+
+    return tasksWithDeps;
+  }
+
+  /**
+   * Add a dependency between two tasks with validation.
+   */
+  async addTaskDependency(dependentId: string, dependencyId: string) {
+    return this.dependencyService.addDependency(dependentId, dependencyId);
+  }
+
+  /**
+   * Remove a dependency between two tasks.
+   */
+  async removeTaskDependency(dependentId: string, dependencyId: string) {
+    return this.dependencyService.removeDependency(dependentId, dependencyId);
+  }
+
+  /**
+   * Validate if a dependency can be safely added.
+   */
+  async validateTaskDependency(dependentId: string, dependencyId: string) {
+    return this.dependencyService.validateDependency(dependentId, dependencyId);
+  }
+
+  /**
+   * Get dependency graph information for a task.
+   */
+  async getTaskDependencyGraph(taskId: string): Promise<TaskDependencyGraph> {
+    return this.dependencyService.getDependencyGraph(taskId);
+  }
+
+  /**
+   * Get topological order for a set of tasks.
+   */
+  async getTopologicalOrder(taskIds: string[]): Promise<string[]> {
+    return this.dependencyService.getTopologicalOrder(taskIds);
+  }
+
+  /**
+   * Find cycles in the dependency graph.
+   */
+  async findDependencyCycles(): Promise<string[][]> {
+    return this.dependencyService.findCycles();
   }
 }

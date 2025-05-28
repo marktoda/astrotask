@@ -376,3 +376,194 @@ export type ListGeneratorsInput = z.infer<typeof listGeneratorsSchema>;
 
 /** Input type for validating generation input */
 export type ValidateGenerationInputInput = z.infer<typeof validateGenerationInputSchema>;
+
+/**
+ * Schema for adding task dependencies via MCP.
+ * Establishes a dependency relationship where one task must be completed before another can start.
+ * 
+ * @constant
+ * @type {z.ZodObject}
+ * @example
+ * ```typescript
+ * const dependency = { 
+ *   dependentTaskId: "task_456", 
+ *   dependencyTaskId: "task_123" 
+ * };
+ * ```
+ */
+export const addTaskDependencySchema = z.object({
+  /** Task ID that depends on another task */
+  dependentTaskId: z.string(),
+  /** Task ID that must be completed first */
+  dependencyTaskId: z.string(),
+});
+
+/**
+ * Schema for removing task dependencies via MCP.
+ * Removes an existing dependency relationship between two tasks.
+ * 
+ * @constant
+ * @type {z.ZodObject}
+ * @example
+ * ```typescript
+ * const removal = { 
+ *   dependentTaskId: "task_456", 
+ *   dependencyTaskId: "task_123" 
+ * };
+ * ```
+ */
+export const removeTaskDependencySchema = z.object({
+  /** Task ID that currently depends on another task */
+  dependentTaskId: z.string(),
+  /** Task ID to remove as a dependency */
+  dependencyTaskId: z.string(),
+});
+
+/**
+ * Schema for getting task dependency information via MCP.
+ * Retrieves comprehensive dependency graph data for a specific task.
+ * 
+ * @constant
+ * @type {z.ZodObject}
+ * @example
+ * ```typescript
+ * const request = { taskId: "task_123" };
+ * ```
+ */
+export const getTaskDependenciesSchema = z.object({
+  /** Task ID to get dependency information for */
+  taskId: z.string(),
+});
+
+/**
+ * Schema for validating task dependencies via MCP.
+ * Checks if a dependency can be safely added without creating cycles.
+ * 
+ * @constant
+ * @type {z.ZodObject}
+ * @example
+ * ```typescript
+ * const validation = { 
+ *   dependentTaskId: "task_456", 
+ *   dependencyTaskId: "task_123" 
+ * };
+ * ```
+ */
+export const validateTaskDependencySchema = z.object({
+  /** Task ID that would depend on another task */
+  dependentTaskId: z.string(),
+  /** Task ID that would be the dependency */
+  dependencyTaskId: z.string(),
+});
+
+/**
+ * Schema for getting available tasks via MCP.
+ * Retrieves tasks that can be started immediately (no incomplete dependencies).
+ * 
+ * @constant
+ * @type {z.ZodObject}
+ * @example
+ * ```typescript
+ * // Get all available tasks
+ * const all = {};
+ * 
+ * // Get available pending tasks
+ * const pending = { status: "pending" };
+ * 
+ * // Get available high priority tasks
+ * const highPriority = { priority: "high" };
+ * ```
+ */
+export const getAvailableTasksSchema = z.object({
+  /** Optional status filter - only return available tasks with this status */
+  status: taskStatus.optional(),
+  /** Optional priority filter - only return available tasks with this priority */
+  priority: taskPriority.optional(),
+});
+
+/**
+ * Schema for dependency-aware task status updates via MCP.
+ * Updates task status with validation against dependency constraints.
+ * 
+ * @constant
+ * @type {z.ZodObject}
+ * @example
+ * ```typescript
+ * // Normal status update
+ * const update = { taskId: "task_123", status: "in-progress" };
+ * 
+ * // Force status update even if blocked
+ * const forced = { taskId: "task_123", status: "in-progress", force: true };
+ * ```
+ */
+export const updateTaskStatusSchema = z.object({
+  /** Task ID to update */
+  taskId: z.string(),
+  /** New status to set */
+  status: taskStatus,
+  /** Whether to force the update even if blocked by dependencies */
+  force: z.boolean().default(false),
+});
+
+/**
+ * Schema for getting multiple tasks with dependency information via MCP.
+ * Retrieves multiple tasks with their complete dependency context.
+ * 
+ * @constant
+ * @type {z.ZodObject}
+ * @example
+ * ```typescript
+ * const request = { taskIds: ["task_123", "task_456", "task_789"] };
+ * ```
+ */
+export const getTasksWithDependenciesSchema = z.object({
+  /** Array of task IDs to retrieve with dependency information */
+  taskIds: z.array(z.string()),
+});
+
+/**
+ * Schema for getting topological order of tasks via MCP.
+ * Calculates the optimal execution order for a set of tasks based on dependencies.
+ * 
+ * @constant
+ * @type {z.ZodObject}
+ * @example
+ * ```typescript
+ * const request = { taskIds: ["task_123", "task_456", "task_789"] };
+ * ```
+ */
+export const getTopologicalOrderSchema = z.object({
+  /** Array of task IDs to order topologically */
+  taskIds: z.array(z.string()),
+});
+
+/**
+ * TypeScript types inferred from the dependency Zod schemas above.
+ * These provide compile-time type safety for all dependency MCP operations.
+ * 
+ * @group Dependency Input Types
+ */
+
+/** Input type for adding task dependencies */
+export type AddTaskDependencyInput = z.infer<typeof addTaskDependencySchema>;
+
+/** Input type for removing task dependencies */
+export type RemoveTaskDependencyInput = z.infer<typeof removeTaskDependencySchema>;
+
+/** Input type for getting task dependency information */
+export type GetTaskDependenciesInput = z.infer<typeof getTaskDependenciesSchema>;
+
+/** Input type for validating task dependencies */
+export type ValidateTaskDependencyInput = z.infer<typeof validateTaskDependencySchema>;
+
+/** Input type for getting available tasks */
+export type GetAvailableTasksInput = z.infer<typeof getAvailableTasksSchema>;
+
+/** Input type for dependency-aware task status updates */
+export type UpdateTaskStatusInput = z.infer<typeof updateTaskStatusSchema>;
+
+/** Input type for getting multiple tasks with dependencies */
+export type GetTasksWithDependenciesInput = z.infer<typeof getTasksWithDependenciesSchema>;
+
+/** Input type for getting topological order */
+export type GetTopologicalOrderInput = z.infer<typeof getTopologicalOrderSchema>;

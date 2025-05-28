@@ -136,6 +136,19 @@ export const llmChainInputSchema = z.object({
 export const llmChainResultSchema = z.object({
   /** Generated tasks without parentId */
   tasks: z.array(createTaskSchema.omit({ parentId: true })),
+  /** Dependency relationships between generated tasks */
+  dependencies: z
+    .array(
+      z.object({
+        /** Index of the dependent task in the tasks array */
+        dependentTaskIndex: z.number(),
+        /** Index of the dependency task in the tasks array */
+        dependencyTaskIndex: z.number(),
+        /** Reason for this dependency relationship */
+        reason: z.string().optional(),
+      })
+    )
+    .optional(),
   /** Confidence score (0-1) */
   confidence: z.number().min(0).max(1),
   /** Any warnings from the LLM */

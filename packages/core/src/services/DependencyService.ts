@@ -1,24 +1,24 @@
 /**
  * @fileoverview DependencyService for managing task dependencies
- * 
+ *
  * This service provides operations for managing task dependency relationships,
  * including CRUD operations, validation, and graph analysis. It implements
  * the core dependency management functionality for Astrolabe's task system.
- * 
+ *
  * @module services/DependencyService
  * @since 1.0.0
  */
 
 import { randomUUID } from 'node:crypto';
-import { eq, and, inArray } from 'drizzle-orm';
-import type { Store } from '../database/store.js';
+import { and, eq, inArray } from 'drizzle-orm';
 import { taskDependencies } from '../database/schema.js';
-import type { 
-  TaskDependency, 
-  CreateTaskDependency, 
-  TaskDependencyGraph,
+import type { Store } from '../database/store.js';
+import type {
+  CreateTaskDependency,
   DependencyValidationResult,
-  TaskWithDependencies 
+  TaskDependency,
+  TaskDependencyGraph,
+  TaskWithDependencies,
 } from '../schemas/dependency.js';
 import type { Task } from '../schemas/task.js';
 
@@ -35,7 +35,7 @@ export class DependencyService {
 
   /**
    * Add a new dependency relationship between two tasks.
-   * 
+   *
    * @param dependentId - ID of the task that depends on another
    * @param dependencyId - ID of the task that must be completed first
    * @returns Promise resolving to the created dependency
@@ -71,7 +71,7 @@ export class DependencyService {
 
   /**
    * Remove a dependency relationship between two tasks.
-   * 
+   *
    * @param dependentId - ID of the dependent task
    * @param dependencyId - ID of the dependency task
    * @returns Promise resolving to true if dependency was removed, false if not found
@@ -92,7 +92,7 @@ export class DependencyService {
 
   /**
    * Get all task IDs that a specific task depends on.
-   * 
+   *
    * @param taskId - ID of the task to get dependencies for
    * @returns Promise resolving to array of dependency task IDs
    */
@@ -107,7 +107,7 @@ export class DependencyService {
 
   /**
    * Get all task IDs that depend on a specific task.
-   * 
+   *
    * @param taskId - ID of the task to get dependents for
    * @returns Promise resolving to array of dependent task IDs
    */
@@ -127,12 +127,15 @@ export class DependencyService {
   /**
    * Validate whether a dependency can be safely added.
    * Checks for self-dependencies, duplicates, task existence, and cycles.
-   * 
+   *
    * @param dependentId - ID of the dependent task
    * @param dependencyId - ID of the dependency task
    * @returns Promise resolving to validation result
    */
-  async validateDependency(dependentId: string, dependencyId: string): Promise<DependencyValidationResult> {
+  async validateDependency(
+    dependentId: string,
+    dependencyId: string
+  ): Promise<DependencyValidationResult> {
     const errors: string[] = [];
     const warnings: string[] = [];
 
@@ -181,15 +184,13 @@ export class DependencyService {
 
   /**
    * Find cycles in the dependency graph.
-   * 
+   *
    * @param taskIds - Optional array of task IDs to check (defaults to all tasks)
    * @returns Promise resolving to array of cycles (each cycle is an array of task IDs)
    */
   async findCycles(taskIds?: string[]): Promise<string[][]> {
     // Get all dependencies
-    const allDependencies = await this.store.sql
-      .select()
-      .from(taskDependencies);
+    const allDependencies = await this.store.sql.select().from(taskDependencies);
 
     // Build adjacency list
     const graph = new Map<string, string[]>();
@@ -197,7 +198,7 @@ export class DependencyService {
       if (!graph.has(dep.dependentTaskId)) {
         graph.set(dep.dependentTaskId, []);
       }
-      graph.get(dep.dependentTaskId)!.push(dep.dependencyTaskId);
+      graph.get(dep.dependentTaskId)?.push(dep.dependencyTaskId);
     }
 
     // Use DFS to detect cycles
@@ -238,21 +239,19 @@ export class DependencyService {
 
   /**
    * Check if adding a dependency would create a cycle.
-   * 
+   *
    * @param dependentId - ID of the dependent task
    * @param dependencyId - ID of the dependency task
    * @returns Promise resolving to array of cycles that would be created
    */
   private async findCyclesIfAdded(dependentId: string, dependencyId: string): Promise<string[][]> {
     // Temporarily add the dependency to check for cycles
-    const allDependencies = await this.store.sql
-      .select()
-      .from(taskDependencies);
+    const allDependencies = await this.store.sql.select().from(taskDependencies);
 
     // Add the proposed dependency
     const testDependencies = [
       ...allDependencies,
-      { dependentTaskId: dependentId, dependencyTaskId: dependencyId }
+      { dependentTaskId: dependentId, dependencyTaskId: dependencyId },
     ];
 
     // Build adjacency list with the test dependency
@@ -261,7 +260,7 @@ export class DependencyService {
       if (!graph.has(dep.dependentTaskId)) {
         graph.set(dep.dependentTaskId, []);
       }
-      graph.get(dep.dependentTaskId)!.push(dep.dependencyTaskId);
+      graph.get(dep.dependentTaskId)?.push(dep.dependencyTaskId);
     }
 
     // Check for cycles starting from the dependent task
@@ -299,7 +298,7 @@ export class DependencyService {
 
   /**
    * Get tasks that are currently blocked by incomplete dependencies.
-   * 
+   *
    * @returns Promise resolving to array of tasks with dependency information
    */
   async getBlockedTasks(): Promise<TaskWithDependencies[]> {
@@ -329,7 +328,7 @@ export class DependencyService {
 
   /**
    * Get comprehensive dependency graph information for a task.
-   * 
+   *
    * @param taskId - ID of the task to get graph information for
    * @returns Promise resolving to dependency graph information
    */
@@ -342,9 +341,7 @@ export class DependencyService {
     // Check if task is blocked by getting status of dependencies
     const blockedBy: string[] = [];
     if (dependencies.length > 0) {
-      const dependencyTasks = await Promise.all(
-        dependencies.map(id => this.store.getTask(id))
-      );
+      const dependencyTasks = await Promise.all(dependencies.map((id) => this.store.getTask(id)));
 
       for (let i = 0; i < dependencyTasks.length; i++) {
         const depTask = dependencyTasks[i];
@@ -366,7 +363,7 @@ export class DependencyService {
 
   /**
    * Get tasks that can be started immediately (no incomplete dependencies).
-   * 
+   *
    * @returns Promise resolving to array of executable tasks
    */
   async getExecutableTasks(): Promise<Task[]> {
@@ -390,7 +387,7 @@ export class DependencyService {
 
   /**
    * Get topological order of tasks based on dependencies.
-   * 
+   *
    * @param taskIds - Array of task IDs to order
    * @returns Promise resolving to array of task IDs in topological order
    */
@@ -406,7 +403,17 @@ export class DependencyService {
         )
       );
 
-    // Build adjacency list and in-degree count
+    const { graph, inDegree } = this.buildTopologicalGraph(taskIds, dependencies);
+    return this.performTopologicalSort(graph, inDegree);
+  }
+
+  /**
+   * Build adjacency list and in-degree count for topological sorting.
+   */
+  private buildTopologicalGraph(
+    taskIds: string[],
+    dependencies: Array<{ dependentTaskId: string; dependencyTaskId: string }>
+  ): { graph: Map<string, string[]>; inDegree: Map<string, number> } {
     const graph = new Map<string, string[]>();
     const inDegree = new Map<string, number>();
 
@@ -418,11 +425,20 @@ export class DependencyService {
 
     // Build graph
     for (const dep of dependencies) {
-      graph.get(dep.dependencyTaskId)!.push(dep.dependentTaskId);
+      graph.get(dep.dependencyTaskId)?.push(dep.dependentTaskId);
       inDegree.set(dep.dependentTaskId, (inDegree.get(dep.dependentTaskId) || 0) + 1);
     }
 
-    // Kahn's algorithm for topological sorting
+    return { graph, inDegree };
+  }
+
+  /**
+   * Perform Kahn's algorithm for topological sorting.
+   */
+  private performTopologicalSort(
+    graph: Map<string, string[]>,
+    inDegree: Map<string, number>
+  ): string[] {
     const queue: string[] = [];
     const result: string[] = [];
 
@@ -434,14 +450,15 @@ export class DependencyService {
     }
 
     while (queue.length > 0) {
-      const current = queue.shift()!;
+      const current = queue.shift();
+      if (!current) break; // This should never happen due to the while condition, but satisfies the linter
       result.push(current);
 
       // Process all dependents
       for (const dependent of graph.get(current) || []) {
         const newDegree = (inDegree.get(dependent) || 0) - 1;
         inDegree.set(dependent, newDegree);
-        
+
         if (newDegree === 0) {
           queue.push(dependent);
         }
@@ -450,4 +467,4 @@ export class DependencyService {
 
     return result;
   }
-} 
+}

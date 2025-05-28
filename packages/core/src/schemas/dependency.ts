@@ -1,10 +1,10 @@
 /**
  * @fileoverview Task dependency schemas and types
- * 
+ *
  * This module defines the Zod schemas and TypeScript types for task dependencies,
  * enabling tasks to specify prerequisite relationships where certain tasks must
  * be completed before others can begin.
- * 
+ *
  * @module schemas/dependency
  * @since 1.0.0
  */
@@ -107,7 +107,9 @@ export function taskDependencyToApi(dependency: TaskDependency): TaskDependencyA
   };
 }
 
-export function taskDependencyFromApi(apiDependency: TaskDependencyApi): Omit<TaskDependency, 'id' | 'createdAt'> {
+export function taskDependencyFromApi(
+  apiDependency: TaskDependencyApi
+): Omit<TaskDependency, 'id' | 'createdAt'> {
   return {
     dependentTaskId: apiDependency.dependentTaskId,
     dependencyTaskId: apiDependency.dependencyTaskId,
@@ -121,4 +123,4 @@ export type TaskDependencyGraph = z.infer<typeof taskDependencyGraphSchema>;
 export type TaskWithDependencies = z.infer<typeof taskWithDependenciesSchema>;
 export type DependencyValidationResult = z.infer<typeof dependencyValidationResultSchema>;
 export type TaskDependencyApi = z.infer<typeof taskDependencyApiSchema>;
-export type CreateTaskDependencyApi = z.infer<typeof createTaskDependencyApiSchema>; 
+export type CreateTaskDependencyApi = z.infer<typeof createTaskDependencyApiSchema>;

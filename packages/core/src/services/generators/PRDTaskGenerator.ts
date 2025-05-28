@@ -64,6 +64,14 @@ export class GenerationError extends Error {
 export class PRDTaskGenerator implements TaskGenerator {
   readonly type = 'prd';
   private chain: RunnableSequence<{ formattedPrompt: string }, LLMChainResult> | null = null;
+  private pendingDependencies: {
+    dependencies: Array<{
+      dependentTaskIndex: number;
+      dependencyTaskIndex: number;
+      reason?: string | undefined;
+    }>;
+    childTaskIds: string[];
+  } | null = null;
 
   constructor(
     private llm: ChatOpenAI,
@@ -197,7 +205,7 @@ export class PRDTaskGenerator implements TaskGenerator {
         );
       }
 
-      // Execute the LLM chain to get flat tasks
+      // Execute the LLM chain to get flat tasks and dependencies
       if (!this.chain) {
         throw new GenerationError(GenerationErrorType.LLM_ERROR, 'LLM chain not initialized');
       }
@@ -212,7 +220,10 @@ export class PRDTaskGenerator implements TaskGenerator {
       const result = await this.chain.invoke({ formattedPrompt });
       const flatTasks = this.validateLLMResult(result);
 
-      this.logger.info('LLM generated tasks', { count: flatTasks.length });
+      this.logger.info('LLM generated tasks', {
+        count: flatTasks.length,
+        dependenciesCount: result.dependencies?.length || 0,
+      });
 
       // Create the PRD epic task as the root of our generated tree
       const prdEpic = this.createRootTask(input);
@@ -223,7 +234,23 @@ export class PRDTaskGenerator implements TaskGenerator {
       );
 
       // Build the tracking tree with the PRD epic and its children
-      return this.buildTrackingTree(existingTree, prdEpic, childTasks);
+      const trackingTree = this.buildTrackingTree(existingTree, prdEpic, childTasks);
+
+      // Store dependency information for later processing
+      // We'll store this in the generator instance for post-processing
+      if (result.dependencies && result.dependencies.length > 0) {
+        this.logger.info('Storing dependency plan for post-processing', {
+          dependenciesCount: result.dependencies.length,
+        });
+
+        // Store dependency plan for later creation after persistence
+        this.pendingDependencies = {
+          dependencies: result.dependencies,
+          childTaskIds: childTasks.map((task) => task.id),
+        };
+      }
+
+      return trackingTree;
     });
   }
 
@@ -391,6 +418,142 @@ export class PRDTaskGenerator implements TaskGenerator {
     });
 
     return trackingTree;
+  }
+
+  /**
+   * Process pending dependencies after task creation
+   * This should be called after the reconciliation plan has been applied
+   */
+  public async processPendingDependencies(persistedTaskIds: string[]): Promise<void> {
+    if (!this.pendingDependencies) {
+      return;
+    }
+
+    const { dependencies, childTaskIds } = this.pendingDependencies;
+
+    this.logger.info('Processing pending dependencies', {
+      dependenciesCount: dependencies.length,
+      childTasksCount: childTaskIds.length,
+    });
+
+    // Create a mapping from original child task IDs to persisted task IDs
+    const taskIdMapping = this.createTaskIdMapping(childTaskIds, persistedTaskIds);
+
+    // Process each dependency
+    await this.processDependencies(dependencies, childTaskIds, taskIdMapping);
+
+    // Clear pending dependencies after processing
+    this.pendingDependencies = null;
+
+    this.logger.info('Finished processing pending dependencies');
+  }
+
+  /**
+   * Create mapping from original child task IDs to persisted task IDs
+   */
+  private createTaskIdMapping(childTaskIds: string[], persistedTaskIds: string[]): Map<string, string> {
+    const taskIdMapping = new Map<string, string>();
+    const maxIndex = Math.min(childTaskIds.length, persistedTaskIds.length);
+    
+    for (let i = 0; i < maxIndex; i++) {
+      const persistedId = persistedTaskIds[i];
+      const originalId = childTaskIds[i];
+      
+      if (persistedId && originalId) {
+        taskIdMapping.set(originalId, persistedId);
+      }
+    }
+    
+    return taskIdMapping;
+  }
+
+  /**
+   * Process all dependencies with proper validation
+   */
+  private async processDependencies(
+    dependencies: Array<{ dependentTaskIndex: number; dependencyTaskIndex: number; reason?: string | undefined }>,
+    childTaskIds: string[],
+    taskIdMapping: Map<string, string>
+  ): Promise<void> {
+    for (const dep of dependencies) {
+      try {
+        await this.processSingleDependency(dep, childTaskIds, taskIdMapping);
+      } catch (error) {
+        this.logger.error('Failed to create dependency', {
+          dependency: dep,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        // Continue processing other dependencies even if one fails
+      }
+    }
+  }
+
+  /**
+   * Process a single dependency with validation
+   */
+  private async processSingleDependency(
+    dep: { dependentTaskIndex: number; dependencyTaskIndex: number; reason?: string | undefined },
+    childTaskIds: string[],
+    taskIdMapping: Map<string, string>
+  ): Promise<void> {
+    // Validate indices are within bounds
+    if (!this.areIndicesValid(dep, childTaskIds.length)) {
+      return;
+    }
+
+    // Get the actual task IDs from the mapping
+    const dependentOriginalId = childTaskIds[dep.dependentTaskIndex];
+    const dependencyOriginalId = childTaskIds[dep.dependencyTaskIndex];
+
+    if (!dependentOriginalId || !dependencyOriginalId) {
+      this.logger.warn('Invalid dependency task IDs', {
+        dependentIndex: dep.dependentTaskIndex,
+        dependencyIndex: dep.dependencyTaskIndex,
+        dependentOriginalId,
+        dependencyOriginalId,
+      });
+      return;
+    }
+
+    const dependentTaskId = taskIdMapping.get(dependentOriginalId);
+    const dependencyTaskId = taskIdMapping.get(dependencyOriginalId);
+
+    if (!dependentTaskId || !dependencyTaskId) {
+      this.logger.warn('Could not map task IDs for dependency', {
+        dependentOriginalId,
+        dependencyOriginalId,
+        dependentTaskId,
+        dependencyTaskId,
+      });
+      return;
+    }
+
+    // Create the dependency using TaskService method
+    await this.taskService.addTaskDependency(dependentTaskId, dependencyTaskId);
+
+    this.logger.debug('Created dependency', {
+      dependentTaskId,
+      dependencyTaskId,
+      reason: dep.reason,
+    });
+  }
+
+  /**
+   * Validate that dependency indices are within bounds
+   */
+  private areIndicesValid(
+    dep: { dependentTaskIndex: number; dependencyTaskIndex: number },
+    childTasksCount: number
+  ): boolean {
+    if (dep.dependentTaskIndex >= childTasksCount || dep.dependencyTaskIndex >= childTasksCount) {
+      this.logger.warn('Dependency indices out of bounds', {
+        dependentIndex: dep.dependentTaskIndex,
+        dependencyIndex: dep.dependencyTaskIndex,
+        childTasksCount,
+      });
+      return false;
+    }
+    return true;
   }
 }
 

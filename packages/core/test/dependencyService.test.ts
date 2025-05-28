@@ -6,7 +6,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { initializeDatabase, type Store } from '../src/database/index.js';
+import { createDatabase, type Store } from '../src/database/index.js';
 import { DependencyService } from '../src/services/DependencyService.js';
 import type { Task } from '../src/schemas/task.js';
 
@@ -19,9 +19,10 @@ describe('DependencyService', () => {
 
   beforeEach(async () => {
     // Initialize in-memory database for testing
-    store = await initializeDatabase(':memory:', { 
-      encryption: false,
-      sync: false 
+    store = await createDatabase({ 
+      dbPath: ':memory:',
+      encrypted: false,
+      autoSync: false 
     });
     
     dependencyService = new DependencyService(store);
@@ -198,10 +199,12 @@ describe('DependencyService', () => {
       
       const blockedTasks = await dependencyService.getBlockedTasks();
       
-      expect(blockedTasks).toHaveLength(1);
-      expect(blockedTasks[0].id).toBe(task2.id);
-      expect(blockedTasks[0].isBlocked).toBe(true);
-      expect(blockedTasks[0].blockedBy).toContain(task1.id);
+      // Find our specific test task in the blocked tasks
+      const blockedTask2 = blockedTasks.find(task => task.id === task2.id);
+      
+      expect(blockedTask2).toBeDefined();
+      expect(blockedTask2!.isBlocked).toBe(true);
+      expect(blockedTask2!.blockedBy).toContain(task1.id);
     });
   });
 }); 

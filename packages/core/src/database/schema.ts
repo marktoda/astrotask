@@ -56,18 +56,19 @@ export const taskDependencies = pgTable(
   'task_dependencies',
   {
     id: text('id').primaryKey(),
-    dependentTaskId: text('dependent_task_id').notNull().references(() => tasks.id, { onDelete: 'cascade' }),
-    dependencyTaskId: text('dependency_task_id').notNull().references(() => tasks.id, { onDelete: 'cascade' }),
+    dependentTaskId: text('dependent_task_id')
+      .notNull()
+      .references(() => tasks.id, { onDelete: 'cascade' }),
+    dependencyTaskId: text('dependency_task_id')
+      .notNull()
+      .references(() => tasks.id, { onDelete: 'cascade' }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
     // Ensure no duplicate dependencies
     unique('unique_dependency').on(table.dependentTaskId, table.dependencyTaskId),
     // Prevent self-dependencies
-    check(
-      'no_self_dependency',
-      sql`${table.dependentTaskId} != ${table.dependencyTaskId}`
-    ),
+    check('no_self_dependency', sql`${table.dependentTaskId} != ${table.dependencyTaskId}`),
   ]
 );
 
