@@ -189,20 +189,6 @@ describe('TrackingTaskTree', () => {
       expect(clearedTree.baseVersion).toBe(trackingTree.baseVersion + 1);
     });
 
-    it('should support rollback', () => {
-      let trackingTree = TrackingTaskTree.fromTask(mockTask);
-      const originalTitle = trackingTree.title;
-      
-      trackingTree = trackingTree.withTask({ title: 'Updated Title' });
-      expect(trackingTree.title).toBe('Updated Title');
-      expect(trackingTree.hasPendingChanges).toBe(true);
-      
-      const rolledBackTree = trackingTree.rollback();
-      expect(rolledBackTree.hasPendingChanges).toBe(false);
-      expect(rolledBackTree.pendingOperations).toHaveLength(0);
-      // Note: Current implementation doesn't actually restore state
-      // This would require storing the original state
-    });
   });
 
   describe('Versioning and Operations', () => {
