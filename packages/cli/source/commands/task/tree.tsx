@@ -1,4 +1,4 @@
-import type { Task } from "@astrolabe/core";
+import { TaskService, type TaskTree } from "@astrolabe/core";
 import { Box, Text } from "ink";
 import { useEffect, useState } from "react";
 import zod from "zod";
@@ -19,13 +19,9 @@ type Props = {
 	options: zod.infer<typeof options>;
 };
 
-interface TreeNode extends Task {
-	children: TreeNode[];
-}
-
 export default function Tree({ options }: Props) {
 	const db = useDatabase();
-	const [tree, setTree] = useState<TreeNode[]>([]);
+	const [tree, setTree] = useState<TaskTree[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
 
@@ -36,26 +32,27 @@ export default function Tree({ options }: Props) {
 	useEffect(() => {
 		async function loadTree() {
 			try {
-				let tasks: Task[];
+				const taskService = new TaskService(db);
 
 				if (rootId) {
-					// Get specific task and its subtree
-					const rootTask = await db.getTask(rootId);
-					if (!rootTask) {
+					// Get specific task and its subtree using TaskTree class
+					const rootTree = await taskService.getTaskTreeClass(rootId, maxDepth);
+					if (!rootTree) {
 						throw new Error(`Task with ID "${rootId}" not found`);
 					}
-					// Get all tasks to build the complete subtree
-					const allTasks = await db.listTasks();
-					// Filter to include root and all its descendants
-					tasks = [rootTask, ...getDescendants(rootTask.id, allTasks)];
+					setTree([rootTree]);
 				} else {
-					// Get all tasks
-					tasks = await db.listTasks();
-				}
+					// Get all root tasks (tasks without parents) as TaskTree instances
+					const allTasks = await db.listTasks();
+					const rootTasks = allTasks.filter((task) => !task.parentId);
 
-				// Build the tree structure
-				const treeData = buildTree(tasks, rootId);
-				setTree(treeData);
+					// Use batch loading for efficiency
+					const rootTrees = await taskService.getTaskTrees(
+						rootTasks.map((task) => task.id),
+						maxDepth,
+					);
+					setTree(rootTrees);
+				}
 			} catch (err) {
 				setError(
 					err instanceof Error ? err.message : "Failed to load task tree",
@@ -65,7 +62,7 @@ export default function Tree({ options }: Props) {
 			}
 		}
 		loadTree();
-	}, [db, rootId]);
+	}, [db, rootId, maxDepth]);
 
 	if (loading) return <Text>Loading task tree...</Text>;
 	if (error) return <Text color="red">Error: {error}</Text>;
@@ -93,7 +90,7 @@ export default function Tree({ options }: Props) {
 			<Text> </Text>
 			{tree.map((node, index) => (
 				<TreeNodeComponent
-					key={node.id}
+					key={node.task.id}
 					node={node}
 					isLast={index === tree.length - 1}
 					depth={0}
@@ -122,7 +119,7 @@ export default function Tree({ options }: Props) {
 }
 
 interface TreeNodeComponentProps {
-	node: TreeNode;
+	node: TaskTree;
 	isLast: boolean;
 	depth: number;
 	maxDepth?: number;
@@ -139,7 +136,9 @@ function TreeNodeComponent({
 	prefix,
 }: TreeNodeComponentProps) {
 	const shouldShowChildren = maxDepth === undefined || depth < maxDepth;
-	const hasChildren = node.children.length > 0;
+	const children = node.getChildren();
+	const hasChildren = children.length > 0;
+	const task = node.task;
 
 	// Tree drawing characters
 	const connector = isLast ? "└── " : "├── ";
@@ -153,32 +152,32 @@ function TreeNodeComponent({
 					{prefix}
 					{connector}
 				</Text>
-				{showStatus && getStatusIcon(node.status)}
+				{showStatus && getStatusIcon(task.status)}
 				{showStatus && " "}
-				<Text bold color={getStatusColor(node.status)}>
-					{node.title}
+				<Text bold color={getStatusColor(task.status)}>
+					{task.title}
 				</Text>
-				<Text color="gray"> ({node.id})</Text>
-				{showStatus && <Text color="yellow"> [{node.status}]</Text>}
+				<Text color="gray"> ({task.id})</Text>
+				{showStatus && <Text color="yellow"> [{task.status}]</Text>}
 			</Text>
 
 			{/* Description if present */}
-			{node.description && (
+			{task.description && (
 				<Text color="gray">
 					{prefix}
 					{isLast ? "    " : "│   "}
-					{node.description}
+					{task.description}
 				</Text>
 			)}
 
 			{/* Children */}
 			{shouldShowChildren && hasChildren && (
 				<>
-					{node.children.map((child, index) => (
+					{children.map((child, index) => (
 						<TreeNodeComponent
-							key={child.id}
+							key={child.task.id}
 							node={child}
-							isLast={index === node.children.length - 1}
+							isLast={index === children.length - 1}
 							depth={depth + 1}
 							maxDepth={maxDepth}
 							showStatus={showStatus}
@@ -191,94 +190,11 @@ function TreeNodeComponent({
 			{/* Show truncation indicator if max depth reached */}
 			{maxDepth !== undefined && depth >= maxDepth && hasChildren && (
 				<Text color="gray">
-					{childPrefix}⋯ ({node.children.length} more subtasks)
+					{childPrefix}⋯ ({children.length} more subtasks)
 				</Text>
 			)}
 		</Box>
 	);
-}
-
-function getDescendants(taskId: string, allTasks: Task[]): Task[] {
-	const descendants: Task[] = [];
-	const children = allTasks.filter((task) => task.parentId === taskId);
-
-	for (const child of children) {
-		descendants.push(child);
-		descendants.push(...getDescendants(child.id, allTasks));
-	}
-
-	return descendants;
-}
-
-function buildTree(tasks: Task[], rootId?: string): TreeNode[] {
-	// Create a map for quick lookup
-	const taskMap = new Map<string, TreeNode>();
-
-	// Initialize all tasks as tree nodes
-	for (const task of tasks) {
-		taskMap.set(task.id, { ...task, children: [] });
-	}
-
-	// If we have a specific root, start from there
-	if (rootId) {
-		const rootNode = taskMap.get(rootId);
-		if (rootNode) {
-			buildChildren(rootNode, taskMap, tasks);
-			return [rootNode];
-		}
-		return [];
-	}
-
-	// Build the tree by linking children to parents
-	const roots: TreeNode[] = [];
-
-	for (const task of tasks) {
-		const node = taskMap.get(task.id)!;
-
-		if (task.parentId) {
-			const parent = taskMap.get(task.parentId);
-			if (parent) {
-				parent.children.push(node);
-			} else {
-				// Parent not found in current dataset, treat as root
-				roots.push(node);
-			}
-		} else {
-			// No parent, this is a root task
-			roots.push(node);
-		}
-	}
-
-	// Sort children by creation date for consistent ordering
-	for (const node of taskMap.values()) {
-		node.children.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
-	}
-
-	// Sort roots by creation date
-	roots.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
-
-	return roots;
-}
-
-function buildChildren(
-	node: TreeNode,
-	taskMap: Map<string, TreeNode>,
-	allTasks: Task[],
-) {
-	// Find all children of this node
-	const children = allTasks.filter((task) => task.parentId === node.id);
-
-	for (const child of children) {
-		const childNode = taskMap.get(child.id);
-		if (childNode) {
-			node.children.push(childNode);
-			// Recursively build children
-			buildChildren(childNode, taskMap, allTasks);
-		}
-	}
-
-	// Sort children by creation date
-	node.children.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
 }
 
 function getStatusIcon(status: string): string {

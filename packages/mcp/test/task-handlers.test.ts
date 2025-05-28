@@ -19,7 +19,10 @@ const mockStore = {
 };
 
 const mockTaskService = {
-  getTaskTree: vi.fn(),
+  getTaskTree: vi.fn(), // Legacy method - deprecated 
+  getTaskTreeClass: vi.fn(),
+  getTaskTrees: vi.fn(),
+  getTaskWithContext: vi.fn(),
   getTaskAncestors: vi.fn(),
   getTaskDescendants: vi.fn(),
   deleteTaskTree: vi.fn(),
@@ -89,29 +92,34 @@ describe('TaskHandlers', () => {
 
     it('should include subtasks when requested', async () => {
       const mockTasks = [{ id: '1', title: 'Task 1' }];
-      const mockTaskTree = { id: '1', title: 'Task 1', subtasks: [] };
+      const mockTaskTreePlain = { task: { id: '1', title: 'Task 1' }, children: [] };
+      const mockTaskTree = {
+        toPlainObject: vi.fn().mockReturnValue(mockTaskTreePlain)
+      };
       
       mockStore.listTasks.mockResolvedValue(mockTasks);
-      mockTaskService.getTaskTree.mockResolvedValue(mockTaskTree);
+      mockTaskService.getTaskTrees.mockResolvedValue([mockTaskTree]);
 
       const result = await taskHandlers.listTasks({ includeSubtasks: true });
 
-      expect(mockTaskService.getTaskTree).toHaveBeenCalledWith('1');
-      expect(result).toEqual([mockTaskTree]);
+      expect(mockTaskService.getTaskTrees).toHaveBeenCalledWith(['1']);
+      expect(result).toEqual([mockTaskTreePlain]);
     });
 
     it('should filter out null task trees', async () => {
       const mockTasks = [{ id: '1' }, { id: '2' }];
-      const mockValidTree = { id: '1', title: 'Task 1' };
+      const mockValidTreePlain = { task: { id: '1', title: 'Task 1' }, children: [] };
+      const mockValidTree = {
+        toPlainObject: vi.fn().mockReturnValue(mockValidTreePlain)
+      };
       
       mockStore.listTasks.mockResolvedValue(mockTasks);
-      mockTaskService.getTaskTree
-        .mockResolvedValueOnce(mockValidTree)
-        .mockResolvedValueOnce(null);
+      // getTaskTrees filters out null results internally, so only valid trees are returned
+      mockTaskService.getTaskTrees.mockResolvedValue([mockValidTree]);
 
       const result = await taskHandlers.listTasks({ includeSubtasks: true });
 
-      expect(result).toEqual([mockValidTree]);
+      expect(result).toEqual([mockValidTreePlain]);
     });
   });
 

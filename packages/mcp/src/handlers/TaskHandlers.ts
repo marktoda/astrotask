@@ -6,7 +6,7 @@
  */
 
 import type { HandlerContext, CreateTaskInput, UpdateTaskInput, DeleteTaskInput, CompleteTaskInput, GetTaskContextInput, ListTasksInput } from './types.js';
-import type { Task } from '@astrolabe/core';
+import type { Task, TaskTree } from '@astrolabe/core';
 
 export interface TaskContext {
   task: Task;
@@ -23,7 +23,7 @@ export interface TaskContext {
 export class TaskHandlers {
   constructor(readonly context: HandlerContext) { }
 
-  async listTasks(args: ListTasksInput): Promise<Task[] | Array<NonNullable<Awaited<ReturnType<typeof this.context.taskService.getTaskTree>>>>> {
+  async listTasks(args: ListTasksInput): Promise<Task[] | any[]> {
     let tasks: Task[];
 
     if (args.parentId) {
@@ -38,13 +38,12 @@ export class TaskHandlers {
     }
 
     if (args.includeSubtasks) {
-      // Get all subtasks for each task
-      const taskTrees = await Promise.all(
-        tasks.map((task: Task) => this.context.taskService.getTaskTree(task.id))
+      // Use the optimized batch tree loading method
+      const taskTrees = await this.context.taskService.getTaskTrees(
+        tasks.map(task => task.id)
       );
-
-      // Filter out null results and extract tasks
-      return taskTrees.filter((tree): tree is NonNullable<typeof tree> => tree !== null);
+      // Convert TaskTree instances to plain objects for MCP serialization
+      return taskTrees.map(tree => tree.toPlainObject());
     }
 
     return tasks;
@@ -126,15 +125,16 @@ export class TaskHandlers {
   }
 
   async getTaskContext(args: GetTaskContextInput): Promise<TaskContext> {
-    const task = await this.context.store.getTask(args.id);
-    if (!task) {
+    // Use the optimized getTaskWithContext method that handles everything in one call
+    const taskWithContext = await this.context.taskService.getTaskWithContext(args.id);
+    if (!taskWithContext) {
       throw new Error('Task not found');
     }
 
     const context: TaskContext = {
-      task,
-      ancestors: [],
-      descendants: [],
+      task: taskWithContext.task,
+      ancestors: args.includeAncestors ? taskWithContext.ancestors : [],
+      descendants: args.includeDescendants ? taskWithContext.descendants.map(tree => tree.task) : [],
       relatedTasks: [],
       metadata: {
         totalSubtasks: 0,
@@ -143,18 +143,8 @@ export class TaskHandlers {
       },
     };
 
-    // Get ancestors if requested
-    if (args.includeAncestors) {
-      context.ancestors = await this.context.taskService.getTaskAncestors(args.id);
-    }
-
-    // Get descendants if requested
-    if (args.includeDescendants) {
-      context.descendants = await this.context.taskService.getTaskDescendants(args.id);
-    }
-
-    // Calculate metadata
-    const allSubtasks = await this.context.store.listTasks({ parentId: task.id });
+    // Calculate metadata from direct subtasks
+    const allSubtasks = await this.context.store.listTasks({ parentId: taskWithContext.task.id });
     context.metadata.totalSubtasks = allSubtasks.length;
     context.metadata.completedSubtasks = allSubtasks.filter((t: Task) => t.status === 'done').length;
     context.metadata.pendingSubtasks = allSubtasks.filter((t: Task) => t.status === 'pending').length;
