@@ -174,7 +174,7 @@ export default function Generate({ options }: Props) {
 				if (options.dry) {
 					// For dry run, just extract tasks from the plan without applying it
 					const previewTasks = plan.operations
-						.filter((op: any) => op.type === 'child_add')
+						.filter((op: any) => op.type === "child_add")
 						.map((op: any) => {
 							const childData = op.childData as any;
 							return childData.task;

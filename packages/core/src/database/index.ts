@@ -1,3 +1,4 @@
+import { TASK_IDENTIFIERS } from '../utils/TaskTreeConstants.js';
 import { createModuleLogger } from '../utils/logger.js';
 import { initializeDatabase } from './config.js';
 import { createStore } from './electric.js';
@@ -26,21 +27,21 @@ export interface DatabaseOptions {
 async function ensureProjectRoot(store: Store): Promise<void> {
   try {
     // Check if the project root task already exists
-    const existingProjectRoot = await store.getTask('__PROJECT_ROOT__');
+    const existingProjectRoot = await store.getTask(TASK_IDENTIFIERS.PROJECT_ROOT);
     if (existingProjectRoot) {
       return;
     }
-    
+
     // Create the project root task with fixed ID
     await store.addTaskWithId({
-      id: '__PROJECT_ROOT__',
+      id: TASK_IDENTIFIERS.PROJECT_ROOT,
       title: 'Project Root',
       description: 'Root container for all project tasks',
       status: 'done', // Mark as done so it doesn't appear in active task lists
       priority: 'low',
     });
-    
-    logger.info('Created project root task with ID: __PROJECT_ROOT__');
+
+    logger.info(`Created project root task with ID: ${TASK_IDENTIFIERS.PROJECT_ROOT}`);
   } catch (error) {
     // Log the error but don't fail database creation
     logger.warn({ error }, 'Failed to create project root task');

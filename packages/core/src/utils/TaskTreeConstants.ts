@@ -6,6 +6,14 @@
  */
 
 /**
+ * Special task identifiers
+ */
+export const TASK_IDENTIFIERS = {
+  /** Special task ID used as the parent for all root-level tasks */
+  PROJECT_ROOT: '__PROJECT_ROOT__',
+} as const;
+
+/**
  * Cache configuration constants
  */
 export const CACHE_CONFIG = {

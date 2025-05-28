@@ -2,6 +2,7 @@ import type { Store } from '../database/store.js';
 import type { CreateTask, Task, TaskStatus } from '../schemas/task.js';
 import { TaskTree, type TaskTreeData } from '../utils/TaskTree.js';
 import { CachedTaskTreeOperations, TaskTreeCache } from '../utils/TaskTreeCache.js';
+import { TASK_IDENTIFIERS } from '../utils/TaskTreeConstants.js';
 import {
   type ValidationResult,
   validateMoveOperation,
@@ -33,7 +34,7 @@ export class TaskService {
   async getTaskTree(rootId?: string, maxDepth?: number): Promise<TaskTree | null> {
     // Special case: project tree for entire task forest
     if (rootId === undefined) {
-      return this.cachedOps.getOrBuildTree('__PROJECT_ROOT__', maxDepth, async () => {
+      return this.cachedOps.getOrBuildTree(TASK_IDENTIFIERS.PROJECT_ROOT, maxDepth, async () => {
         const treeData = await this.buildProjectTreeData(maxDepth);
         return treeData ? new TaskTree(treeData) : null;
       });
@@ -49,8 +50,8 @@ export class TaskService {
    * Internal method to build project tree containing all parentless tasks
    */
   private async buildProjectTreeData(maxDepth?: number): Promise<TaskTreeData | null> {
-    // Get all tasks with no parent (root tasks)
-    const rootTasks = await this.store.listTasks({ parentId: null });
+    // Get all tasks with PROJECT_ROOT as parent (root tasks)
+    const rootTasks = await this.store.listTasks({ parentId: TASK_IDENTIFIERS.PROJECT_ROOT });
 
     if (rootTasks.length === 0) {
       return null; // No tasks exist
@@ -58,7 +59,7 @@ export class TaskService {
 
     // Create project root task
     const projectRoot: Task = {
-      id: '__PROJECT_ROOT__',
+      id: TASK_IDENTIFIERS.PROJECT_ROOT,
       parentId: null,
       title: 'Project Tasks',
       description: 'Project root containing all task hierarchies',

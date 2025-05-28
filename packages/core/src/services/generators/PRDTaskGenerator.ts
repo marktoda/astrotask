@@ -14,10 +14,12 @@ import type { RunnableSequence } from '@langchain/core/runnables';
 import type { ChatOpenAI } from '@langchain/openai';
 import type { Logger } from 'pino';
 
+import type { Store } from '../../database/store.js';
 import type { CreateTask, Task } from '../../schemas/task.js';
-import type { TaskService } from '../../services/TaskService.js';
-import { type ReconciliationPlan, TrackingTaskTree } from '../../utils/TrackingTaskTree.js';
+import { TaskService } from '../../services/TaskService.js';
 import type { TaskTree } from '../../utils/TaskTree.js';
+import { type ReconciliationPlan, TrackingTaskTree } from '../../utils/TrackingTaskTree.js';
+import { createLLM } from '../../utils/llm.js';
 import { PRD_SYSTEM_PROMPT, generatePRDPrompt } from '../../utils/prompts.js';
 import type { TaskGenerator } from './TaskGenerator.js';
 import type {
@@ -185,7 +187,7 @@ export class PRDTaskGenerator implements TaskGenerator {
       // If parentTaskId is provided, use that specific task as the root
       // If not provided, use the project root (undefined gets the project root)
       const existingTree = await this.taskService.getTaskTree(input.context?.parentTaskId);
-      
+
       // The database initialization ensures there's always a project root,
       // so existingTree should never be null
       if (!existingTree) {
@@ -369,25 +371,58 @@ export class PRDTaskGenerator implements TaskGenerator {
   ): TrackingTaskTree {
     // Start with the existing tree
     let trackingTree = TrackingTaskTree.fromTaskTree(existingTree);
-    
+
     // Create PRD epic tree
     let prdEpicTree = TrackingTaskTree.fromTask(prdEpic);
-    
+
     // Add all child tasks to the PRD epic
     for (const childTask of childTasks) {
       const childTree = TrackingTaskTree.fromTask(childTask);
       prdEpicTree = prdEpicTree.addChild(childTree);
     }
-    
+
     // Add the PRD epic (with its children) to the existing tree
     trackingTree = trackingTree.addChild(prdEpicTree);
-    
+
     this.logger.info('Task tree built successfully', {
       prdEpicTitle: prdEpic.title,
       childTasksCount: childTasks.length,
       existingTreeId: existingTree.id,
     });
-    
+
     return trackingTree;
   }
+}
+
+/**
+ * Factory function to create a PRDTaskGenerator instance
+ *
+ * @param llm - Configured ChatOpenAI instance for task generation
+ * @param logger - Logger instance for operation tracking
+ * @param taskService - TaskService instance for task operations
+ * @returns Configured PRDTaskGenerator instance
+ */
+export function createPRDTaskGeneratorWithDeps(
+  llm: ChatOpenAI,
+  logger: Logger,
+  taskService: TaskService
+): PRDTaskGenerator {
+  return new PRDTaskGenerator(llm, logger, taskService);
+}
+
+/**
+ * Factory function to create a PRDTaskGenerator instance with automatic dependency creation
+ *
+ * @param logger - Logger instance for operation tracking
+ * @param store - Database store instance for task operations
+ * @returns Configured PRDTaskGenerator instance
+ */
+export function createPRDTaskGenerator(logger: Logger, store: Store): PRDTaskGenerator {
+  // Create LLM instance using default configuration
+  const llm = createLLM();
+
+  // Create TaskService instance
+  const taskService = new TaskService(store);
+
+  return new PRDTaskGenerator(llm, logger, taskService);
 }

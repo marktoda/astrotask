@@ -9,6 +9,7 @@ import {
 } from '../src/database/config';
 import { createDatabase } from '../src/database/index';
 import { cfg } from '../src/utils/config';
+import { TASK_IDENTIFIERS } from '../src/utils/TaskTreeConstants';
 
 describe('Database Configuration', () => {
   const testDbDir = join(tmpdir(), 'astrolabe-test');
@@ -170,10 +171,11 @@ describe('Database Configuration', () => {
 
       // Test task business methods
       const tasks = await store.listTasks();
-      expect(tasks).toEqual([]);
+      // Filter out the PROJECT_ROOT task since it's automatically created
+      const userTasks = tasks.filter(task => task.id !== TASK_IDENTIFIERS.PROJECT_ROOT);
+      expect(userTasks).toEqual([]);
 
       const newTask = await store.addTask({
-        id: 'test-task-1',
         title: 'Test Task',
         description: 'A test task',
         status: 'pending',
@@ -183,7 +185,7 @@ describe('Database Configuration', () => {
       expect(newTask).toBeDefined();
       expect(newTask.title).toBe('Test Task');
       expect(newTask.priority).toBe('medium');
-      expect(newTask.parentId).toBeNull(); // Root task
+      expect(newTask.parentId).toBe(TASK_IDENTIFIERS.PROJECT_ROOT); // Root task
 
       const foundTask = await store.getTask(newTask.id);
       expect(foundTask).toEqual(newTask);
@@ -194,13 +196,15 @@ describe('Database Configuration', () => {
 
       // Test filtering by status
       const doneTasks = await store.listTasksByStatus('done');
-      expect(doneTasks).toHaveLength(1);
-      expect(doneTasks[0].status).toBe('done');
+      // Filter out PROJECT_ROOT task since it's automatically created with 'done' status
+      const userDoneTasks = doneTasks.filter(task => task.id !== TASK_IDENTIFIERS.PROJECT_ROOT);
+      expect(userDoneTasks).toHaveLength(1);
+      expect(userDoneTasks[0].status).toBe('done');
 
       // Test root tasks filtering
       const rootTasks = await store.listRootTasks();
       expect(rootTasks).toHaveLength(1);
-      expect(rootTasks[0].parentId).toBeNull();
+      expect(rootTasks[0].parentId).toBe(TASK_IDENTIFIERS.PROJECT_ROOT);
 
       await store.close();
     });
@@ -215,7 +219,6 @@ describe('Database Configuration', () => {
 
       // Create a parent task
       const parentTask = await store.addTask({
-        id: 'parent-task',
         title: 'Parent Task',
         description: 'A parent task',
         status: 'pending',
@@ -224,7 +227,6 @@ describe('Database Configuration', () => {
 
       // Create a subtask
       const subtask = await store.addTask({
-        id: 'subtask-1',
         parentId: parentTask.id,
         title: 'Subtask 1',
         description: 'A subtask',

@@ -7,6 +7,7 @@ import type {
   CreateContextSlice as NewContextSlice,
 } from '../schemas/contextSlice.js';
 import type { CreateTask as NewTask, Task, TaskStatus } from '../schemas/task.js';
+import { TASK_IDENTIFIERS } from '../utils/TaskTreeConstants.js';
 import { generateNextTaskId } from '../utils/taskId.js';
 import type { ElectricConnection } from './electric.js';
 import * as schema from './schema.js';
@@ -110,9 +111,18 @@ export class DatabaseStore implements Store {
   }
 
   async addTask(data: NewTask): Promise<Task> {
+    // Determine the actual parentId for database storage
+    // If no parentId is specified, use PROJECT_ROOT as the parent
+    // but still generate a root-level task ID (not a subtask ID)
+    const actualParentId = data.parentId ?? TASK_IDENTIFIERS.PROJECT_ROOT;
+
+    // For task ID generation, treat tasks with no explicit parent as root tasks
+    // even though they will be stored with PROJECT_ROOT as parentId
+    const taskIdParent = data.parentId ?? undefined;
+
     const taskData = {
-      id: await generateNextTaskId(this, data.parentId ?? undefined),
-      parentId: data.parentId ?? null,
+      id: await generateNextTaskId(this, taskIdParent),
+      parentId: actualParentId,
       title: data.title,
       description: data.description ?? null,
       status: data.status,
@@ -219,7 +229,7 @@ export class DatabaseStore implements Store {
   }
 
   async listRootTasks(): Promise<Task[]> {
-    return this.listTasks({ parentId: null });
+    return this.listTasks({ parentId: TASK_IDENTIFIERS.PROJECT_ROOT });
   }
 
   async listSubtasks(parentId: string): Promise<Task[]> {
