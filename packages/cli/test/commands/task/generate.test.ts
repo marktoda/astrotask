@@ -28,7 +28,7 @@ describe('Generate Task Command', () => {
       expect(() => options.parse(validOptions)).not.toThrow();
     });
 
-    it('should require content field (even if empty when using file)', () => {
+    it('should require content field', () => {
       const invalidOptions = {
         file: '/path/to/prd.md',
         type: 'prd' as const,

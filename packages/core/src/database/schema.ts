@@ -1,6 +1,6 @@
 // @ts-nocheck
-import { relations } from 'drizzle-orm';
-import { foreignKey, pgTable, text, timestamp } from 'drizzle-orm/pg-core';
+import { relations, sql } from 'drizzle-orm';
+import { check, foreignKey, pgTable, text, timestamp } from 'drizzle-orm/pg-core';
 
 /*
   Drizzle ORM schema definition for Astrolabe using PostgreSQL (PGlite).
@@ -36,14 +36,17 @@ export const tasks = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (table) => {
-    return {
-      parentFk: foreignKey({
-        columns: [table.parentId],
-        foreignColumns: [table.id],
-      }),
-    };
-  }
+  (table) => [
+    foreignKey({
+      columns: [table.parentId],
+      foreignColumns: [table.id],
+    }),
+    check(
+      'status_check',
+      sql`${table.status} IN ('pending', 'in-progress', 'done', 'cancelled', 'archived')`
+    ),
+    check('priority_check', sql`${table.priority} IN ('low', 'medium', 'high')`),
+  ]
 );
 
 // ---------------------------------------------------------------------------

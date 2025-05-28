@@ -13,10 +13,7 @@ import { useDatabase } from "../../context/DatabaseContext.js";
 export const description = "Generate tasks from PRD content using AI";
 
 export const options = zod.object({
-	content: zod
-		.string()
-		.optional()
-		.describe("PRD content to generate tasks from"),
+	content: zod.string().describe("PRD content to generate tasks from"),
 	file: zod.string().optional().describe("Path to PRD file to read"),
 	parent: zod
 		.string()
