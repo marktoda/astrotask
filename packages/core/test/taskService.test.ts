@@ -107,16 +107,16 @@ describe('TaskService', () => {
 
   it('moves task subtree to a new parent', async () => {
     const { A2, A1 } = (global as any).testTaskIds;
-    const moved = await service.moveTaskTree(A2, A1);
-    expect(moved).toBe(true);
+    const result = await service.moveTaskTree(A2, A1);
+    expect(result.success).toBe(true);
     const updated = await store.getTask(A2);
     expect(updated?.parentId).toBe(A1);
   });
 
   it('prevents moving a task under its own descendant (circular)', async () => {
     const { A, A1 } = (global as any).testTaskIds;
-    const moved = await service.moveTaskTree(A, A1); // would create circular reference
-    expect(moved).toBe(false);
+    const result = await service.moveTaskTree(A, A1); // would create circular reference
+    expect(result.success).toBe(false);
   });
 
   it('deletes a task subtree with cascade', async () => {
@@ -135,6 +135,91 @@ describe('TaskService', () => {
       await Promise.all([A, A1, A11, A2].map((id) => store.getTask(id)))
     ).map((t) => t!.status);
     expect(new Set(statuses)).toEqual(new Set(['done']));
+  });
+
+  describe('Synthetic Root functionality', () => {
+    it('returns synthetic root with all parentless tasks when no ID provided', async () => {
+      const syntheticTree = await service.getTaskTree();
+      expect(syntheticTree).toBeTruthy();
+      
+      // Verify synthetic root properties
+      expect(syntheticTree!.task.id).toBe('__SYNTHETIC_ROOT__');
+      expect(syntheticTree!.task.title).toBe('All Tasks');
+      expect(syntheticTree!.task.parentId).toBe(null);
+      
+      // Verify it contains the root task (A) as a child
+      const children = syntheticTree!.getChildren();
+      expect(children).toHaveLength(1);
+      expect(children[0].task.title).toBe('Task A');
+    });
+
+    it('synthetic root contains complete task hierarchy', async () => {
+      const { A1, A2, A11 } = (global as any).testTaskIds;
+      const syntheticTree = await service.getTaskTree();
+      
+      // Should find all tasks in the synthetic tree
+      const foundA = syntheticTree!.find(task => task.title === 'Task A');
+      const foundA1 = syntheticTree!.find(task => task.title === 'Task A.1');
+      const foundA2 = syntheticTree!.find(task => task.title === 'Task A.2');
+      const foundA11 = syntheticTree!.find(task => task.title === 'Task A.1.1');
+      
+      expect(foundA).toBeTruthy();
+      expect(foundA1).toBeTruthy();
+      expect(foundA2).toBeTruthy();
+      expect(foundA11).toBeTruthy();
+      
+      // Verify descendant count (4 real tasks + 1 synthetic root = 5 total, 4 descendants)
+      expect(syntheticTree!.getDescendantCount()).toBe(4);
+    });
+
+    it('honours maxDepth with synthetic root', async () => {
+      const syntheticTree = await service.getTaskTree(undefined, 2);
+      expect(syntheticTree).toBeTruthy();
+      
+      // Should find tasks up to depth 2 from synthetic root
+      // Depth 0: synthetic root
+      // Depth 1: Task A
+      // Depth 2: Task A.1, A.2
+      // Depth 3: Task A.1.1 (should NOT be present due to maxDepth=2)
+      
+      const foundA11 = syntheticTree!.find(task => task.title === 'Task A.1.1');
+      expect(foundA11).toBe(null); // Should not find A.1.1 due to depth limit
+      
+      const foundA1 = syntheticTree!.find(task => task.title === 'Task A.1');
+      const foundA2 = syntheticTree!.find(task => task.title === 'Task A.2');
+      expect(foundA1).toBeTruthy(); // Should find A.1
+      expect(foundA2).toBeTruthy(); // Should find A.2
+    });
+
+    it('handles multiple root tasks correctly', async () => {
+      // Add another root task (no parent)
+      const newRootTask = createTask({
+        title: 'Task B',
+        parentId: undefined, // No parent = root task
+      });
+      const taskB = await store.addTask(newRootTask);
+      
+      const syntheticTree = await service.getTaskTree();
+      expect(syntheticTree).toBeTruthy();
+      
+      // Should have 2 children (Task A and Task B)
+      const children = syntheticTree!.getChildren();
+      expect(children).toHaveLength(2);
+      
+      const titles = children.map(child => child.task.title).sort();
+      expect(titles).toEqual(['Task A', 'Task B']);
+    });
+
+    it('returns null for synthetic root when database is empty', async () => {
+      // Clear all tasks
+      const allTasks = await store.listTasks();
+      for (const task of allTasks) {
+        await store.deleteTask(task.id);
+      }
+      
+      const syntheticTree = await service.getTaskTree();
+      expect(syntheticTree).toBe(null);
+    });
   });
 
   describe('Store operations', () => {
