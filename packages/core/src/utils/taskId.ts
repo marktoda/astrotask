@@ -2,8 +2,8 @@
  * Task ID generation utilities for human-readable, hierarchical task identifiers.
  *
  * Root tasks use random 4-letter combinations: ABCD, XYZW, QRST, etc.
- * Subtasks use dotted numbers: ABCD.1, ABCD.2, XYZW.1, etc.
- * Sub-subtasks continue the pattern: ABCD.1.1, ABCD.1.2, etc.
+ * Subtasks use dash-separated random 4-letter suffixes: ABCD-EFGH, ABCD-IJKL, etc.
+ * Sub-subtasks continue the pattern: ABCD-EFGH-MNOP, ABCD-EFGH-QRST, etc.
  */
 
 import type { Store } from '../database/store.js';
@@ -42,16 +42,13 @@ export function lettersToNumber(letters: string): number {
  */
 export function parseTaskId(taskId: string): {
   rootId: string;
-  segments: number[];
+  segments: string[];
   depth: number;
   isRoot: boolean;
 } {
-  const parts = taskId.split('.');
+  const parts = taskId.split('-');
   const rootId = parts[0] || '';
-  const segments = parts
-    .slice(1)
-    .map((s) => Number.parseInt(s, 10))
-    .filter((n) => !Number.isNaN(n));
+  const segments = parts.slice(1);
 
   return {
     rootId,
@@ -101,26 +98,55 @@ export async function generateNextRootTaskId(store: Store): Promise<string> {
 }
 
 /**
+ * Generates a random 4-letter combination for subtask IDs.
+ */
+function generateRandomLetters(): string {
+  let result = '';
+  for (let i = 0; i < 4; i++) {
+    result += String.fromCharCode(65 + Math.floor(Math.random() * 26)); // A-Z
+  }
+  return result;
+}
+
+/**
  * Generates the next available subtask ID for a given parent.
+ * Uses random 4-letter suffixes to avoid async collisions.
  */
 export async function generateNextSubtaskId(store: Store, parentId: string): Promise<string> {
-  const subtasks = await store.listSubtasks(parentId);
+  const maxAttempts = 100; // Prevent infinite loops
 
-  if (subtasks.length === 0) {
-    return `${parentId}.1`;
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    // Generate random 4-letter suffix
+    const suffix = generateRandomLetters();
+    const candidateId = `${parentId}-${suffix}`;
+
+    // Check if this ID already exists
+    const existingTask = await store.getTask(candidateId);
+    if (!existingTask) {
+      return candidateId;
+    }
   }
 
-  // Extract the last numeric segment from each subtask and find the highest
-  const maxNumber = Math.max(
-    ...subtasks
-      .map((task) => {
-        const parsed = parseTaskId(task.id);
-        return parsed.segments[parsed.segments.length - 1];
-      })
-      .filter((num): num is number => num !== undefined)
-  );
+  // Fallback: if we can't find a unique random ID after many attempts,
+  // fall back to sequential generation using letters
+  const subtasks = await store.listSubtasks(parentId);
+  const usedSuffixes = subtasks
+    .map((task) => {
+      const parsed = parseTaskId(task.id);
+      return parsed.segments[parsed.segments.length - 1];
+    })
+    .filter((suffix): suffix is string => suffix !== undefined)
+    .map(lettersToNumber)
+    .sort((a, b) => a - b);
 
-  return `${parentId}.${maxNumber + 1}`;
+  let nextNumber = lettersToNumber('AAAA');
+  for (const num of usedSuffixes) {
+    if (num >= nextNumber && num === nextNumber) {
+      nextNumber++;
+    }
+  }
+
+  return `${parentId}-${numberToLetters(nextNumber)}`;
 }
 
 /**
@@ -139,8 +165,8 @@ export async function generateNextTaskId(store: Store, parentId?: string): Promi
 export function validateTaskId(taskId: string): boolean {
   // Root task: one or more uppercase letters
   const rootPattern = /^[A-Z]+$/;
-  // Subtask: root pattern followed by one or more ".number" segments (no zero)
-  const subtaskPattern = /^[A-Z]+(\.[1-9]\d*)+$/;
+  // Subtask: root pattern followed by one or more "-LETTERS" segments
+  const subtaskPattern = /^[A-Z]+(-[A-Z]+)+$/;
 
   return rootPattern.test(taskId) || subtaskPattern.test(taskId);
 }
@@ -162,6 +188,6 @@ export function validateSubtaskId(taskId: string, parentId: string): boolean {
   }
 
   // Child must start with parent ID
-  const parentPrefix = `${parentId}.`;
+  const parentPrefix = `${parentId}-`;
   return taskId.startsWith(parentPrefix);
 }
