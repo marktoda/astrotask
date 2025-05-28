@@ -61,12 +61,17 @@ export function validateTaskTree(
   errors.push(...relationshipErrors);
 
   // Check for deep nesting (warning)
-  if (opts.maxDepth && tree.getDepth() > opts.maxDepth) {
-    warnings.push({
-      type: 'deep_nesting',
-      taskId: tree.id,
-      message: `Task exceeds maximum depth of ${opts.maxDepth} (current: ${tree.getDepth()})`,
-      details: { maxDepth: opts.maxDepth, currentDepth: tree.getDepth() },
+  if (opts.maxDepth) {
+    const maxDepth = opts.maxDepth; // Capture the value to avoid undefined issues in callback
+    tree.walkDepthFirst((node) => {
+      if (node.getDepth() > maxDepth) {
+        warnings.push({
+          type: 'deep_nesting',
+          taskId: node.id,
+          message: `Task exceeds maximum depth of ${maxDepth} (current: ${node.getDepth()})`,
+          details: { maxDepth, currentDepth: node.getDepth() },
+        });
+      }
     });
   }
 
@@ -153,14 +158,22 @@ function validateParentChildRelationships(tree: TaskTree): ValidationError[] {
     const parent = node.getParent();
 
     // Check if parentId matches actual parent
-    if (node.task.parentId !== parent?.id) {
+    // Note: null and undefined are treated as equivalent for root tasks
+    const declaredParentId = node.task.parentId;
+    const actualParentId = parent?.id;
+
+    // Both should be null/undefined for root tasks, or equal for non-root tasks
+    const parentIdsMatch =
+      (declaredParentId == null && actualParentId == null) || declaredParentId === actualParentId;
+
+    if (!parentIdsMatch) {
       errors.push({
         type: 'invalid_parent',
         taskId: node.id,
-        message: `Task parentId "${node.task.parentId}" does not match actual parent "${parent?.id}"`,
+        message: `Task parentId "${declaredParentId}" does not match actual parent "${actualParentId}"`,
         details: {
-          declaredParentId: node.task.parentId,
-          actualParentId: parent?.id,
+          declaredParentId,
+          actualParentId,
           title: node.title,
         },
       });

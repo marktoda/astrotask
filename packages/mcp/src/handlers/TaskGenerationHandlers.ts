@@ -88,35 +88,95 @@ export class TaskGenerationHandlers implements MCPHandler {
         if (params.persist) {
           // Create TaskService and persist the tree
           const taskService = new TaskService(this.context.store);
-          const persistedTree = await taskService.createTaskTree(trackingTree);
-
-          // Return persisted tree with real IDs
-          return {
-            tree: {
-              id: persistedTree.id,
-              title: persistedTree.task.title,
-              description: persistedTree.task.description,
-              status: persistedTree.task.status,
-              priority: persistedTree.task.priority,
-              childCount: persistedTree.getChildren().length,
-              children: persistedTree.getChildren().map(child => ({
-                id: child.id,
-                title: child.task.title,
-                description: child.task.description,
-                status: child.task.status,
-                priority: child.task.priority,
-              })),
-            },
-            metadata: {
-              generator: 'prd',
-              persisted: true,
-              hierarchical: true,
-              rootTaskId: persistedTree.id,
-              totalTasks: 1 + persistedTree.getChildren().length,
-              requestId: this.context.requestId,
-              timestamp: this.context.timestamp,
-            },
+          
+          // Create minimal root task first
+          const rootCreateTask = {
+            title: trackingTree.task.title,
+            description: trackingTree.task.description || undefined,
+            status: trackingTree.task.status,
+            priority: trackingTree.task.priority,
+            prd: trackingTree.task.prd || undefined,
+            contextDigest: trackingTree.task.contextDigest || undefined,
           };
+          
+          const rootTask = await this.context.store.addTask(rootCreateTask);
+          
+          // If there are children, use the reconciliation approach
+          if (trackingTree.getChildren().length > 0) {
+            // Create a new tracking tree from the persisted root
+            const persistedTrackingTree = TrackingTaskTree.fromTaskTree(
+              await taskService.getTaskTree(rootTask.id) as any
+            );
+            
+            // Convert and add all the children from the original tracking tree
+            for (const child of trackingTree.getChildren()) {
+              const childTrackingTree = TrackingTaskTree.fromTask(child.task);
+              // Recursively add grandchildren if they exist
+              for (const grandchild of child.getChildren()) {
+                const grandchildTrackingTree = TrackingTaskTree.fromTask(grandchild.task);
+                childTrackingTree.addChild(grandchildTrackingTree);
+              }
+              persistedTrackingTree.addChild(childTrackingTree);
+            }
+            
+            // Apply the reconciliation plan using the new cleaner API
+            const { updatedTree } = await persistedTrackingTree.apply(taskService);
+            
+            // Return persisted tree with real IDs
+            return {
+              tree: {
+                id: updatedTree.id,
+                title: updatedTree.task.title,
+                description: updatedTree.task.description,
+                status: updatedTree.task.status,
+                priority: updatedTree.task.priority,
+                childCount: updatedTree.getChildren().length,
+                children: updatedTree.getChildren().map((child) => ({
+                  id: child.id,
+                  title: child.task.title,
+                  description: child.task.description,
+                  status: child.task.status,
+                  priority: child.task.priority,
+                })),
+              },
+              metadata: {
+                generator: 'prd',
+                persisted: true,
+                hierarchical: true,
+                rootTaskId: updatedTree.id,
+                totalTasks: 1 + updatedTree.getChildren().length,
+                requestId: this.context.requestId,
+                timestamp: this.context.timestamp,
+              },
+            };
+          } else {
+            // No children, just return the root task
+            const persistedTree = await taskService.getTaskTree(rootTask.id);
+            if (!persistedTree) {
+              throw new Error('Failed to retrieve created root task');
+            }
+            
+            return {
+              tree: {
+                id: persistedTree.id,
+                title: persistedTree.task.title,
+                description: persistedTree.task.description,
+                status: persistedTree.task.status,
+                priority: persistedTree.task.priority,
+                childCount: 0,
+                children: [],
+              },
+              metadata: {
+                generator: 'prd',
+                persisted: true,
+                hierarchical: true,
+                rootTaskId: persistedTree.id,
+                totalTasks: 1,
+                requestId: this.context.requestId,
+                timestamp: this.context.timestamp,
+              },
+            };
+          }
         } else {
           // Return unpersisted tree with temporary IDs
           return {

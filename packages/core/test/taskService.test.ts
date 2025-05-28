@@ -37,6 +37,7 @@ beforeEach(async () => {
   const taskA1 = await store.addTask(createTask({ title: 'Task A.1', parentId: taskA.id }));
   const taskA2 = await store.addTask(createTask({ title: 'Task A.2', parentId: taskA.id }));
   const taskA11 = await store.addTask(createTask({ title: 'Task A.1.1', parentId: taskA1.id }));
+  const taskB = await store.addTask(createTask({ title: 'Task B' })); // Root task for project tree tests
 
   // Store the IDs for use in tests
   (global as any).testTaskIds = {
@@ -44,6 +45,7 @@ beforeEach(async () => {
     A1: taskA1.id,
     A2: taskA2.id,
     A11: taskA11.id,
+    B: taskB.id,
   };
 
   service = new TaskService(store);
@@ -137,101 +139,104 @@ describe('TaskService', () => {
     expect(new Set(statuses)).toEqual(new Set(['done']));
   });
 
-  describe('Synthetic Root functionality', () => {
-    it('returns synthetic root with all parentless tasks when no ID provided', async () => {
-      const syntheticTree = await service.getTaskTree();
-      expect(syntheticTree).toBeTruthy();
-      
-      // Verify synthetic root properties
-      expect(syntheticTree!.task.id).toBe('__SYNTHETIC_ROOT__');
-      expect(syntheticTree!.task.title).toBe('All Tasks');
-      expect(syntheticTree!.task.parentId).toBe(null);
-      
-      // Verify it contains the root task (A) as a child
-      const children = syntheticTree!.getChildren();
-      expect(children).toHaveLength(1);
-      expect(children[0].task.title).toBe('Task A');
+  describe('Project Tree functionality', () => {
+    it('returns project tree with all parentless tasks when no ID provided', async () => {
+      const projectTree = await service.getTaskTree();
+      expect(projectTree).toBeTruthy();
+
+      // Verify project root properties
+      expect(projectTree!.task.id).toBe('__PROJECT_ROOT__');
+      expect(projectTree!.task.title).toBe('Project Tasks');
+      expect(projectTree!.task.parentId).toBe(null);
+
+      // Should contain all root tasks as children
+      const children = projectTree!.getChildren();
+      expect(children).toHaveLength(2); // Task A and Task B
     });
 
-    it('synthetic root contains complete task hierarchy', async () => {
-      const { A1, A2, A11 } = (global as any).testTaskIds;
-      const syntheticTree = await service.getTaskTree();
-      
-      // Should find all tasks in the synthetic tree
-      const foundA = syntheticTree!.find(task => task.title === 'Task A');
-      const foundA1 = syntheticTree!.find(task => task.title === 'Task A.1');
-      const foundA2 = syntheticTree!.find(task => task.title === 'Task A.2');
-      const foundA11 = syntheticTree!.find(task => task.title === 'Task A.1.1');
-      
+    it('project tree contains complete task hierarchy', async () => {
+      // Get the project tree (all tasks)
+      const projectTree = await service.getTaskTree();
+
+      // Should find all tasks in the project tree
+      const foundA = projectTree!.find(task => task.title === 'Task A');
+      const foundA1 = projectTree!.find(task => task.title === 'Task A.1');
+      const foundA2 = projectTree!.find(task => task.title === 'Task A.2');
+      const foundA11 = projectTree!.find(task => task.title === 'Task A.1.1');
+
       expect(foundA).toBeTruthy();
       expect(foundA1).toBeTruthy();
       expect(foundA2).toBeTruthy();
       expect(foundA11).toBeTruthy();
-      
-      // Verify descendant count (4 real tasks + 1 synthetic root = 5 total, 4 descendants)
-      expect(syntheticTree!.getDescendantCount()).toBe(4);
+
+      // Verify descendant count (5 real tasks + 1 project root = 6 total, 5 descendants)
+      expect(projectTree!.getDescendantCount()).toBe(5);
     });
 
-    it('honours maxDepth with synthetic root', async () => {
-      const syntheticTree = await service.getTaskTree(undefined, 2);
-      expect(syntheticTree).toBeTruthy();
-      
-      // Should find tasks up to depth 2 from synthetic root
-      // Depth 0: synthetic root
-      // Depth 1: Task A
-      // Depth 2: Task A.1, A.2
-      // Depth 3: Task A.1.1 (should NOT be present due to maxDepth=2)
-      
-      const foundA11 = syntheticTree!.find(task => task.title === 'Task A.1.1');
-      expect(foundA11).toBe(null); // Should not find A.1.1 due to depth limit
-      
-      const foundA1 = syntheticTree!.find(task => task.title === 'Task A.1');
-      const foundA2 = syntheticTree!.find(task => task.title === 'Task A.2');
-      expect(foundA1).toBeTruthy(); // Should find A.1
-      expect(foundA2).toBeTruthy(); // Should find A.2
+    it('honours maxDepth with project tree', async () => {
+      const projectTree = await service.getTaskTree(undefined, 2);
+      expect(projectTree).toBeTruthy();
+
+      // Should find tasks up to depth 2 from project root
+      // Depth 0: project root
+      // Depth 1: Task A, Task B (children of project root)
+      // Depth 2: Task A.1, Task A.2 (children of Task A)
+      // Should NOT find Task A.1.1 (depth 3)
+      const foundA11 = projectTree!.find(task => task.title === 'Task A.1.1');
+      expect(foundA11).toBe(null);
+
+      const foundA1 = projectTree!.find(task => task.title === 'Task A.1');
+      const foundA2 = projectTree!.find(task => task.title === 'Task A.2');
+      expect(foundA1).toBeTruthy();
+      expect(foundA2).toBeTruthy();
     });
 
-    it('handles multiple root tasks correctly', async () => {
-      // Add another root task (no parent)
-      const newRootTask = createTask({
-        title: 'Task B',
-        parentId: undefined, // No parent = root task
+    it('handles empty tasks with multiple parentless tasks correctly', async () => {
+      // Create another task at root level
+      await store.addTask({
+        title: 'Task C',
+        description: 'Another root task',
+        status: 'pending',
+        priority: 'low',
       });
-      const taskB = await store.addTask(newRootTask);
-      
-      const syntheticTree = await service.getTaskTree();
-      expect(syntheticTree).toBeTruthy();
-      
-      // Should have 2 children (Task A and Task B)
-      const children = syntheticTree!.getChildren();
-      expect(children).toHaveLength(2);
-      
-      const titles = children.map(child => child.task.title).sort();
-      expect(titles).toEqual(['Task A', 'Task B']);
+
+      const projectTree = await service.getTaskTree();
+      expect(projectTree).toBeTruthy();
+
+      // Should have 3 children now (Task A, Task B, Task C)
+      const children = projectTree!.getChildren();
+      expect(children).toHaveLength(3);
+
+      // Should find all root tasks
+      const foundC = projectTree!.find(task => task.title === 'Task C');
+      expect(foundC).toBeTruthy();
     });
 
-    it('returns null for synthetic root when database is empty', async () => {
-      // Clear all tasks
-      const allTasks = await store.listTasks();
-      for (const task of allTasks) {
-        await store.deleteTask(task.id);
-      }
-      
-      const syntheticTree = await service.getTaskTree();
-      expect(syntheticTree).toBe(null);
+    it('returns null for project tree when database is empty', async () => {
+      // Delete all tasks in proper order (children before parents to avoid foreign key constraints)
+      const { A, A1, A2, A11, B } = (global as any).testTaskIds;
+      await store.deleteTask(A11); // Child first
+      await store.deleteTask(A1);  // Then parent
+      await store.deleteTask(A2);  // Other child
+      await store.deleteTask(A);   // Then root parent
+      await store.deleteTask(B);   // Independent root task
+
+      const projectTree = await service.getTaskTree();
+      expect(projectTree).toBe(null);
     });
   });
 
   describe('Store operations', () => {
     it('should list all tasks', async () => {
       const tasks = await store.listTasks();
-      expect(tasks).toHaveLength(4);
+      expect(tasks).toHaveLength(5); // Task A, A1, A2, A11, and B
     });
 
     it('should list root tasks', async () => {
       const rootTasks = await store.listRootTasks();
-      expect(rootTasks).toHaveLength(1);
-      expect(rootTasks[0].title).toBe('Task A');
+      expect(rootTasks).toHaveLength(2); // Task A and Task B
+      const titles = rootTasks.map(t => t.title).sort();
+      expect(titles).toEqual(['Task A', 'Task B']);
     });
 
     it('should list subtasks for a given parent', async () => {

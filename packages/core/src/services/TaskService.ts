@@ -7,7 +7,7 @@ import {
   validateMoveOperation,
   validateTaskTree,
 } from '../utils/TaskTreeValidation.js';
-import { type ReconciliationPlan, TrackingTaskTree } from '../utils/TrackingTaskTree.js';
+import type { ReconciliationPlan } from '../utils/TrackingTaskTree.js';
 
 /**
  * TaskService - Business logic layer for hierarchical task operations
@@ -28,13 +28,13 @@ export class TaskService {
 
   /**
    * Get TaskTree instance with ergonomic tree operations (cached)
-   * If no rootId provided, returns synthetic root containing all parentless tasks
+   * If no rootId provided, returns project tree containing all parentless tasks
    */
   async getTaskTree(rootId?: string, maxDepth?: number): Promise<TaskTree | null> {
-    // Special case: synthetic root for entire task forest
+    // Special case: project tree for entire task forest
     if (rootId === undefined) {
-      return this.cachedOps.getOrBuildTree('__SYNTHETIC_ROOT__', maxDepth, async () => {
-        const treeData = await this.buildSyntheticRootTreeData(maxDepth);
+      return this.cachedOps.getOrBuildTree('__PROJECT_ROOT__', maxDepth, async () => {
+        const treeData = await this.buildProjectTreeData(maxDepth);
         return treeData ? new TaskTree(treeData) : null;
       });
     }
@@ -46,9 +46,9 @@ export class TaskService {
   }
 
   /**
-   * Internal method to build synthetic root containing all parentless tasks
+   * Internal method to build project tree containing all parentless tasks
    */
-  private async buildSyntheticRootTreeData(maxDepth?: number): Promise<TaskTreeData | null> {
+  private async buildProjectTreeData(maxDepth?: number): Promise<TaskTreeData | null> {
     // Get all tasks with no parent (root tasks)
     const rootTasks = await this.store.listTasks({ parentId: null });
 
@@ -56,12 +56,12 @@ export class TaskService {
       return null; // No tasks exist
     }
 
-    // Create synthetic root task
-    const syntheticRoot: Task = {
-      id: '__SYNTHETIC_ROOT__',
+    // Create project root task
+    const projectRoot: Task = {
+      id: '__PROJECT_ROOT__',
       parentId: null,
-      title: 'All Tasks',
-      description: 'Synthetic root containing all task hierarchies',
+      title: 'Project Tasks',
+      description: 'Project root containing all task hierarchies',
       status: 'pending' as const,
       priority: 'medium' as const,
       prd: null,
@@ -81,7 +81,7 @@ export class TaskService {
       }
     }
 
-    return { task: syntheticRoot, children };
+    return { task: projectRoot, children };
   }
 
   /**
@@ -212,22 +212,6 @@ export class TaskService {
   }
 
   /**
-   * Bulk update status for an entire task tree
-   */
-  async updateTreeStatus(rootId: string, status: TaskStatus): Promise<number> {
-    const descendants = await this.getTaskDescendants(rootId);
-    const allTasks = [rootId, ...descendants.map((d) => d.id)];
-
-    let updatedCount = 0;
-    for (const taskId of allTasks) {
-      const updated = await this.store.updateTask(taskId, { status });
-      if (updated) updatedCount++;
-    }
-
-    return updatedCount;
-  }
-
-  /**
    * Get multiple task trees efficiently
    */
   async getTaskTrees(rootIds: string[], maxDepth?: number): Promise<TaskTree[]> {
@@ -339,167 +323,258 @@ export class TaskService {
   }
 
   /**
-   * Create a complete task tree atomically from scratch (brand new trees)
+   * Apply a reconciliation plan to the store
+   * This is the unified way to persist changes from any source that generates a reconciliation plan
    */
-  async createTaskTree(trackingTree: TrackingTaskTree): Promise<TaskTree> {
-    const createdTasks: Task[] = [];
-    const taskMap = new Map<string, string>(); // temp ID -> real ID
-
-    try {
-      // Create root task first
-      const rootTaskData = this.convertToCreateTask(trackingTree.task);
-      const rootTask = await this.store.addTask(rootTaskData);
-      if (!rootTask) {
-        throw new Error('Failed to create root task');
-      }
-
-      createdTasks.push(rootTask);
-      taskMap.set(trackingTree.id, rootTask.id);
-
-      // Create children recursively
-      await this.createChildrenRecursively(trackingTree, rootTask.id, taskMap, createdTasks);
-
-      // Build the final tree from persisted tasks
-      const finalTree = await this.getTaskTree(rootTask.id);
-      if (!finalTree) {
-        throw new Error('Failed to retrieve created tree');
-      }
-
-      // Clear cache since we've added new tasks
-      this.clearCache();
-
-      return finalTree;
-    } catch (error) {
-      // Rollback - delete any created tasks
-      for (const task of createdTasks.reverse()) {
-        try {
-          await this.store.deleteTask(task.id);
-        } catch (deleteError) {
-          // Log but don't throw - we're already in error state
-          console.error('Failed to rollback task during reconciliation error:', deleteError);
-        }
-      }
-
-      throw new Error(
-        `Task tree creation failed: ${error instanceof Error ? error.message : String(error)}`
-      );
-    }
-  }
-
-  /**
-   * Reconcile incremental changes to an existing task tree using a reconciliation plan
-   */
-  private async reconcileTaskTree(plan: ReconciliationPlan): Promise<TaskTree> {
-    // This method handles incremental updates to existing trees
-    const updatedTaskIds = new Set<string>();
-
-    try {
-      // Process operations in order
-      for (const operation of plan.operations) {
-        switch (operation.type) {
-          case 'task_update': {
-            const taskId = operation.taskId;
-            await this.store.updateTask(taskId, operation.updates as Partial<Task>);
-            updatedTaskIds.add(taskId);
-            break;
-          }
-          case 'child_add':
-            // Handle child addition - would need full implementation
-            throw new Error('Child add operations not yet implemented in reconciliation');
-          case 'child_remove':
-            // Handle child removal - would need full implementation
-            throw new Error('Child remove operations not yet implemented in reconciliation');
-        }
-      }
-
-      // Get the updated tree
-      const finalTree = await this.getTaskTree(plan.treeId);
-      if (!finalTree) {
-        throw new Error('Failed to retrieve updated tree after reconciliation');
-      }
-
-      // Clear cache for affected tasks
-      if (updatedTaskIds.size > 0) {
-        this.clearCache();
-      }
-
-      return finalTree;
-    } catch (error) {
-      throw new Error(
-        `Task tree reconciliation failed: ${error instanceof Error ? error.message : String(error)}`
-      );
-    }
-  }
-
-  /**
-   * Recursively create children tasks with proper parent relationships
-   */
-  private async createChildrenRecursively(
-    parentTree: TrackingTaskTree | TaskTree,
-    realParentId: string,
-    taskMap: Map<string, string>,
-    createdTasks: Task[]
-  ): Promise<void> {
-    for (const child of parentTree.getChildren()) {
-      // Convert child to CreateTask format
-      const childTaskData = this.convertToCreateTask(child.task);
-      childTaskData.parentId = realParentId; // Set correct parent ID
-
-      // Create the child task
-      const childTask = await this.store.addTask(childTaskData);
-      if (!childTask) {
-        throw new Error(`Failed to create child task: ${child.task.title}`);
-      }
-
-      createdTasks.push(childTask);
-      taskMap.set(child.id, childTask.id);
-
-      // Recursively create grandchildren
-      if (child.getChildren().length > 0) {
-        await this.createChildrenRecursively(child, childTask.id, taskMap, createdTasks);
-      }
-    }
-  }
-
-  /**
-   * Convert a Task to CreateTask format for persistence
-   */
-  private convertToCreateTask(task: Task): CreateTask {
-    return {
-      parentId: task.parentId ?? undefined,
-      title: task.title,
-      description: task.description ?? undefined,
-      status: task.status,
-      priority: task.priority,
-      prd: task.prd ?? undefined,
-      contextDigest: task.contextDigest ?? undefined,
-    };
-  }
-
-  /**
-   * Get a TrackingTaskTree for making optimistic updates
-   */
-  async getTrackingTaskTree(rootId: string, maxDepth?: number): Promise<TrackingTaskTree | null> {
-    const tree = await this.getTaskTree(rootId, maxDepth);
-    if (!tree) return null;
-
-    return TrackingTaskTree.fromTaskTree(tree);
-  }
-
-  /**
-   * Apply pending operations from a TrackingTaskTree to the store
-   */
-  async applyTrackingTreeChanges(trackingTree: TrackingTaskTree): Promise<TaskTree> {
-    if (!trackingTree.hasPendingChanges) {
+  async applyReconciliationPlan(plan: ReconciliationPlan): Promise<TaskTree> {
+    if (plan.operations.length === 0) {
       // No changes to apply, just return current tree
-      const currentTree = await this.getTaskTree(trackingTree.id);
+      const currentTree = await this.getTaskTree(plan.treeId);
       if (!currentTree) {
         throw new Error('Task tree not found');
       }
       return currentTree;
     }
 
-    const plan = trackingTree.createReconciliationPlan();
-    return this.reconcileTaskTree(plan);
+    return this.executeReconciliationOperations(plan);
+  }
+
+  /**
+   * Execute reconciliation operations with rollback support
+   */
+  private async executeReconciliationOperations(plan: ReconciliationPlan): Promise<TaskTree> {
+    const updatedTaskIds = new Set<string>();
+    const createdTaskIds: string[] = [];
+    const rollbackActions: (() => Promise<void>)[] = [];
+
+    try {
+      // Process operations in order
+      for (const operation of plan.operations) {
+        switch (operation.type) {
+          case 'task_update': {
+            await this.handleTaskUpdate(operation, updatedTaskIds, rollbackActions);
+            break;
+          }
+
+          case 'child_add': {
+            await this.handleChildAdd(operation, createdTaskIds, rollbackActions);
+            break;
+          }
+
+          case 'child_remove': {
+            await this.handleChildRemove(operation, rollbackActions);
+            break;
+          }
+
+          default: {
+            const unknownOp = operation as { type: string };
+            throw new Error(`Unknown operation type: ${unknownOp.type}`);
+          }
+        }
+      }
+
+      return this.finalizeReconciliation(plan.treeId, updatedTaskIds, createdTaskIds);
+    } catch (error) {
+      await this.rollbackOperations(rollbackActions);
+      throw new Error(
+        `Failed to apply reconciliation plan: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+  }
+
+  /**
+   * Finalize reconciliation by clearing cache and returning updated tree
+   */
+  private async finalizeReconciliation(
+    treeId: string,
+    updatedTaskIds: Set<string>,
+    createdTaskIds: string[]
+  ): Promise<TaskTree> {
+    // Get the updated tree
+    const finalTree = await this.getTaskTree(treeId);
+    if (!finalTree) {
+      throw new Error('Failed to retrieve updated tree after applying changes');
+    }
+
+    // Clear cache for affected tasks
+    if (updatedTaskIds.size > 0 || createdTaskIds.length > 0) {
+      this.clearCache();
+    }
+
+    return finalTree;
+  }
+
+  /**
+   * Attempt to rollback operations (best effort)
+   */
+  private async rollbackOperations(rollbackActions: (() => Promise<void>)[]): Promise<void> {
+    try {
+      for (const rollback of rollbackActions.reverse()) {
+        await rollback();
+      }
+      this.clearCache(); // Clear cache after rollback
+    } catch (rollbackError) {
+      console.error('Rollback failed:', rollbackError);
+    }
+  }
+
+  /**
+   * Handle task update operations with proper validation
+   */
+  private async handleTaskUpdate(
+    operation: { taskId?: string; updates?: Record<string, unknown> },
+    updatedTaskIds: Set<string>,
+    rollbackActions: (() => Promise<void>)[]
+  ): Promise<void> {
+    if (!operation.taskId) {
+      throw new Error('task_update operation missing taskId');
+    }
+
+    const taskId = operation.taskId;
+    const originalTask = await this.store.getTask(taskId);
+    if (!originalTask) {
+      throw new Error(`Task ${taskId} not found for update`);
+    }
+
+    const updatedTask = await this.store.updateTask(taskId, operation.updates as Partial<Task>);
+    if (!updatedTask) {
+      throw new Error(`Failed to update task ${taskId}`);
+    }
+    updatedTaskIds.add(taskId);
+
+    // Add rollback action
+    rollbackActions.push(async () => {
+      await this.store.updateTask(taskId, {
+        title: originalTask.title,
+        description: originalTask.description,
+        status: originalTask.status,
+        priority: originalTask.priority,
+        parentId: originalTask.parentId,
+        prd: originalTask.prd,
+        contextDigest: originalTask.contextDigest,
+      });
+    });
+  }
+
+  /**
+   * Handle child add operations with proper validation
+   */
+  private async handleChildAdd(
+    operation: { parentId?: string; childData?: unknown },
+    createdTaskIds: string[],
+    rollbackActions: (() => Promise<void>)[]
+  ): Promise<void> {
+    if (!operation.parentId) {
+      throw new Error('child_add operation missing parentId');
+    }
+    if (!operation.childData) {
+      throw new Error('child_add operation missing childData');
+    }
+
+    const childData = operation.childData as TaskTreeData;
+    const createTask: CreateTask = {
+      parentId: operation.parentId,
+      title: childData.task.title,
+      description: childData.task.description || undefined,
+      status: childData.task.status,
+      priority: childData.task.priority,
+      prd: childData.task.prd || undefined,
+      contextDigest: childData.task.contextDigest || undefined,
+    };
+
+    const createdTask = await this.store.addTask(createTask);
+    createdTaskIds.push(createdTask.id);
+
+    // Add rollback action
+    rollbackActions.push(async () => {
+      await this.store.deleteTask(createdTask.id);
+    });
+
+    // Recursively create children if they exist
+    if (childData.children && childData.children.length > 0) {
+      await this.createChildrenRecursively(childData.children, createdTask.id, rollbackActions);
+    }
+  }
+
+  /**
+   * Handle child remove operations with proper validation
+   */
+  private async handleChildRemove(
+    operation: { childId?: string },
+    rollbackActions: (() => Promise<void>)[]
+  ): Promise<void> {
+    if (!operation.childId) {
+      throw new Error('child_remove operation missing childId');
+    }
+
+    // Delete the child and all its descendants
+    await this.deleteTaskTree(operation.childId, true);
+
+    // Add rollback action (this would be complex, for now just note it)
+    rollbackActions.push(async () => {
+      // Rollback would require recreating the entire subtree
+      // This is complex and may not be worth implementing fully
+      console.warn(`Rollback of child_remove for ${operation.childId} not fully implemented`);
+    });
+  }
+
+  /**
+   * Recursively create children tasks with proper parent relationships
+   */
+  private async createChildrenRecursively(
+    childrenData: TaskTreeData[],
+    parentId: string,
+    rollbackActions?: (() => Promise<void>)[]
+  ): Promise<void> {
+    for (const childData of childrenData) {
+      const createTask: CreateTask = {
+        parentId,
+        title: childData.task.title,
+        description: childData.task.description || undefined,
+        status: childData.task.status,
+        priority: childData.task.priority,
+        prd: childData.task.prd || undefined,
+        contextDigest: childData.task.contextDigest || undefined,
+      };
+
+      const createdChild = await this.store.addTask(createTask);
+
+      // Add rollback action if provided
+      if (rollbackActions) {
+        rollbackActions.push(async () => {
+          await this.store.deleteTask(createdChild.id);
+        });
+      }
+
+      // Recursively create grandchildren
+      if (childData.children && childData.children.length > 0) {
+        await this.createChildrenRecursively(childData.children, createdChild.id, rollbackActions);
+      }
+    }
+  }
+
+  /**
+   * Bulk update status for an entire task tree using direct store updates
+   */
+  async updateTreeStatus(rootId: string, status: TaskStatus): Promise<number> {
+    // Get all descendants to update
+    const descendants = await this.getTaskDescendants(rootId);
+    const allTaskIds = [rootId, ...descendants.map((d) => d.id)];
+
+    // Update all tasks directly in the store
+    let updatedCount = 0;
+    for (const taskId of allTaskIds) {
+      const updated = await this.store.updateTask(taskId, { status });
+      if (updated) {
+        updatedCount++;
+      }
+    }
+
+    // Clear cache for affected tasks since we bypassed the tree operations
+    if (updatedCount > 0) {
+      this.clearCache();
+    }
+
+    return updatedCount;
   }
 }

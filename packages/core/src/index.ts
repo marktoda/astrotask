@@ -27,8 +27,6 @@ export {
   TrackingTaskTree,
   type PendingOperation,
   type ReconciliationPlan,
-  type ConflictDescriptor,
-  batchReconcile,
   serializeTrackingState,
   deserializeTrackingState,
 } from './utils/TrackingTaskTree.js';
