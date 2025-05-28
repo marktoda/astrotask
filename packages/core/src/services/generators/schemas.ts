@@ -9,7 +9,7 @@
  */
 
 import { z } from 'zod';
-import { createTaskSchema } from '../../schemas/task.js';
+import { createTaskSchema, taskSchema } from '../../schemas/task.js';
 
 /**
  * Input data for task generation
@@ -21,7 +21,7 @@ export const generationInputSchema = z.object({
   context: z
     .object({
       /** Existing tasks for context (full Task objects) */
-      existingTasks: z.array(z.any()).optional(),
+      existingTasks: z.array(taskSchema).optional(),
       /** Parent task ID for generated tasks */
       parentTaskId: z.string().optional(),
       /** Additional metadata */
@@ -37,7 +37,7 @@ export const generationInputSchema = z.object({
  */
 export const generationContextSchema = z.object({
   /** Existing tasks for context awareness */
-  existingTasks: z.array(z.any()).optional(),
+  existingTasks: z.array(taskSchema).optional(),
   /** Parent task ID if generating subtasks */
   parentTaskId: z.string().nullable().optional(),
   /** Additional metadata */
@@ -77,7 +77,7 @@ export const llmChainInputSchema = z.object({
   /** Content to analyze */
   content: z.string(),
   /** Existing tasks for context */
-  existingTasks: z.array(z.any()),
+  existingTasks: z.array(taskSchema),
   /** Additional metadata */
   metadata: z.record(z.unknown()),
 });
