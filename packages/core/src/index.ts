@@ -14,6 +14,37 @@ export const APP_NAME = 'Astrolabe';
 // Core functionality
 export * from './database/index.js';
 export { TaskService } from './services/TaskService.js';
+
+// Schema exports
+export {
+  taskSchema,
+  createTaskSchema,
+  updateTaskSchema,
+  taskStatus,
+  taskPriority,
+  validateTask,
+  contextSliceSchema,
+  createContextSliceSchema,
+  updateContextSliceSchema,
+  validateContextSlice,
+  uuid,
+  optionalUuid,
+  title,
+  description,
+  uuidPattern,
+  CONSTRAINTS,
+  safeParseSchema,
+  validateWithErrors,
+  validateBySchemaKey,
+  isTask,
+  isContextSlice,
+  isValidUuid,
+  validateStringConstraints,
+  type ValidationError,
+  type ValidationResult,
+  type Priority,
+} from './schemas/index.js';
+
 // TaskTree utilities
 export {
   TaskTree,
@@ -37,8 +68,6 @@ export {
   validateTaskTreeData,
   validateMoveOperation,
   validateTaskForest,
-  type ValidationResult,
-  type ValidationError,
   type ValidationWarning,
   type ValidationOptions,
 } from './utils/TaskTreeValidation.js';

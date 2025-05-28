@@ -7,12 +7,7 @@
  */
 
 export { TaskHandlers, type TaskContext } from './TaskHandlers.js';
-export { 
-  TaskGenerationHandlers,
-  type GenerateTasksInput,
-  type ListGeneratorsInput,
-  type ValidateGenerationInputInput 
-} from './TaskGenerationHandlers.js';
+export { TaskGenerationHandlers } from './TaskGenerationHandlers.js';
 export * from './types.js';
 export { 
   createTaskSchema, 

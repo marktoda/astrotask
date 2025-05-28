@@ -152,7 +152,7 @@ describe('Database Configuration', () => {
         ORDER BY table_name
       `);
 
-      const tableNames = result.rows.map((row: any) => row.table_name);
+      const tableNames = (result.rows as Array<{ table_name: string }>).map(row => row.table_name);
       expect(tableNames).toContain('tasks');
       expect(tableNames).toContain('context_slices');
       // projects table should no longer exist after migration

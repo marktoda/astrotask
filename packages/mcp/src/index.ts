@@ -16,55 +16,9 @@ import {
   listGeneratorsSchema,
   validateGenerationInputSchema
 } from './handlers/index.js';
+import { wrapMCPHandler } from './utils/response.js';
 
 const logger = createModuleLogger('mcp-server');
-
-/**
- * Wraps handler responses in the standard MCP response format
- */
-function wrapMCPResponse<T>(data: T, isError: boolean = false) {
-  return {
-    content: [
-      {
-        type: 'text' as const,
-        text: typeof data === 'string' ? data : JSON.stringify(data, null, 2)
-      }
-    ],
-    isError
-  };
-}
-
-/**
- * Wraps error information in the standard MCP response format
- */
-function wrapMCPError(error: unknown, context?: string) {
-  const errorMessage = error instanceof Error ? error.message : String(error);
-  const fullMessage = context ? `${context}: ${errorMessage}` : errorMessage;
-
-  return {
-    content: [
-      {
-        type: 'text' as const,
-        text: JSON.stringify({ error: fullMessage }, null, 2)
-      }
-    ],
-    isError: true
-  };
-}
-
-/**
- * Generic wrapper for MCP tool handlers that adds error handling and response formatting
- */
-function wrap<T extends any[], R>(handler: (...args: T) => Promise<R>) {
-  return async (...args: T) => {
-    try {
-      const result = await handler(...args);
-      return wrapMCPResponse(result);
-    } catch (error) {
-      return wrapMCPError(error);
-    }
-  };
-}
 
 /**
  * Main entry point for the Astrolabe MCP Server
@@ -99,42 +53,42 @@ async function main() {
   // Register core task management tools
   server.tool('listTasks',
     listTasksSchema.shape,
-    wrap(async (args) => {
+    wrapMCPHandler(async (args) => {
       return taskHandlers.listTasks(args);
     })
   );
 
   server.tool('createTask',
     createTaskSchema.shape,
-    wrap(async (args) => {
+    wrapMCPHandler(async (args) => {
       return taskHandlers.createTask(args);
     })
   );
 
   server.tool('updateTask',
     updateTaskSchema.shape,
-    wrap(async (args) => {
+    wrapMCPHandler(async (args) => {
       return taskHandlers.updateTask(args);
     })
   );
 
   server.tool('deleteTask',
     deleteTaskSchema.shape,
-    wrap(async (args) => {
+    wrapMCPHandler(async (args) => {
       return taskHandlers.deleteTask(args);
     })
   );
 
   server.tool('completeTask',
     completeTaskSchema.shape,
-    wrap(async (args) => {
+    wrapMCPHandler(async (args) => {
       return taskHandlers.completeTask(args);
     })
   );
 
   server.tool('getTaskContext',
     getTaskContextSchema.shape,
-    wrap(async (args) => {
+    wrapMCPHandler(async (args) => {
       return taskHandlers.getTaskContext(args);
     })
   );
@@ -142,21 +96,21 @@ async function main() {
   // Register task generation tools
   server.tool('generateTasks',
     generateTasksSchema.shape,
-    wrap(async (args) => {
+    wrapMCPHandler(async (args) => {
       return taskGenerationHandlers.generateTasks(args);
     })
   );
 
   server.tool('listGenerators',
     listGeneratorsSchema.shape,
-    wrap(async (args) => {
+    wrapMCPHandler(async (args) => {
       return taskGenerationHandlers.listGenerators(args);
     })
   );
 
   server.tool('validateGenerationInput',
     validateGenerationInputSchema.shape,
-    wrap(async (args) => {
+    wrapMCPHandler(async (args) => {
       return taskGenerationHandlers.validateGenerationInput(args);
     })
   );

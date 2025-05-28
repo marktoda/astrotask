@@ -11,8 +11,114 @@
  */
 
 import { z } from 'zod';
-import { taskStatus, taskPriority } from '@astrolabe/core/dist/schemas';
+import { 
+  taskStatus, 
+  taskPriority, 
+  createTaskSchema as coreCreateTaskSchema,
+  updateTaskSchema as coreUpdateTaskSchema,
+  taskSchema
+} from '@astrolabe/core/dist/schemas/index.js';
 import type { Store, TaskService } from '@astrolabe/core';
+
+/**
+ * Supported generator types for task generation
+ */
+export type GeneratorType = 'prd';
+
+/**
+ * Supported metadata keys for different generators
+ */
+export interface PRDMetadata {
+  /** Maximum number of tasks to generate */
+  maxTasks?: number;
+  /** Target complexity level */
+  complexity?: 'simple' | 'moderate' | 'complex';
+  /** Include implementation details */
+  includeDetails?: boolean;
+  /** Preferred task priority */
+  defaultPriority?: 'low' | 'medium' | 'high';
+}
+
+/**
+ * Union type for all supported metadata types
+ */
+export type GeneratorMetadata = PRDMetadata;
+
+/**
+ * Logging context for operations
+ */
+export interface LoggingContext {
+  /** Operation being performed */
+  operation: string;
+  /** Request identifier */
+  requestId: string;
+  /** Task ID if applicable */
+  taskId?: string;
+  /** User ID if applicable */
+  userId?: string;
+  /** Additional operation-specific data */
+  operationData?: Record<string, string | number | boolean>;
+}
+
+/**
+ * Operation result metadata
+ */
+export interface OperationResult {
+  /** Whether the operation succeeded */
+  success: boolean;
+  /** Number of items affected */
+  itemsAffected?: number;
+  /** Duration in milliseconds */
+  duration?: number;
+  /** Additional result-specific data */
+  resultData?: Record<string, string | number | boolean>;
+}
+
+/**
+ * Task tree node structure for API responses
+ */
+export interface TaskTreeNode {
+  /** Task identifier */
+  id: string;
+  /** Task title */
+  title: string;
+  /** Task description */
+  description?: string | null;
+  /** Task status */
+  status: 'pending' | 'in-progress' | 'done' | 'cancelled' | 'archived';
+  /** Task priority */
+  priority: 'low' | 'medium' | 'high';
+  /** Number of child tasks */
+  childCount?: number;
+  /** Child task nodes */
+  children?: TaskTreeNode[];
+  /** Parent task ID */
+  parentId?: string | null;
+}
+
+/**
+ * Generation metadata for API responses
+ */
+export interface GenerationMetadata {
+  /** Generator type used */
+  generator: GeneratorType;
+  /** Whether tasks were persisted to database */
+  persisted: boolean;
+  /** Whether hierarchical structure was used */
+  hierarchical: boolean;
+  /** Total number of tasks generated */
+  totalTasks: number;
+  /** Root task ID if persisted */
+  rootTaskId?: string;
+  /** Whether there are pending operations */
+  hasPendingOperations?: boolean;
+  /** Number of operations applied */
+  operationsApplied?: number;
+  /** Request identifier */
+  requestId: string;
+  /** Generation timestamp */
+  timestamp: string;
+}
 
 /**
  * Context object passed to all MCP handlers containing shared dependencies
@@ -62,79 +168,9 @@ export interface MCPHandler {
   readonly context: HandlerContext;
 }
 
-// Note: taskStatus and taskPriority are now imported from @astrolabe/core
-// to maintain single source of truth for these type definitions
-
-/**
- * Schema for creating new tasks via MCP.
- * Validates input for task creation operations.
- * 
- * @constant
- * @type {z.ZodObject}
- * @example
- * ```typescript
- * const newTask = {
- *   title: "Implement user authentication",
- *   description: "Add JWT-based authentication system",
- *   status: "pending",
- *   priority: "high"
- * };
- * 
- * const validated = createTaskSchema.parse(newTask);
- * ```
- */
-export const createTaskSchema = z.object({
-  /** Task title (required) - should be concise and descriptive */
-  title: z.string(),
-  /** Optional detailed description of the task */
-  description: z.string().optional(),
-  /** Optional parent task ID for creating subtasks */
-  parentId: z.string().optional(),
-  /** Task status - defaults to 'pending' if not specified */
-  status: taskStatus.default('pending'),
-  /** Task priority - defaults to 'medium' if not specified */
-  priority: taskPriority.default('medium'),
-  /** Optional Product Requirements Document content */
-  prd: z.string().optional(),
-  /** Optional context digest for AI agents */
-  contextDigest: z.string().optional(),
-});
-
-/**
- * Schema for updating existing tasks via MCP.
- * All fields except ID are optional to allow partial updates.
- * 
- * @constant
- * @type {z.ZodObject}
- * @example
- * ```typescript
- * const update = {
- *   id: "task_123",
- *   status: "done",
- *   description: "Updated description"
- * };
- * 
- * const validated = updateTaskSchema.parse(update);
- * ```
- */
-export const updateTaskSchema = z.object({
-  /** Task ID (required) - identifies which task to update */
-  id: z.string(),
-  /** Optional new title for the task */
-  title: z.string().optional(),
-  /** Optional new description for the task */
-  description: z.string().optional(),
-  /** Optional new status for the task */
-  status: taskStatus.optional(),
-  /** Optional new priority for the task */
-  priority: taskPriority.optional(),
-  /** Optional new parent task ID (for moving tasks) */
-  parentId: z.string().optional(),
-  /** Optional new PRD content */
-  prd: z.string().optional(),
-  /** Optional new context digest */
-  contextDigest: z.string().optional(),
-});
+// Re-export core schemas to maintain API compatibility while eliminating duplication
+export const createTaskSchema = coreCreateTaskSchema;
+export const updateTaskSchema = coreUpdateTaskSchema;
 
 /**
  * Schema for deleting tasks via MCP.
@@ -234,27 +270,11 @@ export const listTasksSchema = z.object({
 });
 
 /**
- * Schema for generating tasks from input content via MCP.
- * Supports different generator types and context information.
- * 
- * @constant
- * @type {z.ZodObject}
- * @example
- * ```typescript
- * // Generate tasks from PRD
- * const prdGeneration = {
- *   type: "prd",
- *   content: "Product requirements document content...",
- *   context: {
- *     parentTaskId: "epic_123",
- *     existingTasks: ["task_1", "task_2"]
- *   }
- * };
- * ```
+ * Improved schema for generating tasks with proper metadata typing
  */
 export const generateTasksSchema = z.object({
   /** Generator type (currently only 'prd' supported) */
-  type: z.string(),
+  type: z.literal('prd'),
   /** Source content to generate tasks from */
   content: z.string().min(1, "Content cannot be empty"),
   /** Optional context information */
@@ -265,7 +285,20 @@ export const generateTasksSchema = z.object({
     existingTasks: z.array(z.string()).optional(),
   }).optional(),
   /** Generator-specific metadata and options */
-  metadata: z.record(z.unknown()).optional(),
+  metadata: z.object({
+    /** Maximum number of tasks to generate */
+    maxTasks: z.number().min(1).max(100).optional(),
+    /** Target complexity level */
+    complexity: z.enum(['simple', 'moderate', 'complex']).optional(),
+    /** Include implementation details */
+    includeDetails: z.boolean().optional(),
+    /** Preferred task priority */
+    defaultPriority: z.enum(['low', 'medium', 'high']).optional(),
+  }).optional(),
+  /** Whether to persist the generated tree to database */
+  persist: z.boolean().default(false),
+  /** Whether to return hierarchical structure (default: true) */
+  hierarchical: z.boolean().default(true),
 });
 
 /**
@@ -288,27 +321,24 @@ export const listGeneratorsSchema = z.object({
 });
 
 /**
- * Schema for validating generation input via MCP.
- * 
- * @constant
- * @type {z.ZodObject}
- * @example
- * ```typescript
- * // Validate PRD content
- * const validation = {
- *   type: "prd",
- *   content: "Product requirements...",
- *   metadata: { "maxTasks": 10 }
- * };
- * ```
+ * Improved schema for validating generation input with proper metadata typing
  */
 export const validateGenerationInputSchema = z.object({
   /** Generator type to validate against */
-  type: z.string(),
+  type: z.literal('prd'),
   /** Content to validate */
   content: z.string(),
   /** Optional metadata for validation */
-  metadata: z.record(z.unknown()).optional(),
+  metadata: z.object({
+    /** Maximum number of tasks to generate */
+    maxTasks: z.number().min(1).max(100).optional(),
+    /** Target complexity level */
+    complexity: z.enum(['simple', 'moderate', 'complex']).optional(),
+    /** Include implementation details */
+    includeDetails: z.boolean().optional(),
+    /** Preferred task priority */
+    defaultPriority: z.enum(['low', 'medium', 'high']).optional(),
+  }).optional(),
 });
 
 /**

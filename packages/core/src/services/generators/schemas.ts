@@ -12,6 +12,44 @@ import { z } from 'zod';
 import { createTaskSchema, taskSchema } from '../../schemas/task.js';
 
 /**
+ * Metadata schema for PRD generation
+ */
+export const prdMetadataSchema = z.object({
+  /** Maximum number of tasks to generate */
+  maxTasks: z.number().min(1).max(100).optional(),
+  /** Target complexity level */
+  complexity: z.enum(['simple', 'moderate', 'complex']).optional(),
+  /** Include implementation details */
+  includeDetails: z.boolean().optional(),
+  /** Preferred task priority */
+  defaultPriority: z.enum(['low', 'medium', 'high']).optional(),
+  /** Source document type */
+  sourceType: z.enum(['prd', 'requirements', 'specification']).optional(),
+  /** Language of the content */
+  language: z.string().optional(),
+});
+
+/**
+ * Generation metadata for tracking and analytics
+ */
+export const generationMetadataSchema = z.object({
+  /** Generation timestamp */
+  timestamp: z.date().optional(),
+  /** Model used for generation */
+  model: z.string().optional(),
+  /** Processing time in milliseconds */
+  processingTime: z.number().optional(),
+  /** Token usage statistics */
+  tokenUsage: z.object({
+    input: z.number(),
+    output: z.number(),
+    total: z.number(),
+  }).optional(),
+  /** Confidence score */
+  confidence: z.number().min(0).max(1).optional(),
+});
+
+/**
  * Input data for task generation
  */
 export const generationInputSchema = z.object({
@@ -24,12 +62,12 @@ export const generationInputSchema = z.object({
       existingTasks: z.array(taskSchema).optional(),
       /** Parent task ID for generated tasks */
       parentTaskId: z.string().optional(),
-      /** Additional metadata */
-      metadata: z.record(z.unknown()).optional(),
+      /** Additional context metadata */
+      metadata: prdMetadataSchema.optional(),
     })
     .optional(),
   /** Generator-specific metadata and options */
-  metadata: z.record(z.unknown()).optional(),
+  metadata: prdMetadataSchema.optional(),
 });
 
 /**
@@ -40,8 +78,8 @@ export const generationContextSchema = z.object({
   existingTasks: z.array(taskSchema).optional(),
   /** Parent task ID if generating subtasks */
   parentTaskId: z.string().nullable().optional(),
-  /** Additional metadata */
-  metadata: z.record(z.unknown()).optional(),
+  /** Additional context metadata */
+  metadata: prdMetadataSchema.optional(),
 });
 
 /**
@@ -50,8 +88,8 @@ export const generationContextSchema = z.object({
 export const generationResultSchema = z.object({
   /** Generated tasks ready for database insertion */
   tasks: z.array(createTaskSchema),
-  /** Optional metadata about the generation process */
-  metadata: z.record(z.unknown()).optional(),
+  /** Generation metadata and analytics */
+  metadata: generationMetadataSchema.optional(),
   /** Any warnings from the generation process */
   warnings: z.array(z.string()).optional(),
 });
@@ -68,6 +106,8 @@ export const validationResultSchema = z.object({
   warnings: z.array(z.string()).optional(),
   /** Suggestions for improvement */
   suggestions: z.array(z.string()).optional(),
+  /** Estimated number of tasks that would be generated */
+  estimatedTasks: z.number().optional(),
 });
 
 /**
@@ -78,8 +118,8 @@ export const llmChainInputSchema = z.object({
   content: z.string(),
   /** Existing tasks for context */
   existingTasks: z.array(taskSchema),
-  /** Additional metadata */
-  metadata: z.record(z.unknown()),
+  /** Generation metadata */
+  metadata: prdMetadataSchema,
 });
 
 /**
@@ -92,9 +132,13 @@ export const llmChainResultSchema = z.object({
   confidence: z.number().min(0).max(1),
   /** Any warnings from the LLM */
   warnings: z.array(z.string()).optional(),
+  /** Generation metadata */
+  metadata: generationMetadataSchema.optional(),
 });
 
 // Exported types
+export type PRDMetadata = z.infer<typeof prdMetadataSchema>;
+export type GenerationMetadata = z.infer<typeof generationMetadataSchema>;
 export type GenerationInput = z.infer<typeof generationInputSchema>;
 export type GenerationContext = z.infer<typeof generationContextSchema>;
 export type GenerationResult = z.infer<typeof generationResultSchema>;

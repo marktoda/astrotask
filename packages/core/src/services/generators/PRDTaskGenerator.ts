@@ -281,7 +281,7 @@ export class PRDTaskGenerator implements TaskGenerator {
     return {
       id: `root-${Date.now()}`, // Temporary ID, will be replaced during persistence
       parentId: null,
-      title: (input.metadata?.title as string) || this.extractTitleFromContent(input.content),
+      title: this.extractTitleFromContent(input.content),
       description: this.extractSummaryFromContent(input.content),
       status: 'pending',
       priority: 'high',
