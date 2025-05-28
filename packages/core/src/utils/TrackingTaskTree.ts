@@ -204,39 +204,84 @@ export class TrackingTaskTree extends TaskTree {
    * Create a reconciliation plan for pending operations
    */
   createReconciliationPlan(): ReconciliationPlan {
-    const plan: ReconciliationPlan = {
+    const { taskUpdates, nonTaskOperations } = this.groupOperationsByType();
+    const finalOperations = this.resolveConflictsWithLastUpdateWins(taskUpdates, nonTaskOperations);
+
+    return {
       treeId: this.id,
       baseVersion: this._baseVersion,
-      operations: this._pendingOperations,
-      conflicts: [], // Would detect conflicts here
-      canAutoResolve: true,
+      operations: finalOperations,
+      conflicts: [], // Don't store conflicts, just log them
+      canAutoResolve: true, // Always auto-resolvable with last update wins
     };
+  }
 
-    // Detect potential conflicts (simplified)
+  /**
+   * Group operations by type for conflict detection
+   */
+  private groupOperationsByType(): {
+    taskUpdates: Map<string, PendingOperation[]>;
+    nonTaskOperations: PendingOperation[];
+  } {
     const taskUpdates = new Map<string, PendingOperation[]>();
+    const nonTaskOperations: PendingOperation[] = [];
+
     for (const op of this._pendingOperations) {
       if (op.type === 'task_update') {
         const existing = taskUpdates.get(op.taskId) || [];
         existing.push(op);
         taskUpdates.set(op.taskId, existing);
+      } else {
+        // Non-task-update operations don't conflict, include as-is
+        nonTaskOperations.push(op);
       }
     }
 
-    // Last update wins policy - automatically resolve conflicts
+    return { taskUpdates, nonTaskOperations };
+  }
+
+  /**
+   * Resolve conflicts using last update wins policy
+   */
+  private resolveConflictsWithLastUpdateWins(
+    taskUpdates: Map<string, PendingOperation[]>,
+    nonTaskOperations: PendingOperation[]
+  ): PendingOperation[] {
+    const finalOperations: PendingOperation[] = [...nonTaskOperations];
+
     for (const [taskId, ops] of taskUpdates) {
       if (ops.length > 1) {
-        plan.conflicts.push({
-          type: 'concurrent_task_update',
-          taskId,
-          operations: ops,
-          resolution: 'use_latest',
-        });
-        // Can auto-resolve with last update wins
-        plan.canAutoResolve = true;
+        this.logConflict(taskId, ops.length);
+        const latestOp = this.getLatestOperation(ops);
+        if (latestOp) {
+          finalOperations.push(latestOp);
+        }
+      } else if (ops.length === 1) {
+        const singleOp = ops[0];
+        if (singleOp) {
+          finalOperations.push(singleOp);
+        }
       }
     }
 
-    return plan;
+    return finalOperations;
+  }
+
+  /**
+   * Log conflict for observability
+   */
+  private logConflict(taskId: string, conflictCount: number): void {
+    console.warn(
+      `Conflict detected for task ${taskId}: ${conflictCount} concurrent updates. Using last update wins policy.`
+    );
+  }
+
+  /**
+   * Get the latest operation from a list based on timestamp
+   */
+  private getLatestOperation(ops: PendingOperation[]): PendingOperation | undefined {
+    const sortedOps = ops.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+    return sortedOps[sortedOps.length - 1];
   }
 
   // Factory methods

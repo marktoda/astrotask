@@ -243,11 +243,17 @@ describe('TrackingTaskTree', () => {
       
       const plan = trackingTree.createReconciliationPlan();
       
-      expect(plan.conflicts).toHaveLength(1);
-      expect(plan.conflicts[0].type).toBe('concurrent_task_update');
-      expect(plan.conflicts[0].taskId).toBe(mockTask.id);
-      expect(plan.conflicts[0].resolution).toBe('use_latest');
-      expect(plan.canAutoResolve).toBe(true);
+      // With last-update-wins, conflicts are logged but not stored in the plan
+      expect(plan.conflicts).toHaveLength(0); // No conflicts stored
+      expect(plan.operations).toHaveLength(1); // Only the latest operation kept
+      expect(plan.canAutoResolve).toBe(true); // Always auto-resolvable
+      
+      // Verify only the latest operation is kept
+      const latestOp = plan.operations[0];
+      expect(latestOp.type).toBe('task_update');
+      if (latestOp.type === 'task_update') {
+        expect(latestOp.updates.title).toBe('Update 2');
+      }
     });
   });
 
