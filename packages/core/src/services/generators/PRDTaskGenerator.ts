@@ -15,6 +15,7 @@ import type { ChatOpenAI } from '@langchain/openai';
 import type { Logger } from 'pino';
 
 import type { CreateTask } from '../../schemas/task.js';
+import type { TaskTree } from '../../utils/TaskTree.js';
 import { TrackingTaskTree } from '../../utils/TrackingTaskTree.js';
 import { createLLM } from '../../utils/llm.js';
 import { PRD_SYSTEM_PROMPT, generatePRDPrompt } from '../../utils/prompts.js';
@@ -321,6 +322,20 @@ export class PRDTaskGenerator implements TaskGenerator {
     }
 
     return 'Generated Epic from PRD';
+  }
+
+  /**
+   * Generate a task tree and persist it atomically (business logic)
+   */
+  async generateAndStoreTaskTree(
+    input: GenerationInput,
+    taskService: { storeTaskTree(trackingTree: TrackingTaskTree): Promise<TaskTree> }
+  ): Promise<TaskTree> {
+    // Generate the tracking tree using business logic
+    const trackingTree = await this.generateTaskTree(input);
+
+    // Delegate to TaskService for atomic persistence (storage layer)
+    return taskService.storeTaskTree(trackingTree);
   }
 
   /**

@@ -9,7 +9,7 @@
  */
 
 import type { HandlerContext, MCPHandler } from './types.js';
-import { createPRDTaskGenerator, type GenerationError, createModuleLogger, getCurrentModelConfig, type Task, TaskService } from '@astrolabe/core';
+import { createPRDTaskGenerator, type GenerationError, createModuleLogger, getCurrentModelConfig, type Task, TaskService, TrackingTaskTree } from '@astrolabe/core';
 import { taskToApi } from '@astrolabe/core';
 
 /**
@@ -250,7 +250,7 @@ export class TaskGenerationHandlers implements MCPHandler {
       if (params.persist) {
         // Create TaskService and persist the tree
         const taskService = new TaskService(this.context.store);
-        const persistedTree = await taskService.createTaskTree(trackingTree);
+        const persistedTree = await taskService.storeTaskTree(trackingTree);
 
         // Return persisted tree with real IDs
         return {

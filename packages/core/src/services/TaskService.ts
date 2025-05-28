@@ -339,9 +339,9 @@ export class TaskService {
   }
 
   /**
-   * Create and persist a complete task tree atomically
+   * Store a complete task tree atomically (storage layer interface)
    */
-  async createTaskTree(trackingTree: TrackingTaskTree): Promise<TaskTree> {
+  async storeTaskTree(trackingTree: TrackingTaskTree): Promise<TaskTree> {
     // Create reconciliation plan
     const plan = trackingTree.createReconciliationPlan();
 
@@ -352,20 +352,6 @@ export class TaskService {
     this.clearCache();
 
     return persistedTree;
-  }
-
-  /**
-   * Generate a task tree using a generator and persist it atomically
-   */
-  async generateAndCreateTaskTree(
-    generator: { generateTaskTree(input: unknown): Promise<TrackingTaskTree> },
-    input: unknown
-  ): Promise<TaskTree> {
-    // Generate the tracking tree
-    const trackingTree = await generator.generateTaskTree(input);
-
-    // Persist it atomically
-    return this.createTaskTree(trackingTree);
   }
 
   /**
