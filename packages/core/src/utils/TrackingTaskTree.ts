@@ -201,7 +201,31 @@ export class TrackingTaskTree extends TaskTree {
   }
 
   /**
-   * Create a reconciliation plan for pending operations
+   * Creates a reconciliation plan for resolving pending operations with conflict detection
+   * 
+   * Analyzes all pending operations to detect conflicts (multiple updates to the same task)
+   * and generates a reconciled set of operations using the "last update wins" strategy.
+   * This is essential for optimistic UI updates that need to be synchronized with the backend.
+   * 
+   * @returns ReconciliationPlan containing resolved operations and metadata
+   * 
+   * @complexity O(n log n) where n = number of pending operations (due to timestamp sorting)
+   * @space O(n) for operation grouping and conflict detection data structures
+   * 
+   * @sideEffects 
+   * - Logs conflict warnings for observability
+   * - Does not modify the tree state (read-only analysis)
+   * 
+   * @algorithm
+   * 1. Group operations by type (task updates vs structural changes)
+   * 2. Detect conflicts within task update groups
+   * 3. Apply last-update-wins resolution for conflicting operations
+   * 4. Preserve all non-conflicting operations in original order
+   * 
+   * @conflictResolution
+   * - Task updates: Use latest timestamp (last update wins)
+   * - Structural operations: No conflicts possible, preserve all
+   * - Cross-type conflicts: Not currently detected/resolved
    */
   createReconciliationPlan(): ReconciliationPlan {
     const { taskUpdates, nonTaskOperations } = this.groupOperationsByType();
@@ -241,7 +265,33 @@ export class TrackingTaskTree extends TaskTree {
   }
 
   /**
-   * Resolve conflicts using last update wins policy
+   * Resolves conflicts between multiple operations using "last update wins" strategy
+   * 
+   * Implements automatic conflict resolution for optimistic updates by choosing
+   * the most recent operation for each conflicting task based on timestamps.
+   * This provides predictable behavior for concurrent modifications in collaborative scenarios.
+   * 
+   * @param taskUpdates - Map of task IDs to their conflicting update operations
+   * @param nonTaskOperations - Non-conflicting structural operations to preserve
+   * @returns Resolved list of operations with conflicts eliminated
+   * 
+   * @complexity O(k log k) where k = max operations per task (for timestamp sorting)
+   * @space O(n) where n = total number of operations
+   * 
+   * @sideEffects
+   * - Logs conflict warnings to console for debugging/monitoring
+   * - May discard earlier operations when conflicts are detected
+   * 
+   * @resolutionPolicy Last Update Wins (LUW):
+   * - Sort conflicting operations by timestamp ascending
+   * - Select the operation with the latest timestamp
+   * - Preserve operation ordering semantics for replay
+   * - Log conflicts for observability and debugging
+   * 
+   * @alternatives
+   * - First update wins: Simpler but potentially loses user intent
+   * - Manual resolution: More accurate but requires user intervention
+   * - Operational transform: Complex but preserves all user intent
    */
   private resolveConflictsWithLastUpdateWins(
     taskUpdates: Map<string, PendingOperation[]>,
