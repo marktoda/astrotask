@@ -10,14 +10,14 @@
 
 import { JsonOutputParser } from '@langchain/core/output_parsers';
 import { ChatPromptTemplate } from '@langchain/core/prompts';
-import { RunnableSequence } from '@langchain/core/runnables';
+import type { RunnableSequence } from '@langchain/core/runnables';
 import type { ChatOpenAI } from '@langchain/openai';
 import type { Logger } from 'pino';
 
-import type { CreateTask } from '../../schemas/task.js';
+import type { CreateTask, Task } from '../../schemas/task.js';
+import type { TaskService } from '../../services/TaskService.js';
 import type { TaskTree } from '../../utils/TaskTree.js';
-import { TrackingTaskTree } from '../../utils/TrackingTaskTree.js';
-import { createLLM } from '../../utils/llm.js';
+import { type ReconciliationPlan, TrackingTaskTree } from '../../utils/TrackingTaskTree.js';
 import { PRD_SYSTEM_PROMPT, generatePRDPrompt } from '../../utils/prompts.js';
 import type { TaskGenerator } from './TaskGenerator.js';
 import type {
@@ -36,6 +36,7 @@ export enum GenerationErrorType {
   TIMEOUT = 'timeout',
   RATE_LIMIT = 'rate_limit',
   PARSING_ERROR = 'parsing_error',
+  VALIDATION_ERROR = 'validation_error',
 }
 
 /**
@@ -60,91 +61,56 @@ export class GenerationError extends Error {
  */
 export class PRDTaskGenerator implements TaskGenerator {
   readonly type = 'prd';
-  private chain: RunnableSequence<LLMChainInput, LLMChainResult> | null = null;
+  private chain: RunnableSequence<{ formattedPrompt: string }, LLMChainResult> | null = null;
 
   constructor(
     private llm: ChatOpenAI,
-    private logger: Logger
+    private logger: Logger,
+    private taskService: TaskService
   ) {
     this.initializeChain();
   }
 
   /**
-   * Generate tasks from PRD content
+   * Initialize the LangChain processing chain
    */
-  async generate(input: GenerationInput, parentId?: string | null): Promise<CreateTask[]> {
-    const startTime = Date.now();
+  private initializeChain(): void {
+    const prompt = ChatPromptTemplate.fromMessages([
+      ['system', PRD_SYSTEM_PROMPT],
+      ['human', '{formattedPrompt}'],
+    ]);
 
-    try {
-      // Validate input first
-      const validation = await this.validate(input);
-      if (!validation.valid) {
-        throw new GenerationError(
-          GenerationErrorType.INVALID_INPUT,
-          `Invalid input: ${validation.errors?.join(', ')}`,
-          { validation }
-        );
-      }
+    const parser = new JsonOutputParser();
 
-      // Prepare chain input
-      const chainInput: LLMChainInput = {
-        content: input.content,
-        existingTasks: input.context?.existingTasks || [],
-        metadata: input.metadata || {},
-      };
+    this.chain = prompt.pipe(this.llm).pipe(parser) as RunnableSequence<
+      { formattedPrompt: string },
+      LLMChainResult
+    >;
+  }
 
-      this.logger.info('Starting PRD task generation', {
-        contentLength: input.content.length,
-        existingTasksCount: chainInput.existingTasks.length,
-        parentId,
-      });
+  /**
+   * Generate a reconciliation plan representing the task hierarchy from PRD content
+   */
+  async generate(input: GenerationInput): Promise<ReconciliationPlan> {
+    return this.withErrorHandling('generate', input, async () => {
+      // Generate the task tree first
+      const trackingTree = await this.generateTaskTree(input);
 
-      // Execute the LLM chain
-      if (!this.chain) {
-        throw new GenerationError(GenerationErrorType.LLM_ERROR, 'LLM chain not initialized');
-      }
+      // Create the reconciliation plan from the tracking tree
+      // The TrackingTaskTree will handle root task creation if needed
+      const plan = trackingTree.createReconciliationPlan();
 
-      const result: LLMChainResult = await this.chain.invoke(chainInput);
-
-      // Add parentId to all generated tasks
-      const createTasks: CreateTask[] = result.tasks.map((task) => ({
-        ...task,
-        parentId: parentId ?? undefined, // Convert null to undefined for CreateTask compatibility
-      }));
-
-      // Log successful generation
-      const metadata = {
+      this.logger.info('Reconciliation plan generated successfully', {
         generator: this.type,
         inputSize: input.content.length,
-        processingTime: Date.now() - startTime,
         model: this.llm.modelName,
-        confidence: result.confidence,
-        tasksGenerated: createTasks.length,
-        warnings: result.warnings,
+        treeId: plan.treeId,
+        operationsCount: plan.operations.length,
         ...input.metadata,
-      };
-
-      this.logger.info('Tasks generated successfully', metadata);
-
-      return createTasks;
-    } catch (error) {
-      this.logger.error('Task generation failed', {
-        error: error instanceof Error ? error.message : String(error),
-        contentLength: input.content.length,
-        processingTime: Date.now() - startTime,
       });
 
-      if (error instanceof GenerationError) {
-        throw error;
-      }
-
-      // Wrap unknown errors
-      throw new GenerationError(
-        GenerationErrorType.LLM_ERROR,
-        `Task generation failed: ${error instanceof Error ? error.message : String(error)}`,
-        { originalError: error }
-      );
-    }
+      return plan;
+    });
   }
 
   /**
@@ -198,95 +164,81 @@ export class PRDTaskGenerator implements TaskGenerator {
    * Generate a hierarchical task tree from PRD input
    */
   async generateTaskTree(input: GenerationInput): Promise<TrackingTaskTree> {
+    return this.withErrorHandling('generateTaskTree', input, async () => {
+      // Validate input first
+      await this.validateInput(input);
+
+      // Prepare chain input
+      const chainInput: LLMChainInput = {
+        content: input.content,
+        existingTasks: input.context?.existingTasks || [],
+        metadata: input.metadata || {},
+      };
+
+      this.logger.info('Starting PRD task tree generation', {
+        contentLength: input.content.length,
+        existingTasksCount: chainInput.existingTasks.length,
+        parentTaskId: input.context?.parentTaskId,
+      });
+
+      // Get the existing task tree from the database
+      // If parentTaskId is provided, use that specific task as the root
+      // If not provided, use the project root (undefined gets the project root)
+      const existingTree = await this.taskService.getTaskTree(input.context?.parentTaskId);
+
+      // The database initialization ensures there's always a project root,
+      // so existingTree should never be null
+      if (!existingTree) {
+        throw new GenerationError(
+          GenerationErrorType.VALIDATION_ERROR,
+          `Parent task not found: ${input.context?.parentTaskId || 'project root'}`
+        );
+      }
+
+      // Execute the LLM chain to get flat tasks
+      if (!this.chain) {
+        throw new GenerationError(GenerationErrorType.LLM_ERROR, 'LLM chain not initialized');
+      }
+
+      // Format the prompt using the helper function
+      const formattedPrompt = generatePRDPrompt(
+        chainInput.content,
+        chainInput.existingTasks,
+        chainInput.metadata
+      );
+
+      const result = await this.chain.invoke({ formattedPrompt });
+      const flatTasks = this.validateLLMResult(result);
+
+      this.logger.info('LLM generated tasks', { count: flatTasks.length });
+
+      // Create the PRD epic task as the root of our generated tree
+      const prdEpic = this.createRootTask(input);
+
+      // Convert flat tasks to full Task objects
+      const childTasks = flatTasks.map((createTask, index) =>
+        this.createTaskToTask(createTask, prdEpic.id, index + 1)
+      );
+
+      // Build the tracking tree with the PRD epic and its children
+      return this.buildTrackingTree(existingTree, prdEpic, childTasks);
+    });
+  }
+
+  /**
+   * Common error handling wrapper for generation operations
+   */
+  private async withErrorHandling<T>(
+    operation: string,
+    input: GenerationInput,
+    fn: () => Promise<T>
+  ): Promise<T> {
     const startTime = Date.now();
 
     try {
-      // Validate input first
-      const validation = await this.validate(input);
-      if (!validation.valid) {
-        throw new GenerationError(
-          GenerationErrorType.INVALID_INPUT,
-          `Validation failed: ${validation.errors?.join(', ') ?? 'Unknown error'}`,
-          { validation }
-        );
-      }
-
-      // Generate flat tasks using existing method
-      const createTasks = await this.generate(input);
-
-      if (createTasks.length === 0) {
-        throw new GenerationError(
-          GenerationErrorType.PARSING_ERROR,
-          'No tasks were generated from the input',
-          { input: input.content.substring(0, 200) }
-        );
-      }
-
-      // Create root task representing the PRD/epic
-      const rootTaskData: CreateTask = {
-        title: (input.metadata?.title as string) || this.extractTitleFromContent(input.content),
-        description: this.extractSummaryFromContent(input.content),
-        status: 'pending',
-        priority: 'high',
-        prd: input.content,
-        contextDigest: `Generated from PRD at ${new Date().toISOString()}`,
-      };
-
-      // Create root task tree
-      const rootTask = {
-        id: `root-${Date.now()}`, // Temporary ID, will be replaced during persistence
-        parentId: null,
-        title: rootTaskData.title,
-        description: rootTaskData.description ?? null,
-        status: rootTaskData.status,
-        priority: rootTaskData.priority,
-        prd: rootTaskData.prd ?? null,
-        contextDigest: rootTaskData.contextDigest ?? null,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-
-      // Create child trees from generated tasks
-      const childTrees = createTasks.map((task) => {
-        const childTask = {
-          id: `child-${Date.now()}-${Math.random()}`, // Temporary ID
-          parentId: null, // Will be set when added as child
-          title: task.title,
-          description: task.description ?? null,
-          status: task.status,
-          priority: task.priority,
-          prd: task.prd ?? null,
-          contextDigest: task.contextDigest ?? null,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        };
-        return TrackingTaskTree.fromTask(childTask);
-      });
-
-      // Create root tracking tree
-      let trackingTree = TrackingTaskTree.fromTask(rootTask);
-
-      // Add all children to the root
-      for (const childTree of childTrees) {
-        trackingTree = trackingTree.addChild(childTree);
-      }
-
-      // Log successful generation
-      const metadata = {
-        generator: this.type,
-        inputSize: input.content.length,
-        processingTime: Date.now() - startTime,
-        model: this.llm.modelName,
-        rootTitle: rootTask.title,
-        childrenGenerated: childTrees.length,
-        ...input.metadata,
-      };
-
-      this.logger.info('Task tree generated successfully', metadata);
-
-      return trackingTree;
+      return await fn();
     } catch (error) {
-      this.logger.error('Task tree generation failed', {
+      this.logger.error(`${operation} failed`, {
         error: error instanceof Error ? error.message : String(error),
         contentLength: input.content.length,
         processingTime: Date.now() - startTime,
@@ -299,10 +251,75 @@ export class PRDTaskGenerator implements TaskGenerator {
       // Wrap unknown errors
       throw new GenerationError(
         GenerationErrorType.LLM_ERROR,
-        `Task tree generation failed: ${error instanceof Error ? error.message : String(error)}`,
+        `${operation} failed: ${error instanceof Error ? error.message : String(error)}`,
         { originalError: error }
       );
     }
+  }
+
+  /**
+   * Validate input and throw on failure
+   */
+  private async validateInput(input: GenerationInput): Promise<void> {
+    const validation = await this.validate(input);
+    if (!validation.valid) {
+      throw new GenerationError(
+        GenerationErrorType.INVALID_INPUT,
+        `Invalid input: ${validation.errors?.join(', ')}`,
+        { validation }
+      );
+    }
+  }
+
+  /**
+   * Create root task from PRD input
+   */
+  private createRootTask(input: GenerationInput): Task {
+    const now = new Date();
+    return {
+      id: `root-${Date.now()}`, // Temporary ID, will be replaced during persistence with proper root task ID
+      parentId: null, // This will be a root task, not a child of __PROJECT_ROOT__
+      title: (input.metadata?.title as string) || this.extractTitleFromContent(input.content),
+      description: this.extractSummaryFromContent(input.content),
+      status: 'pending',
+      priority: 'high',
+      prd: input.content,
+      contextDigest: `Generated from PRD at ${now.toISOString()}`,
+      createdAt: now,
+      updatedAt: now,
+    };
+  }
+
+  /**
+   * Validate LLM result and extract tasks
+   */
+  private validateLLMResult(result: LLMChainResult): CreateTask[] {
+    if (!result.tasks || result.tasks.length === 0) {
+      throw new GenerationError(
+        GenerationErrorType.PARSING_ERROR,
+        'No tasks were generated from the input'
+      );
+    }
+    return result.tasks;
+  }
+
+  /**
+   * Convert CreateTask to Task with proper hierarchy
+   * Child tasks will get proper IDs during persistence via TaskService
+   */
+  private createTaskToTask(createTask: CreateTask, parentId: string, index: number): Task {
+    return {
+      id: `temp-child-${index}`, // Temporary ID, will be replaced during persistence
+      parentId,
+      title: createTask.title,
+      description: createTask.description || null,
+      status: createTask.status,
+      priority: createTask.priority,
+      prd: createTask.prd || null,
+      contextDigest: createTask.contextDigest || null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
   }
 
   /**
@@ -325,20 +342,6 @@ export class PRDTaskGenerator implements TaskGenerator {
   }
 
   /**
-   * Generate a task tree and persist it atomically (business logic)
-   */
-  async generateAndStoreTaskTree(
-    input: GenerationInput,
-    taskService: { storeTaskTree(trackingTree: TrackingTaskTree): Promise<TaskTree> }
-  ): Promise<TaskTree> {
-    // Generate the tracking tree using business logic
-    const trackingTree = await this.generateTaskTree(input);
-
-    // Delegate to TaskService for atomic persistence (storage layer)
-    return taskService.storeTaskTree(trackingTree);
-  }
-
-  /**
    * Extract summary from PRD content
    */
   private extractSummaryFromContent(content: string): string {
@@ -354,58 +357,37 @@ export class PRDTaskGenerator implements TaskGenerator {
       return firstParagraph;
     }
 
-    return `Epic generated from PRD content (${Math.round(content.length / 1000)}k chars)`;
+    return 'Epic task generated from Product Requirements Document';
   }
 
   /**
-   * Initialize the LangChain processing chain
+   * Build tracking tree with PRD epic and its children
+   * The PRD epic becomes a root task, and __PROJECT_ROOT__ is only used for database organization
    */
-  private initializeChain(): void {
-    try {
-      // Create the prompt template
-      const prompt = ChatPromptTemplate.fromMessages([
-        ['system', PRD_SYSTEM_PROMPT],
-        ['human', '{userPrompt}'],
-      ]);
+  private buildTrackingTree(
+    existingTree: TaskTree,
+    prdEpic: Task,
+    childTasks: Task[]
+  ): TrackingTaskTree {
+    // Create PRD epic tree as a standalone root task
+    let prdEpicTree = TrackingTaskTree.fromTask(prdEpic);
 
-      // Create output parser for structured JSON
-      const outputParser = new JsonOutputParser();
-
-      // Create the processing chain
-      this.chain = RunnableSequence.from([
-        {
-          userPrompt: (input: LLMChainInput) =>
-            generatePRDPrompt(input.content, input.existingTasks, input.metadata),
-        },
-        prompt,
-        this.llm,
-        outputParser,
-      ]) as RunnableSequence<LLMChainInput, LLMChainResult>;
-
-      this.logger.info('LangChain processing chain initialized', {
-        model: this.llm.modelName,
-        temperature: this.llm.temperature,
-      });
-    } catch (error) {
-      this.logger.error('Failed to initialize LLM chain', {
-        error: error instanceof Error ? error.message : String(error),
-      });
-      throw new GenerationError(
-        GenerationErrorType.LLM_ERROR,
-        'Failed to initialize LLM processing chain',
-        { originalError: error }
-      );
+    // Add all child tasks to the PRD epic
+    for (const childTask of childTasks) {
+      const childTree = TrackingTaskTree.fromTask(childTask);
+      prdEpicTree = prdEpicTree.addChild(childTree);
     }
-  }
-}
 
-/**
- * Factory function to create a PRD task generator
- */
-export function createPRDTaskGenerator(
-  logger: Logger,
-  llmConfig?: Parameters<typeof createLLM>[0]
-): PRDTaskGenerator {
-  const llm = createLLM(llmConfig);
-  return new PRDTaskGenerator(llm, logger);
+    // The PRD epic tree is returned as the main result
+    // The __PROJECT_ROOT__ from existingTree is only used for database organization
+    // and doesn't affect the actual task IDs
+
+    this.logger.info('Task tree built successfully', {
+      prdEpicTitle: prdEpic.title,
+      childTasksCount: childTasks.length,
+      treatAsRootTask: true,
+    });
+
+    return prdEpicTree;
+  }
 }

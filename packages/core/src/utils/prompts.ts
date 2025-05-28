@@ -40,19 +40,19 @@ OUTPUT FORMAT:
 Return a JSON object with a "tasks" array containing task objects. Each task must have title, priority, and status fields. Description and prd fields are optional but recommended.
 
 Example:
-{
+{{
   "tasks": [
-    {
+    {{
       "title": "Set up user authentication database schema",
       "description": "Create users table with email, password hash, and basic profile fields",
       "priority": "high",
       "status": "pending",
       "prd": "Users should be able to register with email/password and log in securely"
-    }
+    }}
   ],
   "confidence": 0.95,
   "warnings": []
-}`;
+}}`;
 
 /**
  * User prompt template for PRD analysis

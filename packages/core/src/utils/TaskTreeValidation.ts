@@ -89,25 +89,25 @@ export function validateTaskTree(
 
 /**
  * Detects cycles in a task tree using depth-first search with recursion stack tracking
- * 
+ *
  * Implements the "white-gray-black" DFS algorithm for cycle detection:
  * - White: unvisited nodes (not in visited set)
- * - Gray: currently being processed (in recursionStack)  
+ * - Gray: currently being processed (in recursionStack)
  * - Black: fully processed (in visited but not recursionStack)
- * 
+ *
  * A cycle exists if we encounter a gray node during traversal.
- * 
+ *
  * @param node - Current tree node being processed
  * @param visited - Set of fully processed node IDs (black nodes)
  * @param recursionStack - Set of currently processing node IDs (gray nodes)
  * @returns Array of validation errors for any cycles detected
- * 
+ *
  * @complexity O(V + E) where V=nodes, E=parent-child edges
- * 
+ *
  * @algorithm
  * 1. Check if current node is in recursion stack (gray) → cycle found
  * 2. Skip if already fully processed (black)
- * 3. Mark as currently processing (gray) 
+ * 3. Mark as currently processing (gray)
  * 4. Recursively process all children
  * 5. Mark as fully processed (black) and remove from gray set
  */
@@ -224,21 +224,21 @@ function validateParentChildRelationships(tree: TaskTree): ValidationError[] {
 
 /**
  * Validates status consistency between parent tasks and their children
- * 
+ *
  * Implements business rule validation for task completion states:
  * - Rule 1: A parent task marked as "done" should have all children completed
  * - Rule 2: A parent with all children completed should typically be marked as "done"
- * 
+ *
  * These are warnings rather than errors to allow for flexible project management workflows.
- * 
+ *
  * @param tree - The task tree to validate
  * @param options - Validation configuration options
  * @returns Array of warning objects for status inconsistencies
- * 
+ *
  * @complexity O(n) where n = number of nodes in tree
- * 
+ *
  * @sideEffects None - pure validation function
- * 
+ *
  * @businessLogic
  * - Leaf nodes (no children) are always consistent
  * - Parent status vs children completion mismatch generates warnings
@@ -295,26 +295,26 @@ function validateStatusConsistency(
 
 /**
  * Validates a move operation before execution to prevent structural violations
- * 
+ *
  * Pre-validation for tree rearrangement operations that could introduce cycles
  * or violate tree integrity. This is critical for maintaining the DAG (Directed
  * Acyclic Graph) property of task hierarchies.
- * 
+ *
  * @param taskId - ID of the task to be moved
  * @param newParentId - ID of the new parent (null for root level)
  * @param existingTree - Current tree structure for validation context
  * @returns Validation result indicating if move is safe to perform
- * 
+ *
  * @complexity O(h) where h = tree height (for ancestor checking)
- * 
+ *
  * @sideEffects None - pure validation, does not modify tree structure
- * 
+ *
  * @algorithm
- * 1. Handle root moves (always safe) 
+ * 1. Handle root moves (always safe)
  * 2. Validate both source and target tasks exist
  * 3. Use isAncestorOf() to detect potential cycles
  * 4. Return detailed error context for debugging
- * 
+ *
  * @prevention
  * - Prevents moving a task to its own descendant (cycle creation)
  * - Validates existence of both source and target nodes

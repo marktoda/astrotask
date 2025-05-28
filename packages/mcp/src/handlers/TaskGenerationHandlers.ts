@@ -76,107 +76,50 @@ export class TaskGenerationHandlers implements MCPHandler {
 
     try {
       // Create PRD generator
-      const prdGenerator = createPRDTaskGenerator(this.logger);
+      const prdGenerator = createPRDTaskGenerator(this.logger, this.context.store);
 
       if (useHierarchical) {
         // Generate hierarchical task tree
         const trackingTree = await prdGenerator.generateTaskTree({
           content: params.content,
+          context: {
+            parentTaskId: params.context?.parentTaskId,
+          },
           metadata: params.metadata,
         });
 
         if (params.persist) {
-          // Create TaskService and persist the tree
-          const taskService = new TaskService(this.context.store);
+          // Apply the reconciliation plan directly using taskService
+          const plan = trackingTree.createReconciliationPlan();
+          const updatedTree = await this.context.taskService.applyReconciliationPlan(plan);
           
-          // Create minimal root task first
-          const rootCreateTask = {
-            title: trackingTree.task.title,
-            description: trackingTree.task.description || undefined,
-            status: trackingTree.task.status,
-            priority: trackingTree.task.priority,
-            prd: trackingTree.task.prd || undefined,
-            contextDigest: trackingTree.task.contextDigest || undefined,
+          // Return persisted tree with real IDs
+          return {
+            tree: {
+              id: updatedTree.id,
+              title: updatedTree.task.title,
+              description: updatedTree.task.description,
+              status: updatedTree.task.status,
+              priority: updatedTree.task.priority,
+              childCount: updatedTree.getChildren().length,
+              children: updatedTree.getChildren().map((child: any) => ({
+                id: child.id,
+                title: child.task.title,
+                description: child.task.description,
+                status: child.task.status,
+                priority: child.task.priority,
+              })),
+            },
+            metadata: {
+              generator: 'prd',
+              persisted: true,
+              hierarchical: true,
+              rootTaskId: updatedTree.id,
+              totalTasks: 1 + updatedTree.getChildren().length,
+              requestId: this.context.requestId,
+              timestamp: this.context.timestamp,
+            },
           };
-          
-          const rootTask = await this.context.store.addTask(rootCreateTask);
-          
-          // If there are children, use the reconciliation approach
-          if (trackingTree.getChildren().length > 0) {
-            // Create a new tracking tree from the persisted root
-            const persistedTrackingTree = TrackingTaskTree.fromTaskTree(
-              await taskService.getTaskTree(rootTask.id) as any
-            );
-            
-            // Convert and add all the children from the original tracking tree
-            for (const child of trackingTree.getChildren()) {
-              const childTrackingTree = TrackingTaskTree.fromTask(child.task);
-              // Recursively add grandchildren if they exist
-              for (const grandchild of child.getChildren()) {
-                const grandchildTrackingTree = TrackingTaskTree.fromTask(grandchild.task);
-                childTrackingTree.addChild(grandchildTrackingTree);
-              }
-              persistedTrackingTree.addChild(childTrackingTree);
-            }
-            
-            // Apply the reconciliation plan using the new cleaner API
-            const { updatedTree } = await persistedTrackingTree.apply(taskService);
-            
-            // Return persisted tree with real IDs
-            return {
-              tree: {
-                id: updatedTree.id,
-                title: updatedTree.task.title,
-                description: updatedTree.task.description,
-                status: updatedTree.task.status,
-                priority: updatedTree.task.priority,
-                childCount: updatedTree.getChildren().length,
-                children: updatedTree.getChildren().map((child) => ({
-                  id: child.id,
-                  title: child.task.title,
-                  description: child.task.description,
-                  status: child.task.status,
-                  priority: child.task.priority,
-                })),
-              },
-              metadata: {
-                generator: 'prd',
-                persisted: true,
-                hierarchical: true,
-                rootTaskId: updatedTree.id,
-                totalTasks: 1 + updatedTree.getChildren().length,
-                requestId: this.context.requestId,
-                timestamp: this.context.timestamp,
-              },
-            };
-          } else {
-            // No children, just return the root task
-            const persistedTree = await taskService.getTaskTree(rootTask.id);
-            if (!persistedTree) {
-              throw new Error('Failed to retrieve created root task');
-            }
-            
-            return {
-              tree: {
-                id: persistedTree.id,
-                title: persistedTree.task.title,
-                description: persistedTree.task.description,
-                status: persistedTree.task.status,
-                priority: persistedTree.task.priority,
-                childCount: 0,
-                children: [],
-              },
-              metadata: {
-                generator: 'prd',
-                persisted: true,
-                hierarchical: true,
-                rootTaskId: persistedTree.id,
-                totalTasks: 1,
-                requestId: this.context.requestId,
-                timestamp: this.context.timestamp,
-              },
-            };
-          }
         } else {
           // Return unpersisted tree with temporary IDs
           return {
@@ -188,7 +131,7 @@ export class TaskGenerationHandlers implements MCPHandler {
               priority: trackingTree.task.priority,
               childCount: trackingTree.getChildren().length,
               pendingOperations: trackingTree.pendingOperations.length,
-              children: trackingTree.getChildren().map(child => ({
+              children: trackingTree.getChildren().map((child: any) => ({
                 id: child.id,
                 title: child.task.title,
                 description: child.task.description,
@@ -208,7 +151,7 @@ export class TaskGenerationHandlers implements MCPHandler {
           };
         }
       } else {
-        // Legacy flat task generation for backward compatibility
+        // Generate reconciliation plan and apply it directly
         // Load existing tasks for context if requested
         let existingTasks: Task[] = [];
         if (params.context?.existingTasks) {
@@ -219,37 +162,42 @@ export class TaskGenerationHandlers implements MCPHandler {
           existingTasks = tasks.filter((task): task is Task => task !== null);
         }
 
-        // Generate tasks
-        const createTasks = await prdGenerator.generate(
-          {
-            content: params.content,
-            context: {
-              existingTasks,
-              parentTaskId: params.context?.parentTaskId,
-            },
-            metadata: params.metadata,
+        // Generate reconciliation plan
+        const plan = await prdGenerator.generate({
+          content: params.content,
+          context: {
+            existingTasks,
+            parentTaskId: params.context?.parentTaskId,
           },
-          params.context?.parentTaskId ?? null
-        );
+          metadata: params.metadata,
+        });
 
-        // Convert to API format by creating complete Task objects with required fields
-        const apiTasks = createTasks.map((task) => taskToApi({
-          ...task,
-          id: 'generated-' + Math.random().toString(36).substring(2, 11), // Temporary ID
-          createdAt: new Date(),
-          updatedAt: new Date(),
-          parentId: task.parentId ?? null,
-          description: task.description ?? null,
-          prd: task.prd ?? null,
-          contextDigest: task.contextDigest ?? null,
-        }));
+        // Apply the reconciliation plan directly using taskService
+        const updatedTree = await this.context.taskService.applyReconciliationPlan(plan);
+
+        // Get all tasks from the updated tree (root + children)
+        const allTasks = [updatedTree.task];
+        const addChildrenRecursively = (tree: any) => {
+          if (tree.children) {
+            for (const child of tree.children) {
+              allTasks.push(child.task);
+              addChildrenRecursively(child);
+            }
+          }
+        };
+        addChildrenRecursively(updatedTree);
+
+        // Convert applied tasks to API format
+        const apiTasks = allTasks.map(taskToApi);
 
         return {
           tasks: apiTasks,
           metadata: {
             generator: 'prd',
             hierarchical: false,
-            tasksGenerated: createTasks.length,
+            tasksGenerated: apiTasks.length,
+            planId: plan.treeId,
+            operationsApplied: plan.operations.length,
             requestId: this.context.requestId,
             timestamp: this.context.timestamp,
           },
@@ -325,7 +273,8 @@ export class TaskGenerationHandlers implements MCPHandler {
     try {
       // Create PRD generator for validation
       const prdGenerator = createPRDTaskGenerator(
-        this.logger
+        this.logger,
+        this.context.store
       );
 
       // Perform validation

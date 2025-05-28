@@ -49,15 +49,15 @@ export class LRUCache<K, V> {
 
   /**
    * Retrieves a value from the cache with LRU and TTL validation
-   * 
+   *
    * @param key - The cache key to retrieve
    * @returns The cached value if found and valid, undefined otherwise
-   * 
+   *
    * @complexity O(1) average case for HashMap lookup, O(n) worst case for access order update
-   * 
-   * @sideEffects 
+   *
+   * @sideEffects
    * - Updates access statistics (hits/misses)
-   * - Updates LRU order for accessed entries  
+   * - Updates LRU order for accessed entries
    * - Removes expired entries automatically
    * - Modifies entry access metadata (count, timestamp)
    */
@@ -163,12 +163,12 @@ export class LRUCache<K, V> {
 
   /**
    * Evicts the least recently used entry from the cache
-   * 
+   *
    * Uses the access order array to identify the LRU entry and removes it
    * from both the cache map and access tracking array.
-   * 
+   *
    * @complexity O(1) - removes from beginning of access order array
-   * 
+   *
    * @sideEffects
    * - Removes one entry from cache and access order tracking
    * - Increments eviction statistics counter
@@ -347,18 +347,18 @@ export class CachedTaskTreeOperations {
 
   /**
    * Retrieves a TaskTree from cache or builds it using the provided builder function
-   * 
+   *
    * Implements the cache-aside pattern with intelligent cache key generation
    * based on task ID and optional depth limit. Falls back to the builder
    * function if cache miss occurs.
-   * 
+   *
    * @param taskId - The root task ID for the tree
-   * @param maxDepth - Optional depth limit for tree traversal 
+   * @param maxDepth - Optional depth limit for tree traversal
    * @param builder - Async function to build the tree if not cached
    * @returns Promise resolving to TaskTree or null if not found
-   * 
+   *
    * @complexity O(1) for cache hit, O(n*m) for cache miss where n=tree nodes, m=avg depth
-   * 
+   *
    * @sideEffects
    * - Updates cache with newly built trees
    * - Triggers metadata extraction and caching for new trees

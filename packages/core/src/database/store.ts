@@ -37,6 +37,7 @@ export interface Store {
     parentId?: string | null;
   }): Promise<Task[]>;
   addTask(data: NewTask): Promise<Task>;
+  addTaskWithId(data: NewTask & { id: string }): Promise<Task>;
   getTask(id: string): Promise<Task | null>;
   updateTask(id: string, updates: Partial<Omit<Task, 'id' | 'createdAt'>>): Promise<Task | null>;
   deleteTask(id: string): Promise<boolean>;
@@ -111,6 +112,27 @@ export class DatabaseStore implements Store {
   async addTask(data: NewTask): Promise<Task> {
     const taskData = {
       id: await generateNextTaskId(this, data.parentId ?? undefined),
+      parentId: data.parentId ?? null,
+      title: data.title,
+      description: data.description ?? null,
+      status: data.status,
+      priority: data.priority,
+      prd: data.prd ?? null,
+      contextDigest: data.contextDigest ?? null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    const [task] = await this.sql.insert(schema.tasks).values(taskData).returning();
+    if (!task) {
+      throw new Error('Failed to create task');
+    }
+    return task;
+  }
+
+  async addTaskWithId(data: NewTask & { id: string }): Promise<Task> {
+    const taskData = {
+      id: data.id,
       parentId: data.parentId ?? null,
       title: data.title,
       description: data.description ?? null,

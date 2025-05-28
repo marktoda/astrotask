@@ -9,6 +9,9 @@
  */
 
 import { ChatOpenAI } from '@langchain/openai';
+import type { Logger } from 'pino';
+import { TaskService } from '../services/TaskService.js';
+import { PRDTaskGenerator } from '../services/generators/PRDTaskGenerator.js';
 import { cfg } from './config.js';
 import { type ModelConfig, getModelConfig } from './models.js';
 
@@ -125,4 +128,25 @@ export function isLLMConfigured(): boolean {
  */
 export function getCurrentModelConfig(): ModelConfig {
   return getModelConfig(cfg.LLM_MODEL);
+}
+
+/**
+ * Create a PRD task generator with proper dependencies
+ *
+ * @param logger - Logger instance for the generator
+ * @param store - Store instance for database operations
+ * @param config - Optional LLM configuration overrides
+ * @returns Configured PRDTaskGenerator instance
+ */
+export function createPRDTaskGenerator(
+  logger: Logger,
+  store: any, // Store type - using any to avoid circular imports
+  config: Partial<LLMConfig> = {}
+): PRDTaskGenerator {
+  const llm = createLLM(config);
+
+  // Create task service from provided store
+  const taskService = new TaskService(store);
+
+  return new PRDTaskGenerator(llm, logger, taskService);
 }

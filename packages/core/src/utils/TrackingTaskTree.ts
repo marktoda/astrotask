@@ -91,14 +91,14 @@ export class TrackingTaskTree extends TaskTree {
 
     const newOperations = this._isTracking
       ? [
-        ...this._pendingOperations,
-        {
-          type: 'task_update' as const,
-          taskId: this.id,
-          updates: updates as Record<string, unknown>,
-          timestamp: new Date(),
-        },
-      ]
+          ...this._pendingOperations,
+          {
+            type: 'task_update' as const,
+            taskId: this.id,
+            updates: updates as Record<string, unknown>,
+            timestamp: new Date(),
+          },
+        ]
       : this._pendingOperations;
 
     return new TrackingTaskTree(result.toPlainObject(), this.getParent() as TrackingTaskTree, {
@@ -113,14 +113,14 @@ export class TrackingTaskTree extends TaskTree {
 
     const newOperations = this._isTracking
       ? [
-        ...this._pendingOperations,
-        {
-          type: 'child_add' as const,
-          parentId: this.id,
-          childData: child.toPlainObject(),
-          timestamp: new Date(),
-        },
-      ]
+          ...this._pendingOperations,
+          {
+            type: 'child_add' as const,
+            parentId: this.id,
+            childData: child.toPlainObject(),
+            timestamp: new Date(),
+          },
+        ]
       : this._pendingOperations;
 
     return new TrackingTaskTree(result.toPlainObject(), this.getParent() as TrackingTaskTree, {
@@ -135,14 +135,14 @@ export class TrackingTaskTree extends TaskTree {
 
     const newOperations = this._isTracking
       ? [
-        ...this._pendingOperations,
-        {
-          type: 'child_remove' as const,
-          parentId: this.id,
-          childId,
-          timestamp: new Date(),
-        },
-      ]
+          ...this._pendingOperations,
+          {
+            type: 'child_remove' as const,
+            parentId: this.id,
+            childId,
+            timestamp: new Date(),
+          },
+        ]
       : this._pendingOperations;
 
     return new TrackingTaskTree(result.toPlainObject(), this.getParent() as TrackingTaskTree, {

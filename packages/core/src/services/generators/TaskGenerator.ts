@@ -8,15 +8,14 @@
  * @since 1.0.0
  */
 
-import type { CreateTask } from '../../schemas/task.js';
-import type { TrackingTaskTree } from '../../utils/TrackingTaskTree.js';
+import type { ReconciliationPlan, TrackingTaskTree } from '../../utils/TrackingTaskTree.js';
 import type { GenerationInput, ValidationResult } from './schemas.js';
 
 /**
  * Base interface for all task generators
  *
  * Task generators are responsible for converting input content (PRDs, test descriptions, etc.)
- * into structured task objects that can be stored in the database.
+ * into structured task hierarchies that can be stored in the database.
  *
  * @interface TaskGenerator
  * @example
@@ -24,7 +23,7 @@ import type { GenerationInput, ValidationResult } from './schemas.js';
  * class PRDTaskGenerator implements TaskGenerator {
  *   readonly type = 'prd';
  *
- *   async generate(input: GenerationInput, parentId?: string | null): Promise<CreateTask[]> {
+ *   async generate(input: GenerationInput, parentId?: string | null): Promise<ReconciliationPlan> {
  *     // Implementation logic here
  *   }
  *
@@ -39,15 +38,19 @@ export interface TaskGenerator {
   readonly type: string;
 
   /**
-   * Generate tasks from the provided input
+   * Generate a reconciliation plan representing the task hierarchy from the provided input
+   *
+   * This is the primary generation method that creates a complete task hierarchy
+   * and returns it as a ReconciliationPlan that can be applied to any compatible store.
+   * This enables the AI to generate proper hierarchical structures with multiple layers,
+   * subtasks, and complex relationships in a single operation.
    *
    * @param input - The input content and context for generation
-   * @param parentId - Optional parent task ID for generated tasks
-   * @returns Promise resolving to an array of CreateTask objects ready for database insertion
+   * @returns Promise resolving to a ReconciliationPlan representing the task hierarchy
    *
    * @throws {Error} When generation fails due to invalid input or processing errors
    */
-  generate(input: GenerationInput, parentId?: string | null): Promise<CreateTask[]>;
+  generate(input: GenerationInput): Promise<ReconciliationPlan>;
 
   /**
    * Validate input before generation

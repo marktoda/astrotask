@@ -1,6 +1,7 @@
 import {
 	type GenerationError,
 	type Task,
+	TaskService,
 	createModuleLogger,
 	createPRDTaskGenerator,
 } from "@astrolabe/core";
@@ -53,7 +54,7 @@ interface GenerationMetadata {
 }
 
 interface GenerationState {
-	phase: "init" | "validating" | "generating" | "saving" | "complete" | "error";
+	phase: "init" | "validating" | "generating" | "complete" | "error";
 	message: string;
 	tasks: Task[];
 	error?: string;
@@ -104,7 +105,7 @@ export default function Generate({ options }: Props) {
 
 				// Create logger and generator
 				const logger = createModuleLogger("CLI-TaskGeneration");
-				const generator = createPRDTaskGenerator(logger);
+				const generator = createPRDTaskGenerator(logger, db);
 
 				// Validate input
 				setState((prev) => ({
@@ -155,68 +156,71 @@ export default function Generate({ options }: Props) {
 					}
 				}
 
-				// Generate tasks
-				setState((prev) => ({
-					...prev,
-					phase: "generating",
-					message: "Generating tasks with AI...",
-				}));
-
-				const createTasks = await generator.generate(
-					{
-						content,
-						context: {
-							existingTasks,
-							parentTaskId: options.parent,
-						},
-						metadata: {
-							source: "cli",
-							file: options.file,
-							generator: options.type,
-						},
+				// Generate reconciliation plan
+				const plan = await generator.generate({
+					content,
+					context: {
+						existingTasks,
+						parentTaskId: options.parent,
 					},
-					options.parent ?? null,
-				);
+					metadata: {
+						source: "cli",
+						file: options.file,
+						generator: options.type,
+					},
+				});
 
 				// Preview mode - don't save to database
 				if (options.dry) {
+					// For dry run, just extract tasks from the plan without applying it
+					const previewTasks = plan.operations
+						.filter((op: any) => op.type === 'child_add')
+						.map((op: any) => {
+							const childData = op.childData as any;
+							return childData.task;
+						});
+
 					setState((prev) => ({
 						...prev,
 						phase: "complete",
-						message: `Generated ${createTasks.length} tasks (preview mode - not saved)`,
-						tasks: createTasks as Task[],
+						message: `Generated ${previewTasks.length} tasks (preview mode - not saved)`,
+						tasks: previewTasks as Task[],
 						metadata: {
 							contentLength: content.length,
 							existingTasksCount: existingTasks.length,
-							generatedCount: createTasks.length,
+							generatedCount: previewTasks.length,
 							validation,
 						},
 					}));
 					return;
 				}
 
-				// Save tasks to database
-				setState((prev) => ({
-					...prev,
-					phase: "saving",
-					message: "Saving tasks to database...",
-				}));
+				// Apply the reconciliation plan (this persists to database)
+				const taskService = new TaskService(db);
+				const updatedTree = await taskService.applyReconciliationPlan(plan);
 
-				const savedTasks: Task[] = [];
-				for (const task of createTasks) {
-					const savedTask = await db.addTask(task);
-					savedTasks.push(savedTask);
-				}
+				// Get all tasks from the updated tree (root + children)
+				const allTasks = [updatedTree.task];
+				const addChildrenRecursively = (tree: any) => {
+					if (tree.children) {
+						for (const child of tree.children) {
+							allTasks.push(child.task);
+							addChildrenRecursively(child);
+						}
+					}
+				};
+				addChildrenRecursively(updatedTree);
 
+				// Tasks are already saved by applyReconciliationPlan
 				setState((prev) => ({
 					...prev,
 					phase: "complete",
-					message: `Successfully generated and saved ${savedTasks.length} tasks`,
-					tasks: savedTasks,
+					message: `Successfully generated and saved ${allTasks.length} tasks`,
+					tasks: allTasks,
 					metadata: {
 						contentLength: content.length,
 						existingTasksCount: existingTasks.length,
-						generatedCount: savedTasks.length,
+						generatedCount: allTasks.length,
 						validation,
 					},
 				}));
@@ -257,7 +261,6 @@ export default function Generate({ options }: Props) {
 			init: "🚀",
 			validating: "🔍",
 			generating: "🤖",
-			saving: "💾",
 		};
 
 		return (
