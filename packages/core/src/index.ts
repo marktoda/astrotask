@@ -22,6 +22,15 @@ export {
   type TreeMetrics,
 } from './utils/TaskTree.js';
 
+// TrackingTaskTree utilities
+export {
+  TrackingTaskTree,
+  type PendingOperation,
+  type ReconciliationPlan,
+  serializeTrackingState,
+  deserializeTrackingState,
+} from './utils/TrackingTaskTree.js';
+
 // TaskTree validation
 export {
   validateTaskTree,

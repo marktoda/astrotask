@@ -15,6 +15,8 @@ import type { ChatOpenAI } from '@langchain/openai';
 import type { Logger } from 'pino';
 
 import type { CreateTask } from '../../schemas/task.js';
+import type { TaskTree } from '../../utils/TaskTree.js';
+import { TrackingTaskTree } from '../../utils/TrackingTaskTree.js';
 import { createLLM } from '../../utils/llm.js';
 import { PRD_SYSTEM_PROMPT, generatePRDPrompt } from '../../utils/prompts.js';
 import type { TaskGenerator } from './TaskGenerator.js';
@@ -190,6 +192,169 @@ export class PRDTaskGenerator implements TaskGenerator {
       warnings: warnings.length > 0 ? warnings : undefined,
       suggestions: suggestions.length > 0 ? suggestions : undefined,
     };
+  }
+
+  /**
+   * Generate a hierarchical task tree from PRD input
+   */
+  async generateTaskTree(input: GenerationInput): Promise<TrackingTaskTree> {
+    const startTime = Date.now();
+
+    try {
+      // Validate input first
+      const validation = await this.validate(input);
+      if (!validation.valid) {
+        throw new GenerationError(
+          GenerationErrorType.INVALID_INPUT,
+          `Validation failed: ${validation.errors?.join(', ') ?? 'Unknown error'}`,
+          { validation }
+        );
+      }
+
+      // Generate flat tasks using existing method
+      const createTasks = await this.generate(input);
+
+      if (createTasks.length === 0) {
+        throw new GenerationError(
+          GenerationErrorType.PARSING_ERROR,
+          'No tasks were generated from the input',
+          { input: input.content.substring(0, 200) }
+        );
+      }
+
+      // Create root task representing the PRD/epic
+      const rootTaskData: CreateTask = {
+        title: (input.metadata?.title as string) || this.extractTitleFromContent(input.content),
+        description: this.extractSummaryFromContent(input.content),
+        status: 'pending',
+        priority: 'high',
+        prd: input.content,
+        contextDigest: `Generated from PRD at ${new Date().toISOString()}`,
+      };
+
+      // Create root task tree
+      const rootTask = {
+        id: `root-${Date.now()}`, // Temporary ID, will be replaced during persistence
+        parentId: null,
+        title: rootTaskData.title,
+        description: rootTaskData.description ?? null,
+        status: rootTaskData.status,
+        priority: rootTaskData.priority,
+        prd: rootTaskData.prd ?? null,
+        contextDigest: rootTaskData.contextDigest ?? null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      // Create child trees from generated tasks
+      const childTrees = createTasks.map((task) => {
+        const childTask = {
+          id: `child-${Date.now()}-${Math.random()}`, // Temporary ID
+          parentId: null, // Will be set when added as child
+          title: task.title,
+          description: task.description ?? null,
+          status: task.status,
+          priority: task.priority,
+          prd: task.prd ?? null,
+          contextDigest: task.contextDigest ?? null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+        return TrackingTaskTree.fromTask(childTask);
+      });
+
+      // Create root tracking tree
+      let trackingTree = TrackingTaskTree.fromTask(rootTask);
+
+      // Add all children to the root
+      for (const childTree of childTrees) {
+        trackingTree = trackingTree.addChild(childTree);
+      }
+
+      // Log successful generation
+      const metadata = {
+        generator: this.type,
+        inputSize: input.content.length,
+        processingTime: Date.now() - startTime,
+        model: this.llm.modelName,
+        rootTitle: rootTask.title,
+        childrenGenerated: childTrees.length,
+        ...input.metadata,
+      };
+
+      this.logger.info('Task tree generated successfully', metadata);
+
+      return trackingTree;
+    } catch (error) {
+      this.logger.error('Task tree generation failed', {
+        error: error instanceof Error ? error.message : String(error),
+        contentLength: input.content.length,
+        processingTime: Date.now() - startTime,
+      });
+
+      if (error instanceof GenerationError) {
+        throw error;
+      }
+
+      // Wrap unknown errors
+      throw new GenerationError(
+        GenerationErrorType.LLM_ERROR,
+        `Task tree generation failed: ${error instanceof Error ? error.message : String(error)}`,
+        { originalError: error }
+      );
+    }
+  }
+
+  /**
+   * Extract title from PRD content
+   */
+  private extractTitleFromContent(content: string): string {
+    // Look for markdown headers or title patterns
+    const titleMatch = content.match(/^#\s+(.+)$/m) || content.match(/title:\s*(.+)/i);
+    if (titleMatch?.[1]) {
+      return titleMatch[1].trim();
+    }
+
+    // Fall back to first line or generic title
+    const firstLine = content.split('\n')[0]?.trim();
+    if (firstLine && firstLine.length > 0 && firstLine.length < 100) {
+      return firstLine;
+    }
+
+    return 'Generated Epic from PRD';
+  }
+
+  /**
+   * Generate a task tree and persist it atomically (business logic)
+   */
+  async generateAndStoreTaskTree(
+    input: GenerationInput,
+    taskService: { storeTaskTree(trackingTree: TrackingTaskTree): Promise<TaskTree> }
+  ): Promise<TaskTree> {
+    // Generate the tracking tree using business logic
+    const trackingTree = await this.generateTaskTree(input);
+
+    // Delegate to TaskService for atomic persistence (storage layer)
+    return taskService.storeTaskTree(trackingTree);
+  }
+
+  /**
+   * Extract summary from PRD content
+   */
+  private extractSummaryFromContent(content: string): string {
+    // Look for summary or overview sections
+    const summaryMatch = content.match(/(?:summary|overview|description):\s*(.+?)(?:\n\n|\n#|$)/i);
+    if (summaryMatch?.[1]) {
+      return summaryMatch[1].trim();
+    }
+
+    // Fall back to first paragraph
+    const firstParagraph = content.split('\n\n')[0]?.trim();
+    if (firstParagraph && firstParagraph.length > 20 && firstParagraph.length < 500) {
+      return firstParagraph;
+    }
+
+    return `Epic generated from PRD content (${Math.round(content.length / 1000)}k chars)`;
   }
 
   /**

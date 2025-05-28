@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { TrackingTaskTree, type PendingOperation, batchReconcile, serializeTrackingState, deserializeTrackingState } from '../src/utils/TrackingTaskTree.js';
+import { TrackingTaskTree, type PendingOperation, serializeTrackingState, deserializeTrackingState } from '../src/utils/TrackingTaskTree.js';
 import { TaskTree } from '../src/utils/TaskTree.js';
 import type { Task } from '../src/schemas/task.js';
 
@@ -221,7 +221,7 @@ describe('TrackingTaskTree', () => {
   });
 
   describe('Reconciliation Planning', () => {
-    it('should create reconciliation plan with no conflicts', () => {
+    it('should create reconciliation plan', () => {
       let trackingTree = TrackingTaskTree.fromTask(mockTask);
       trackingTree = trackingTree.withTask({ title: 'Updated Title' });
       
@@ -230,11 +230,9 @@ describe('TrackingTaskTree', () => {
       expect(plan.treeId).toBe(mockTask.id);
       expect(plan.baseVersion).toBe(0);
       expect(plan.operations).toHaveLength(1);
-      expect(plan.conflicts).toHaveLength(0);
-      expect(plan.canAutoResolve).toBe(true);
     });
 
-    it('should detect conflicts and auto-resolve with last-update-wins', () => {
+    it('should consolidate multiple updates with last-update-wins', () => {
       let trackingTree = TrackingTaskTree.fromTask(mockTask);
       
       // Simulate multiple updates to the same task (would happen with concurrent edits)
@@ -243,10 +241,8 @@ describe('TrackingTaskTree', () => {
       
       const plan = trackingTree.createReconciliationPlan();
       
-      // With last-update-wins, conflicts are logged but not stored in the plan
-      expect(plan.conflicts).toHaveLength(0); // No conflicts stored
+      // With last-update-wins, only the latest operation is kept
       expect(plan.operations).toHaveLength(1); // Only the latest operation kept
-      expect(plan.canAutoResolve).toBe(true); // Always auto-resolvable
       
       // Verify only the latest operation is kept
       const latestOp = plan.operations[0];
@@ -268,42 +264,6 @@ describe('TrackingTaskTree', () => {
       expect(deserialized.baseVersion).toBe(trackingTree.baseVersion);
       expect(deserialized.operations).toHaveLength(1);
       expect(typeof deserialized.timestamp).toBe('string');
-    });
-
-    it('should handle batch reconciliation', async () => {
-      const tree1 = TrackingTaskTree.fromTask(mockTask).withTask({ title: 'Update 1' });
-      const tree2 = TrackingTaskTree.fromTask(mockChildTask).withTask({ title: 'Update 2' });
-      
-      const reconcileCallback = async (plan: any) => {
-        // Simulate successful reconciliation
-        return plan.canAutoResolve;
-      };
-      
-      const result = await batchReconcile([tree1, tree2], reconcileCallback);
-      
-      expect(result.succeeded).toHaveLength(2);
-      expect(result.failed).toHaveLength(0);
-      
-      // Succeeded trees should have cleared operations
-      expect(result.succeeded[0].hasPendingChanges).toBe(false);
-      expect(result.succeeded[1].hasPendingChanges).toBe(false);
-    });
-
-    it('should handle failed reconciliation', async () => {
-      let trackingTree = TrackingTaskTree.fromTask(mockTask);
-      trackingTree = trackingTree.withTask({ title: 'Update 1' });
-      trackingTree = trackingTree.withTask({ title: 'Update 2' }); // This creates conflicts
-      
-      const reconcileCallback = async (plan: any) => {
-        // Simulate failed reconciliation by rejecting even auto-resolvable conflicts
-        return false;
-      };
-      
-      const result = await batchReconcile([trackingTree], reconcileCallback);
-      
-      expect(result.succeeded).toHaveLength(0);
-      expect(result.failed).toHaveLength(1);
-      expect(result.failed[0].error.message).toBe('Reconciliation rejected');
     });
   });
 

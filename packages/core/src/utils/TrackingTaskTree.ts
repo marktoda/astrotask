@@ -29,6 +29,15 @@ export const pendingOperationSchema = z.discriminatedUnion('type', [
 export type PendingOperation = z.infer<typeof pendingOperationSchema>;
 
 /**
+ * Reconciliation plan containing operations to apply to the store
+ */
+export interface ReconciliationPlan {
+  treeId: string;
+  baseVersion: number;
+  operations: PendingOperation[];
+}
+
+/**
  * TrackingTaskTree extends TaskTree to capture all mutations for later reconciliation.
  *
  * Key features:
@@ -82,14 +91,14 @@ export class TrackingTaskTree extends TaskTree {
 
     const newOperations = this._isTracking
       ? [
-          ...this._pendingOperations,
-          {
-            type: 'task_update' as const,
-            taskId: this.id,
-            updates: updates as Record<string, unknown>,
-            timestamp: new Date(),
-          },
-        ]
+        ...this._pendingOperations,
+        {
+          type: 'task_update' as const,
+          taskId: this.id,
+          updates: updates as Record<string, unknown>,
+          timestamp: new Date(),
+        },
+      ]
       : this._pendingOperations;
 
     return new TrackingTaskTree(result.toPlainObject(), this.getParent() as TrackingTaskTree, {
@@ -104,14 +113,14 @@ export class TrackingTaskTree extends TaskTree {
 
     const newOperations = this._isTracking
       ? [
-          ...this._pendingOperations,
-          {
-            type: 'child_add' as const,
-            parentId: this.id,
-            childData: child.toPlainObject(),
-            timestamp: new Date(),
-          },
-        ]
+        ...this._pendingOperations,
+        {
+          type: 'child_add' as const,
+          parentId: this.id,
+          childData: child.toPlainObject(),
+          timestamp: new Date(),
+        },
+      ]
       : this._pendingOperations;
 
     return new TrackingTaskTree(result.toPlainObject(), this.getParent() as TrackingTaskTree, {
@@ -126,14 +135,14 @@ export class TrackingTaskTree extends TaskTree {
 
     const newOperations = this._isTracking
       ? [
-          ...this._pendingOperations,
-          {
-            type: 'child_remove' as const,
-            parentId: this.id,
-            childId,
-            timestamp: new Date(),
-          },
-        ]
+        ...this._pendingOperations,
+        {
+          type: 'child_remove' as const,
+          parentId: this.id,
+          childId,
+          timestamp: new Date(),
+        },
+      ]
       : this._pendingOperations;
 
     return new TrackingTaskTree(result.toPlainObject(), this.getParent() as TrackingTaskTree, {
@@ -177,6 +186,67 @@ export class TrackingTaskTree extends TaskTree {
   }
 
   /**
+   * Apply all pending operations to a TaskService and clear them on success
+   * This is the recommended way to persist changes from a TrackingTaskTree
+   *
+   * @param taskService - The TaskService to apply changes to
+   * @returns Promise of the updated TaskTree from the store and the cleared TrackingTaskTree
+   */
+  async apply(taskService: {
+    applyReconciliationPlan(plan: ReconciliationPlan): Promise<TaskTree>;
+  }): Promise<{
+    updatedTree: TaskTree;
+    clearedTrackingTree: TrackingTaskTree;
+  }> {
+    if (!this.hasPendingChanges) {
+      // No changes to apply, just return current state
+      const currentTree = await taskService.applyReconciliationPlan({
+        treeId: this.id,
+        baseVersion: this._baseVersion,
+        operations: [],
+      });
+
+      return {
+        updatedTree: currentTree,
+        clearedTrackingTree: this,
+      };
+    }
+
+    // Create reconciliation plan
+    const plan = this.createReconciliationPlan();
+
+    try {
+      // Apply the plan to the task service
+      const updatedTree = await taskService.applyReconciliationPlan(plan);
+
+      // Clear pending operations on success
+      const clearedTrackingTree = this.clearPendingOperations();
+
+      return {
+        updatedTree,
+        clearedTrackingTree,
+      };
+    } catch (error) {
+      // Don't clear pending operations on failure - preserve them for retry
+      throw new Error(
+        `Failed to apply tracking tree changes: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+  }
+
+  /**
+   * Alias for apply() - more intuitive name for "flushing" pending changes to the store
+   */
+  async flush(taskService: {
+    applyReconciliationPlan(plan: ReconciliationPlan): Promise<TaskTree>;
+  }): Promise<{
+    updatedTree: TaskTree;
+    clearedTrackingTree: TrackingTaskTree;
+  }> {
+    return this.apply(taskService);
+  }
+
+  /**
    * Get operations since a specific version
    */
   getOperationsSince(version: number): PendingOperation[] {
@@ -187,7 +257,7 @@ export class TrackingTaskTree extends TaskTree {
   /**
    * Merge operations from another tracking tree (for collaborative editing)
    */
-  mergeOperations(otherOperations: PendingOperation[]): TrackingTaskTree {
+  mergeOperations(otherOperations: readonly PendingOperation[]): TrackingTaskTree {
     // Simple merge - in practice, this would need conflict resolution
     const mergedOperations = [...this._pendingOperations, ...otherOperations].sort(
       (a, b) => a.timestamp.getTime() - b.timestamp.getTime()
@@ -202,136 +272,65 @@ export class TrackingTaskTree extends TaskTree {
 
   /**
    * Creates a reconciliation plan for resolving pending operations with conflict detection
-   * 
+   *
    * Analyzes all pending operations to detect conflicts (multiple updates to the same task)
    * and generates a reconciled set of operations using the "last update wins" strategy.
    * This is essential for optimistic UI updates that need to be synchronized with the backend.
-   * 
+   *
    * @returns ReconciliationPlan containing resolved operations and metadata
-   * 
+   *
    * @complexity O(n log n) where n = number of pending operations (due to timestamp sorting)
    * @space O(n) for operation grouping and conflict detection data structures
-   * 
-   * @sideEffects 
+   *
+   * @sideEffects
    * - Logs conflict warnings for observability
    * - Does not modify the tree state (read-only analysis)
-   * 
+   *
    * @algorithm
    * 1. Group operations by type (task updates vs structural changes)
    * 2. Detect conflicts within task update groups
    * 3. Apply last-update-wins resolution for conflicting operations
    * 4. Preserve all non-conflicting operations in original order
-   * 
+   *
    * @conflictResolution
    * - Task updates: Use latest timestamp (last update wins)
    * - Structural operations: No conflicts possible, preserve all
    * - Cross-type conflicts: Not currently detected/resolved
    */
   createReconciliationPlan(): ReconciliationPlan {
-    const { taskUpdates, nonTaskOperations } = this.groupOperationsByType();
-    const finalOperations = this.resolveConflictsWithLastUpdateWins(taskUpdates, nonTaskOperations);
+    const consolidatedOperations = this.consolidateOperations([...this._pendingOperations]);
 
     return {
       treeId: this.id,
       baseVersion: this._baseVersion,
-      operations: finalOperations,
-      conflicts: [], // Don't store conflicts, just log them
-      canAutoResolve: true, // Always auto-resolvable with last update wins
+      operations: consolidatedOperations,
     };
   }
 
   /**
-   * Group operations by type for conflict detection
+   * Consolidate operations, keeping only the latest update for each task
    */
-  private groupOperationsByType(): {
-    taskUpdates: Map<string, PendingOperation[]>;
-    nonTaskOperations: PendingOperation[];
-  } {
-    const taskUpdates = new Map<string, PendingOperation[]>();
-    const nonTaskOperations: PendingOperation[] = [];
+  private consolidateOperations(operations: PendingOperation[]): PendingOperation[] {
+    const taskUpdates = new Map<string, PendingOperation>();
+    const otherOperations: PendingOperation[] = [];
 
-    for (const op of this._pendingOperations) {
+    // Separate task updates from other operations
+    for (const op of operations) {
       if (op.type === 'task_update') {
-        const existing = taskUpdates.get(op.taskId) || [];
-        existing.push(op);
-        taskUpdates.set(op.taskId, existing);
+        // For task updates, keep only the latest one per task
+        const existing = taskUpdates.get(op.taskId);
+        if (!existing || op.timestamp >= existing.timestamp) {
+          taskUpdates.set(op.taskId, op);
+        }
       } else {
-        // Non-task-update operations don't conflict, include as-is
-        nonTaskOperations.push(op);
+        // Other operations (child_add, child_remove) don't conflict
+        otherOperations.push(op);
       }
     }
 
-    return { taskUpdates, nonTaskOperations };
-  }
-
-  /**
-   * Resolves conflicts between multiple operations using "last update wins" strategy
-   * 
-   * Implements automatic conflict resolution for optimistic updates by choosing
-   * the most recent operation for each conflicting task based on timestamps.
-   * This provides predictable behavior for concurrent modifications in collaborative scenarios.
-   * 
-   * @param taskUpdates - Map of task IDs to their conflicting update operations
-   * @param nonTaskOperations - Non-conflicting structural operations to preserve
-   * @returns Resolved list of operations with conflicts eliminated
-   * 
-   * @complexity O(k log k) where k = max operations per task (for timestamp sorting)
-   * @space O(n) where n = total number of operations
-   * 
-   * @sideEffects
-   * - Logs conflict warnings to console for debugging/monitoring
-   * - May discard earlier operations when conflicts are detected
-   * 
-   * @resolutionPolicy Last Update Wins (LUW):
-   * - Sort conflicting operations by timestamp ascending
-   * - Select the operation with the latest timestamp
-   * - Preserve operation ordering semantics for replay
-   * - Log conflicts for observability and debugging
-   * 
-   * @alternatives
-   * - First update wins: Simpler but potentially loses user intent
-   * - Manual resolution: More accurate but requires user intervention
-   * - Operational transform: Complex but preserves all user intent
-   */
-  private resolveConflictsWithLastUpdateWins(
-    taskUpdates: Map<string, PendingOperation[]>,
-    nonTaskOperations: PendingOperation[]
-  ): PendingOperation[] {
-    const finalOperations: PendingOperation[] = [...nonTaskOperations];
-
-    for (const [taskId, ops] of taskUpdates) {
-      if (ops.length > 1) {
-        this.logConflict(taskId, ops.length);
-        const latestOp = this.getLatestOperation(ops);
-        if (latestOp) {
-          finalOperations.push(latestOp);
-        }
-      } else if (ops.length === 1) {
-        const singleOp = ops[0];
-        if (singleOp) {
-          finalOperations.push(singleOp);
-        }
-      }
-    }
-
-    return finalOperations;
-  }
-
-  /**
-   * Log conflict for observability
-   */
-  private logConflict(taskId: string, conflictCount: number): void {
-    console.warn(
-      `Conflict detected for task ${taskId}: ${conflictCount} concurrent updates. Using last update wins policy.`
-    );
-  }
-
-  /**
-   * Get the latest operation from a list based on timestamp
-   */
-  private getLatestOperation(ops: PendingOperation[]): PendingOperation | undefined {
-    const sortedOps = ops.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
-    return sortedOps[sortedOps.length - 1];
+    // Combine and sort by timestamp to maintain operation order
+    const allOperations = [...otherOperations, ...taskUpdates.values()];
+    return allOperations.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
   }
 
   // Factory methods
@@ -362,54 +361,6 @@ export class TrackingTaskTree extends TaskTree {
       pendingOperations: [],
     });
   }
-}
-
-// Supporting types
-
-export interface ReconciliationPlan {
-  treeId: string;
-  baseVersion: number;
-  operations: PendingOperation[];
-  conflicts: ConflictDescriptor[];
-  canAutoResolve: boolean;
-}
-
-export interface ConflictDescriptor {
-  type: 'concurrent_task_update' | 'parent_child_conflict' | 'status_conflict';
-  taskId: string;
-  operations: PendingOperation[];
-  resolution?: 'merge' | 'use_latest' | 'manual';
-}
-
-/**
- * Batch reconcile multiple tracking trees
- */
-export async function batchReconcile(
-  trees: TrackingTaskTree[],
-  reconcileCallback: (plan: ReconciliationPlan) => Promise<boolean>
-): Promise<{
-  succeeded: TrackingTaskTree[];
-  failed: { tree: TrackingTaskTree; error: Error }[];
-}> {
-  const succeeded: TrackingTaskTree[] = [];
-  const failed: { tree: TrackingTaskTree; error: Error }[] = [];
-
-  for (const tree of trees) {
-    try {
-      const plan = tree.createReconciliationPlan();
-      const success = await reconcileCallback(plan);
-
-      if (success) {
-        succeeded.push(tree.clearPendingOperations());
-      } else {
-        failed.push({ tree, error: new Error('Reconciliation rejected') });
-      }
-    } catch (error) {
-      failed.push({ tree, error: error as Error });
-    }
-  }
-
-  return { succeeded, failed };
 }
 
 /**
