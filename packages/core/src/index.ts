@@ -13,7 +13,8 @@ export const APP_NAME = 'Astrolabe';
 
 // Core functionality
 export * from './database/index.js';
-export * from './services/TaskService.js';
+export { TaskService, type LegacyTaskTree } from './services/TaskService.js';
+export { TaskTree, type TaskTreeData, validateTaskTree } from './utils/TaskTree.js';
 
 // Task generation exports
 export * from './services/generators/TaskGenerator.js';
