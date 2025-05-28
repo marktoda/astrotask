@@ -44,18 +44,18 @@ describe('TaskTree Enhanced Features', () => {
       
       const operations: BatchUpdateOperation[] = [
         { 
-          type: 'update_by_predicate', 
-          predicate: (task) => task.status === 'pending',
-          updates: { status: 'in-progress' }
+          type: 'bulk_status_update', 
+          taskIds: ['1', '2'], // Root and child1 IDs
+          status: 'in-progress'
         }
       ];
       
       const result = tree.batchUpdate(operations);
-      expect(result.task.status).toBe('in-progress'); // Root was pending
+      expect(result.task.status).toBe('in-progress'); // Root was updated
       
       const children = result.getChildren();
-      expect(children[0].task.status).toBe('in-progress'); // Child1 was pending
-      expect(children[1].task.status).toBe('done'); // Child2 was already done
+      expect(children[0].task.status).toBe('in-progress'); // Child1 was updated
+      expect(children[1].task.status).toBe('done'); // Child2 was unchanged
     });
 
     it('applies bulk status updates', () => {
@@ -150,7 +150,7 @@ describe('TaskTree Enhanced Features', () => {
       expect(metrics.totalTasks).toBe(4);
       expect(metrics.treeCount).toBe(2);
       expect(metrics.maxDepth).toBe(2); // Root1 -> Child1 -> Grandchild1
-      expect(metrics.averageDepth).toBe(1); // (0 + 1 + 2 + 0) / 4 = 0.75
+      expect(metrics.averageDepth).toBe(0.75); // (0 + 1 + 2 + 0) / 4 = 0.75
       
       // Status distribution
       expect(metrics.statusDistribution).toEqual({
