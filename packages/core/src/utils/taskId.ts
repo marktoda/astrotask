@@ -10,6 +10,7 @@
  */
 
 import type { Store } from '../database/store.js';
+import { TASK_IDENTIFIERS } from './TaskTreeConstants.js';
 
 /**
  * Error thrown when a unique task ID cannot be generated after reasonable attempts.
@@ -108,8 +109,24 @@ export async function generateNextTaskId(store: Store, parentId?: string): Promi
 
 /**
  * Validates that a task ID follows the correct format.
+ * Handles both regular task IDs and special system task IDs.
  */
 export function validateTaskId(taskId: string): boolean {
+  // Handle special system task IDs
+  if (taskId === TASK_IDENTIFIERS.PROJECT_ROOT) {
+    return true;
+  }
+
+  // Handle subtasks of PROJECT_ROOT (e.g., __PROJECT_ROOT__-ABCD)
+  const projectRootPrefix = `${TASK_IDENTIFIERS.PROJECT_ROOT}-`;
+  if (taskId.startsWith(projectRootPrefix)) {
+    const suffix = taskId.substring(projectRootPrefix.length);
+    // The suffix should follow normal task ID patterns
+    const rootPattern = /^[A-Z]+$/;
+    const subtaskPattern = /^[A-Z]+(-[A-Z]+)+$/;
+    return rootPattern.test(suffix) || subtaskPattern.test(suffix);
+  }
+
   // Root task: one or more uppercase letters
   const rootPattern = /^[A-Z]+$/;
   // Subtask: root pattern followed by one or more "-LETTERS" segments
@@ -120,10 +137,25 @@ export function validateTaskId(taskId: string): boolean {
 
 /**
  * Validates that a subtask ID is valid for the given parent.
+ * Handles both regular task IDs and special system task IDs.
  */
 export function validateSubtaskId(taskId: string, parentId: string): boolean {
   if (!validateTaskId(taskId)) {
     return false;
+  }
+
+  // Special handling for PROJECT_ROOT parent
+  if (parentId === TASK_IDENTIFIERS.PROJECT_ROOT) {
+    // Child of PROJECT_ROOT should start with PROJECT_ROOT- and be a valid task ID
+    const expectedPrefix = `${TASK_IDENTIFIERS.PROJECT_ROOT}-`;
+    if (!taskId.startsWith(expectedPrefix)) {
+      return false;
+    }
+
+    // The suffix after PROJECT_ROOT- should be a valid root task pattern
+    const suffix = taskId.substring(expectedPrefix.length);
+    const rootPattern = /^[A-Z]+$/;
+    return rootPattern.test(suffix);
   }
 
   const parsed = parseTaskId(taskId);
