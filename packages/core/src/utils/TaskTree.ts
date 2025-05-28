@@ -89,7 +89,24 @@ export class TaskTree {
     return current;
   }
 
-  // Traversal methods
+  /**
+   * Traverses the tree using depth-first search (DFS) pre-order
+   * 
+   * Visits current node first, then recursively visits all children.
+   * This traversal order is useful for operations that need to process
+   * parent nodes before their children (e.g., validation, aggregation).
+   * 
+   * @param visitor - Function called for each node during traversal
+   * 
+   * @complexity O(n) where n = total number of nodes in subtree
+   * @space O(h) where h = height of tree (due to recursion stack)
+   * 
+   * @sideEffects
+   * - Calls visitor function for each node (may have side effects)
+   * - Uses recursion which consumes call stack space
+   * 
+   * @algorithm Pre-order DFS: Node → Left subtrees → Right subtrees
+   */
   walkDepthFirst(visitor: (node: TaskTree) => void): void {
     visitor(this);
     for (const child of this._children) {
@@ -97,6 +114,24 @@ export class TaskTree {
     }
   }
 
+  /**
+   * Traverses the tree using breadth-first search (BFS) level-order
+   * 
+   * Visits all nodes at the current level before moving to the next level.
+   * This traversal is useful for level-based operations (e.g., finding
+   * shortest path, level-wise processing, tree visualization).
+   * 
+   * @param visitor - Function called for each node during traversal
+   * 
+   * @complexity O(n) where n = total number of nodes in subtree
+   * @space O(w) where w = maximum width of tree (queue size)
+   * 
+   * @sideEffects
+   * - Calls visitor function for each node (may have side effects)
+   * - Allocates queue array that grows with tree width
+   * 
+   * @algorithm BFS using queue: Level 0 → Level 1 → Level 2 → ...
+   */
   walkBreadthFirst(visitor: (node: TaskTree) => void): void {
     const queue: TaskTree[] = [this];
 
@@ -156,10 +191,11 @@ export class TaskTree {
 
   getAllDescendants(): TaskTree[] {
     const descendants: TaskTree[] = [];
-    for (const child of this._children) {
-      descendants.push(child);
-      descendants.push(...child.getAllDescendants());
-    }
+    this.walkDepthFirst((node) => {
+      if (node !== this) {
+        descendants.push(node);
+      }
+    });
     return descendants;
   }
 
@@ -202,7 +238,27 @@ export class TaskTree {
     return this.withChildren(filteredChildren);
   }
 
-  // Bulk operations
+  /**
+   * Updates all descendant nodes matching the given predicate with immutable semantics
+   * 
+   * Performs a recursive tree transformation where nodes matching the predicate
+   * receive the specified updates. Returns a new tree instance with all changes
+   * applied, preserving immutability throughout the tree structure.
+   * 
+   * @param predicate - Function to determine which tasks should be updated
+   * @param updates - Partial task updates to apply to matching nodes
+   * @returns New TaskTree instance with updates applied
+   * 
+   * @complexity O(n) where n = total number of nodes in subtree
+   * @space O(n) for creating new tree instances (structural sharing not implemented)
+   * 
+   * @sideEffects None - pure function returning new instances
+   * 
+   * @immutability
+   * - Original tree remains unchanged
+   * - Creates new TaskTree instances for modified paths
+   * - Maintains referential integrity of parent-child relationships
+   */
   updateDescendants(predicate: (task: Task) => boolean, updates: Partial<Task>): TaskTree {
     const updateTree = (node: TaskTree): TaskTree => {
       const shouldUpdate = predicate(node._task);
@@ -221,7 +277,26 @@ export class TaskTree {
     return updateTree(this);
   }
 
-  // Enhanced batch operations
+  /**
+   * Applies multiple update operations to the tree in sequence with immutable semantics
+   * 
+   * Processes an array of batch operations sequentially, where each operation
+   * is applied to the result of the previous operation. This enables complex
+   * tree transformations to be expressed as a series of atomic operations.
+   * 
+   * @param updates - Array of batch operations to apply in sequence
+   * @returns New TaskTree instance with all operations applied
+   * 
+   * @complexity O(k*n) where k = number of operations, n = nodes affected per operation
+   * @space O(n) for intermediate tree instances created during processing
+   * 
+   * @sideEffects None - pure function with immutable operations
+   * 
+   * @operationTypes
+   * - update_task: Updates a specific task by ID
+   * - bulk_status_update: Updates status for multiple tasks by ID list
+   * - Future: move_task, delete_task, etc.
+   */
   batchUpdate(updates: BatchUpdateOperation[]): TaskTree {
     let current: TaskTree = this;
 
@@ -234,16 +309,16 @@ export class TaskTree {
 
   private applyBatchOperation(tree: TaskTree, operation: BatchUpdateOperation): TaskTree {
     switch (operation.type) {
-      case 'update_task':
+      case 'update_task': {
+        const predicate = (task: Task) => task.id === operation.taskId;
         return operation.taskId === tree.id
           ? tree.withTask(operation.updates)
-          : tree.updateDescendants((task) => task.id === operation.taskId, operation.updates);
-
-      case 'bulk_status_update':
-        return tree.updateDescendants((task) => operation.taskIds.includes(task.id), {
-          status: operation.status,
-        });
-
+          : tree.updateDescendants(predicate, operation.updates);
+      }
+      case 'bulk_status_update': {
+        const predicate = (task: Task) => operation.taskIds.includes(task.id);
+        return tree.updateDescendants(predicate, { status: operation.status });
+      }
       default:
         return tree;
     }

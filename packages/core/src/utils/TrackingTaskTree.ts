@@ -91,14 +91,14 @@ export class TrackingTaskTree extends TaskTree {
 
     const newOperations = this._isTracking
       ? [
-          ...this._pendingOperations,
-          {
-            type: 'task_update' as const,
-            taskId: this.id,
-            updates: updates as Record<string, unknown>,
-            timestamp: new Date(),
-          },
-        ]
+        ...this._pendingOperations,
+        {
+          type: 'task_update' as const,
+          taskId: this.id,
+          updates: updates as Record<string, unknown>,
+          timestamp: new Date(),
+        },
+      ]
       : this._pendingOperations;
 
     return new TrackingTaskTree(result.toPlainObject(), this.getParent() as TrackingTaskTree, {
@@ -113,14 +113,14 @@ export class TrackingTaskTree extends TaskTree {
 
     const newOperations = this._isTracking
       ? [
-          ...this._pendingOperations,
-          {
-            type: 'child_add' as const,
-            parentId: this.id,
-            childData: child.toPlainObject(),
-            timestamp: new Date(),
-          },
-        ]
+        ...this._pendingOperations,
+        {
+          type: 'child_add' as const,
+          parentId: this.id,
+          childData: child.toPlainObject(),
+          timestamp: new Date(),
+        },
+      ]
       : this._pendingOperations;
 
     return new TrackingTaskTree(result.toPlainObject(), this.getParent() as TrackingTaskTree, {
@@ -135,14 +135,14 @@ export class TrackingTaskTree extends TaskTree {
 
     const newOperations = this._isTracking
       ? [
-          ...this._pendingOperations,
-          {
-            type: 'child_remove' as const,
-            parentId: this.id,
-            childId,
-            timestamp: new Date(),
-          },
-        ]
+        ...this._pendingOperations,
+        {
+          type: 'child_remove' as const,
+          parentId: this.id,
+          childId,
+          timestamp: new Date(),
+        },
+      ]
       : this._pendingOperations;
 
     return new TrackingTaskTree(result.toPlainObject(), this.getParent() as TrackingTaskTree, {
@@ -271,8 +271,31 @@ export class TrackingTaskTree extends TaskTree {
   }
 
   /**
-   * Create a reconciliation plan for pending operations
-   * Uses "last update wins" policy for any duplicate task updates
+   * Creates a reconciliation plan for resolving pending operations with conflict detection
+   *
+   * Analyzes all pending operations to detect conflicts (multiple updates to the same task)
+   * and generates a reconciled set of operations using the "last update wins" strategy.
+   * This is essential for optimistic UI updates that need to be synchronized with the backend.
+   *
+   * @returns ReconciliationPlan containing resolved operations and metadata
+   *
+   * @complexity O(n log n) where n = number of pending operations (due to timestamp sorting)
+   * @space O(n) for operation grouping and conflict detection data structures
+   *
+   * @sideEffects
+   * - Logs conflict warnings for observability
+   * - Does not modify the tree state (read-only analysis)
+   *
+   * @algorithm
+   * 1. Group operations by type (task updates vs structural changes)
+   * 2. Detect conflicts within task update groups
+   * 3. Apply last-update-wins resolution for conflicting operations
+   * 4. Preserve all non-conflicting operations in original order
+   *
+   * @conflictResolution
+   * - Task updates: Use latest timestamp (last update wins)
+   * - Structural operations: No conflicts possible, preserve all
+   * - Cross-type conflicts: Not currently detected/resolved
    */
   createReconciliationPlan(): ReconciliationPlan {
     const consolidatedOperations = this.consolidateOperations([...this._pendingOperations]);
