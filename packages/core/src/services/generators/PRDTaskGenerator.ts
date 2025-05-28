@@ -16,8 +16,8 @@ import type { Logger } from 'pino';
 
 import type { CreateTask, Task } from '../../schemas/task.js';
 import type { TaskService } from '../../services/TaskService.js';
-import type { TaskTree } from '../../utils/TaskTree.js';
 import { type ReconciliationPlan, TrackingTaskTree } from '../../utils/TrackingTaskTree.js';
+import type { TaskTree } from '../../utils/TaskTree.js';
 import { PRD_SYSTEM_PROMPT, generatePRDPrompt } from '../../utils/prompts.js';
 import type { TaskGenerator } from './TaskGenerator.js';
 import type {
@@ -185,7 +185,7 @@ export class PRDTaskGenerator implements TaskGenerator {
       // If parentTaskId is provided, use that specific task as the root
       // If not provided, use the project root (undefined gets the project root)
       const existingTree = await this.taskService.getTaskTree(input.context?.parentTaskId);
-
+      
       // The database initialization ensures there's always a project root,
       // so existingTree should never be null
       if (!existingTree) {
@@ -277,8 +277,8 @@ export class PRDTaskGenerator implements TaskGenerator {
   private createRootTask(input: GenerationInput): Task {
     const now = new Date();
     return {
-      id: `root-${Date.now()}`, // Temporary ID, will be replaced during persistence with proper root task ID
-      parentId: null, // This will be a root task, not a child of __PROJECT_ROOT__
+      id: `root-${Date.now()}`, // Temporary ID, will be replaced during persistence
+      parentId: null,
       title: (input.metadata?.title as string) || this.extractTitleFromContent(input.content),
       description: this.extractSummaryFromContent(input.content),
       status: 'pending',
@@ -305,11 +305,10 @@ export class PRDTaskGenerator implements TaskGenerator {
 
   /**
    * Convert CreateTask to Task with proper hierarchy
-   * Child tasks will get proper IDs during persistence via TaskService
    */
   private createTaskToTask(createTask: CreateTask, parentId: string, index: number): Task {
     return {
-      id: `temp-child-${index}`, // Temporary ID, will be replaced during persistence
+      id: `${parentId}.${index}`,
       parentId,
       title: createTask.title,
       description: createTask.description || null,
@@ -362,32 +361,33 @@ export class PRDTaskGenerator implements TaskGenerator {
 
   /**
    * Build tracking tree with PRD epic and its children
-   * The PRD epic becomes a root task, and __PROJECT_ROOT__ is only used for database organization
    */
   private buildTrackingTree(
     existingTree: TaskTree,
     prdEpic: Task,
     childTasks: Task[]
   ): TrackingTaskTree {
-    // Create PRD epic tree as a standalone root task
+    // Start with the existing tree
+    let trackingTree = TrackingTaskTree.fromTaskTree(existingTree);
+    
+    // Create PRD epic tree
     let prdEpicTree = TrackingTaskTree.fromTask(prdEpic);
-
+    
     // Add all child tasks to the PRD epic
     for (const childTask of childTasks) {
       const childTree = TrackingTaskTree.fromTask(childTask);
       prdEpicTree = prdEpicTree.addChild(childTree);
     }
-
-    // The PRD epic tree is returned as the main result
-    // The __PROJECT_ROOT__ from existingTree is only used for database organization
-    // and doesn't affect the actual task IDs
-
+    
+    // Add the PRD epic (with its children) to the existing tree
+    trackingTree = trackingTree.addChild(prdEpicTree);
+    
     this.logger.info('Task tree built successfully', {
       prdEpicTitle: prdEpic.title,
       childTasksCount: childTasks.length,
-      treatAsRootTask: true,
+      existingTreeId: existingTree.id,
     });
-
-    return prdEpicTree;
+    
+    return trackingTree;
   }
 }

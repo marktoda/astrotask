@@ -10,10 +10,10 @@
 
 import { ChatOpenAI } from '@langchain/openai';
 import type { Logger } from 'pino';
-import { TaskService } from '../services/TaskService.js';
-import { PRDTaskGenerator } from '../services/generators/PRDTaskGenerator.js';
 import { cfg } from './config.js';
 import { type ModelConfig, getModelConfig } from './models.js';
+import { PRDTaskGenerator } from '../services/generators/PRDTaskGenerator.js';
+import { TaskService } from '../services/TaskService.js';
 
 /**
  * Configuration options for LLM instances

@@ -30,7 +30,7 @@ async function ensureProjectRoot(store: Store): Promise<void> {
     if (existingProjectRoot) {
       return;
     }
-
+    
     // Create the project root task with fixed ID
     await store.addTaskWithId({
       id: '__PROJECT_ROOT__',
@@ -39,7 +39,7 @@ async function ensureProjectRoot(store: Store): Promise<void> {
       status: 'done', // Mark as done so it doesn't appear in active task lists
       priority: 'low',
     });
-
+    
     logger.info('Created project root task with ID: __PROJECT_ROOT__');
   } catch (error) {
     // Log the error but don't fail database creation
