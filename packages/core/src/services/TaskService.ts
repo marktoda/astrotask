@@ -27,12 +27,60 @@ export class TaskService {
 
   /**
    * Get TaskTree instance with ergonomic tree operations (cached)
+   * If no rootId provided, returns synthetic root containing all parentless tasks
    */
-  async getTaskTree(rootId: string, maxDepth?: number): Promise<TaskTree | null> {
+  async getTaskTree(rootId?: string, maxDepth?: number): Promise<TaskTree | null> {
+    // Special case: synthetic root for entire task forest
+    if (rootId === undefined) {
+      return this.cachedOps.getOrBuildTree('__SYNTHETIC_ROOT__', maxDepth, async () => {
+        const treeData = await this.buildSyntheticRootTreeData(maxDepth);
+        return treeData ? new TaskTree(treeData) : null;
+      });
+    }
+
     return this.cachedOps.getOrBuildTree(rootId, maxDepth, async () => {
       const treeData = await this.buildTaskTreeData(rootId, maxDepth);
       return treeData ? new TaskTree(treeData) : null;
     });
+  }
+
+  /**
+   * Internal method to build synthetic root containing all parentless tasks
+   */
+  private async buildSyntheticRootTreeData(maxDepth?: number): Promise<TaskTreeData | null> {
+    // Get all tasks with no parent (root tasks)
+    const rootTasks = await this.store.listTasks({ parentId: null });
+
+    if (rootTasks.length === 0) {
+      return null; // No tasks exist
+    }
+
+    // Create synthetic root task
+    const syntheticRoot: Task = {
+      id: '__SYNTHETIC_ROOT__',
+      parentId: null,
+      title: 'All Tasks',
+      description: 'Synthetic root containing all task hierarchies',
+      status: 'pending' as const,
+      priority: 'medium' as const,
+      prd: null,
+      contextDigest: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    // Build tree data for all root tasks
+    const children: TaskTreeData[] = [];
+    const adjustedMaxDepth = maxDepth === undefined ? undefined : maxDepth - 1;
+
+    for (const rootTask of rootTasks) {
+      const childData = await this.buildTaskTreeData(rootTask.id, adjustedMaxDepth);
+      if (childData) {
+        children.push(childData);
+      }
+    }
+
+    return { task: syntheticRoot, children };
   }
 
   /**
