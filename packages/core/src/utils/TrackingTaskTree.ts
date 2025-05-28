@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { Task } from '../schemas/task.js';
-import { type BatchUpdateOperation, TaskTree, type TaskTreeData } from './TaskTree.js';
+import { TaskTree, type TaskTreeData } from './TaskTree.js';
 
 /**
  * Pending operations that can be applied to a TaskTree
@@ -22,19 +22,6 @@ export const pendingOperationSchema = z.discriminatedUnion('type', [
     type: z.literal('child_remove'),
     parentId: z.string(),
     childId: z.string(),
-    timestamp: z.date(),
-  }),
-  z.object({
-    type: z.literal('batch_update'),
-    operations: z.array(
-      z.object({
-        type: z.string(),
-        taskId: z.string().optional(),
-        taskIds: z.array(z.string()).optional(),
-        updates: z.record(z.unknown()).optional(),
-        status: z.string().optional(),
-      })
-    ),
     timestamp: z.date(),
   }),
 ]);
@@ -156,30 +143,6 @@ export class TrackingTaskTree extends TaskTree {
     });
   }
 
-  override batchUpdate(operations: BatchUpdateOperation[]): TrackingTaskTree {
-    const result = super.batchUpdate(operations);
-
-    const newOperations = this._isTracking
-      ? [
-          ...this._pendingOperations,
-          {
-            type: 'batch_update' as const,
-            operations: operations.map((op) => ({
-              type: op.type,
-              ...op, // Spread all operation properties
-            })),
-            timestamp: new Date(),
-          },
-        ]
-      : this._pendingOperations;
-
-    return new TrackingTaskTree(result.toPlainObject(), this.getParent() as TrackingTaskTree, {
-      isTracking: this._isTracking,
-      baseVersion: this._baseVersion,
-      pendingOperations: newOperations,
-    });
-  }
-
   // Tracking-specific methods
 
   /**
@@ -209,19 +172,6 @@ export class TrackingTaskTree extends TaskTree {
     return new TrackingTaskTree(this.toPlainObject(), this.getParent() as TrackingTaskTree, {
       isTracking: this._isTracking,
       baseVersion: this._baseVersion + this._pendingOperations.length,
-      pendingOperations: [],
-    });
-  }
-
-  /**
-   * Rollback to the base state (discard all pending operations)
-   */
-  rollback(): TrackingTaskTree {
-    // This would require storing the original state, which we could add
-    // For now, return a new tracking tree with cleared operations
-    return new TrackingTaskTree(this.toPlainObject(), this.getParent() as TrackingTaskTree, {
-      isTracking: this._isTracking,
-      baseVersion: this._baseVersion,
       pendingOperations: [],
     });
   }
@@ -258,11 +208,11 @@ export class TrackingTaskTree extends TaskTree {
       treeId: this.id,
       baseVersion: this._baseVersion,
       operations: this._pendingOperations,
-      conflicts: [],
+      conflicts: [], // Would detect conflicts here
       canAutoResolve: true,
     };
 
-    // Implement last update wins policy for conflict resolution
+    // Detect potential conflicts (simplified)
     const taskUpdates = new Map<string, PendingOperation[]>();
     for (const op of this._pendingOperations) {
       if (op.type === 'task_update') {
@@ -272,18 +222,17 @@ export class TrackingTaskTree extends TaskTree {
       }
     }
 
-    // Auto-resolve conflicts using last update wins
+    // Last update wins policy - automatically resolve conflicts
     for (const [taskId, ops] of taskUpdates) {
       if (ops.length > 1) {
-        // Sort by timestamp to get the latest operation
-        const sortedOps = ops.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
         plan.conflicts.push({
           type: 'concurrent_task_update',
           taskId,
-          operations: [sortedOps[0]], // Only keep the latest operation
+          operations: ops,
           resolution: 'use_latest',
         });
-        // Still auto-resolvable with last update wins policy
+        // Can auto-resolve with last update wins
+        plan.canAutoResolve = true;
       }
     }
 

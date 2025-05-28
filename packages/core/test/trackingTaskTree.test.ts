@@ -123,21 +123,6 @@ describe('TrackingTaskTree', () => {
       });
     });
 
-    it('should track batch updates', () => {
-      const trackingTree = TrackingTaskTree.fromTask(mockTask);
-      
-      const batchOperations = [
-        { type: 'update_task' as const, taskId: mockTask.id, updates: { status: 'in-progress' as const } },
-      ];
-      
-      const updatedTree = trackingTree.batchUpdate(batchOperations);
-
-      expect(updatedTree.hasPendingChanges).toBe(true);
-      expect(updatedTree.pendingOperations).toHaveLength(1);
-      
-      const operation = updatedTree.pendingOperations[0];
-      expect(operation.type).toBe('batch_update');
-    });
 
     it('should accumulate multiple operations', () => {
       let trackingTree = TrackingTaskTree.fromTask(mockTask);
@@ -189,20 +174,6 @@ describe('TrackingTaskTree', () => {
       expect(clearedTree.baseVersion).toBe(trackingTree.baseVersion + 1);
     });
 
-    it('should support rollback', () => {
-      let trackingTree = TrackingTaskTree.fromTask(mockTask);
-      const originalTitle = trackingTree.title;
-      
-      trackingTree = trackingTree.withTask({ title: 'Updated Title' });
-      expect(trackingTree.title).toBe('Updated Title');
-      expect(trackingTree.hasPendingChanges).toBe(true);
-      
-      const rolledBackTree = trackingTree.rollback();
-      expect(rolledBackTree.hasPendingChanges).toBe(false);
-      expect(rolledBackTree.pendingOperations).toHaveLength(0);
-      // Note: Current implementation doesn't actually restore state
-      // This would require storing the original state
-    });
   });
 
   describe('Versioning and Operations', () => {
@@ -263,7 +234,7 @@ describe('TrackingTaskTree', () => {
       expect(plan.canAutoResolve).toBe(true);
     });
 
-    it('should detect conflicts in reconciliation plan', () => {
+    it('should detect conflicts and auto-resolve with last-update-wins', () => {
       let trackingTree = TrackingTaskTree.fromTask(mockTask);
       
       // Simulate multiple updates to the same task (would happen with concurrent edits)
@@ -276,7 +247,7 @@ describe('TrackingTaskTree', () => {
       expect(plan.conflicts[0].type).toBe('concurrent_task_update');
       expect(plan.conflicts[0].taskId).toBe(mockTask.id);
       expect(plan.conflicts[0].resolution).toBe('use_latest');
-      expect(plan.canAutoResolve).toBe(true); // With last update wins policy, conflicts are auto-resolvable
+      expect(plan.canAutoResolve).toBe(true);
     });
   });
 
@@ -318,7 +289,7 @@ describe('TrackingTaskTree', () => {
       trackingTree = trackingTree.withTask({ title: 'Update 2' }); // This creates conflicts
       
       const reconcileCallback = async (plan: any) => {
-        // Simulate failed reconciliation by always returning false
+        // Simulate failed reconciliation by rejecting even auto-resolvable conflicts
         return false;
       };
       
