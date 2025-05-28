@@ -49,28 +49,32 @@ Whether you're a developer managing complex projects, a team coordinating work, 
 
 ### For End Users (CLI)
 
+**Note:** Packages are currently in development and not yet published to npm.
+
 ```bash
-# Install the CLI globally
-npm install -g @astrolabe/cli
+# Clone and set up the development environment
+git clone https://github.com/marktoda/astrolabe.git
+cd astrolabe
+pnpm install
+pnpm build
 
-# Initialize your first project
-astrolabe init --name "My Project"
+# Use the CLI locally
+pnpm cli --help
 
-# Create and manage tasks
-astrolabe create "Implement user authentication"
-astrolabe create "Write unit tests" --parent task_123
-astrolabe list --status pending
-astrolabe complete task_123
+# Example commands (in development)
+pnpm cli task add "Implement user authentication"
+pnpm cli task list
 ```
 
 ### For Developers (API)
 
-```typescript
-import { createDatabase, TaskService } from "@astrolabe/core";
+**Note:** API is currently in development. Basic usage:
 
-// Initialize with local database
-const store = createDatabase({ path: "./tasks.db", encrypted: true });
-const taskService = new TaskService(store);
+```typescript
+import { TaskService } from "@astrolabe/core";
+
+// Initialize task service
+const taskService = new TaskService();
 
 // Create hierarchical tasks
 const feature = await taskService.createTask({
@@ -84,17 +88,18 @@ const subtask = await taskService.createTask({
 });
 
 // Query with full context
-const context = await taskService.getTaskContext(feature.id, {
-  includeDescendants: true,
-  maxDepth: 3,
-});
+const context = await taskService.getTaskContext(feature.id);
 ```
 
 ### For AI Agents (MCP)
 
+**Note:** MCP server is currently in development.
+
 ```bash
-# Start MCP server
-npx @astrolabe/mcp --database-path ./tasks.db
+# Build and start MCP server locally
+cd packages/mcp
+pnpm build
+node dist/index.js
 ```
 
 Configure in Cursor IDE (`.cursor/mcp.json`):
@@ -103,8 +108,8 @@ Configure in Cursor IDE (`.cursor/mcp.json`):
 {
   "mcpServers": {
     "astrolabe": {
-      "command": "npx",
-      "args": ["@astrolabe/mcp"],
+      "command": "node",
+      "args": ["path/to/astrolabe/packages/mcp/dist/index.js"],
       "env": { "DATABASE_PATH": "./tasks.db" }
     }
   }
@@ -179,38 +184,34 @@ Astrolabe is built as a TypeScript monorepo with three core packages:
 
 ### Prerequisites
 
-- **Node.js** 18.0.0 or higher
+- **Node.js** 22.0.0 or higher
 - **pnpm** (recommended) or npm/yarn
 - **SQLite** 3.40+ (usually included with Node.js)
 
-### Install Globally (Recommended)
+### Development Installation
+
+**Note:** Packages are not yet published to npm. Use development setup:
 
 ```bash
-# Install CLI globally for best user experience
-npm install -g @astrolabe/cli
+# Clone repository
+git clone https://github.com/marktoda/astrolabe.git
+cd astrolabe
 
-# Verify installation
-astrolabe --version
-```
+# Install dependencies (requires pnpm)
+pnpm install
 
-### Add to Project
+# Build all packages
+pnpm build
 
-```bash
-# For application development
-npm install @astrolabe/core
-
-# For AI agent integration
-npm install @astrolabe/mcp
-
-# For CLI integration
-npm install @astrolabe/cli
+# Run CLI locally
+pnpm cli --help
 ```
 
 ### Development Setup
 
 ```bash
 # Clone repository
-git clone https://github.com/astrolabe/astrolabe.git
+git clone https://github.com/marktoda/astrolabe.git
 cd astrolabe
 
 # Install dependencies (requires pnpm)
@@ -305,7 +306,7 @@ From personal todo lists to enterprise project management, Astrolabe scales with
 
 ## 📊 Project Status
 
-**Current Version:** 0.1.0 (Early Access)
+**Current Version:** 0.1.0 (Development)
 
 **Milestone Progress:**
 
@@ -316,9 +317,9 @@ From personal todo lists to enterprise project management, Astrolabe scales with
 
 **Package Status:**
 
-- `@astrolabe/core` - ✅ **Stable** - Production ready with comprehensive testing
-- `@astrolabe/mcp` - ✅ **Stable** - Full MCP compatibility, works with major AI tools
-- `@astrolabe/cli` - ✅ **Stable** - Feature-complete CLI with React UI
+- `@astrolabe/core` - 🔄 **In Development** - Core functionality implemented, testing in progress
+- `@astrolabe/mcp` - 🔄 **In Development** - Basic MCP server implemented, expanding functionality
+- `@astrolabe/cli` - 🔄 **In Development** - CLI framework in place, commands being implemented
 
 ## 🤝 Contributing
 
@@ -383,11 +384,10 @@ Built with these amazing technologies:
 ## 📞 Support & Community
 
 - 📖 **Documentation**: [docs/](docs/) - Comprehensive guides and API reference
-- 🐛 **Issues**: [GitHub Issues](https://github.com/astrolabe/astrolabe/issues) - Bug reports and feature requests
-- 💬 **Discussions**: [GitHub Discussions](https://github.com/astrolabe/astrolabe/discussions) - Questions and community
-- 📧 **Email**: <hello@astrolabe.dev> - Direct contact for partnerships and enterprise
+- 🐛 **Issues**: [GitHub Issues](https://github.com/marktoda/astrolabe/issues) - Bug reports and feature requests
+- 💬 **Discussions**: [GitHub Discussions](https://github.com/marktoda/astrolabe/discussions) - Questions and community
 
 ---
 
-**Ready to get started?** Check out the **[Getting Started Guide](docs/guides/getting-started.md)** or jump right in with `npm install -g @astrolabe/cli && astrolabe init`!
+**Ready to get started?** Check out the **[Getting Started Guide](docs/guides/getting-started.md)** or jump right in with `git clone https://github.com/marktoda/astrolabe.git && cd astrolabe && pnpm install && pnpm build`!
 
