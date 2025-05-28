@@ -239,25 +239,6 @@ export class TaskTree {
           ? tree.withTask(operation.updates)
           : tree.updateDescendants((task) => task.id === operation.taskId, operation.updates);
 
-      case 'update_by_predicate':
-        return tree.updateDescendants(operation.predicate, operation.updates);
-
-      case 'add_child':
-        return operation.parentId === tree.id
-          ? tree.addChild(operation.child)
-          : tree.updateDescendants(
-              (task) => task.id === operation.parentId,
-              {} // No task updates, just structural change
-            );
-
-      case 'remove_child':
-        return operation.parentId === tree.id
-          ? tree.removeChild(operation.childId)
-          : tree.updateDescendants(
-              (task) => task.id === operation.parentId,
-              {} // No task updates, just structural change
-            );
-
       case 'bulk_status_update':
         return tree.updateDescendants((task) => operation.taskIds.includes(task.id), {
           status: operation.status,
@@ -347,36 +328,7 @@ export class TaskTree {
     return markdown;
   }
 
-  // Legacy compatibility - matches existing TaskService.TaskTree interface
-  toLegacyFormat(): LegacyTaskTree {
-    return {
-      ...this._task,
-      children: this._children.map((child) => child.toLegacyFormat()),
-    };
-  }
-
   // Factory methods
-  static fromLegacyFormat(legacyTree: LegacyTaskTree): TaskTree {
-    const data: TaskTreeData = {
-      task: {
-        id: legacyTree.id,
-        parentId: legacyTree.parentId,
-        title: legacyTree.title,
-        description: legacyTree.description,
-        status: legacyTree.status,
-        priority: legacyTree.priority,
-        prd: legacyTree.prd,
-        contextDigest: legacyTree.contextDigest,
-        createdAt: legacyTree.createdAt,
-        updatedAt: legacyTree.updatedAt,
-      },
-      children: legacyTree.children.map((child) =>
-        TaskTree.fromLegacyFormat(child).toPlainObject()
-      ),
-    };
-
-    return new TaskTree(data);
-  }
 
   static fromTask(task: Task, children: TaskTree[] = []): TaskTree {
     const data: TaskTreeData = {
@@ -388,27 +340,9 @@ export class TaskTree {
   }
 }
 
-// Legacy TaskTree interface for backward compatibility
-export interface LegacyTaskTree extends Task {
-  children: LegacyTaskTree[];
-}
-
-// Validation helper
-export function validateTaskTree(data: unknown): data is TaskTreeData {
-  try {
-    taskTreeSchema.parse(data);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-// Enhanced batch operation types
+// Core batch operation types - simplified for common use cases
 export type BatchUpdateOperation =
   | { type: 'update_task'; taskId: string; updates: Partial<Task> }
-  | { type: 'update_by_predicate'; predicate: (task: Task) => boolean; updates: Partial<Task> }
-  | { type: 'add_child'; parentId: string; child: TaskTree }
-  | { type: 'remove_child'; parentId: string; childId: string }
   | { type: 'bulk_status_update'; taskIds: string[]; status: TaskStatus };
 
 export interface TreeMetrics {

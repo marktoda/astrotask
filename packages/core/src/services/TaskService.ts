@@ -13,11 +13,6 @@ import {
  * Uses Store for data access but handles complex tree operations and aggregations
  */
 
-// Legacy interface for backward compatibility
-export interface LegacyTaskTree extends Task {
-  children: LegacyTaskTree[];
-}
-
 export class TaskService {
   private cache: TaskTreeCache;
   private cachedOps: CachedTaskTreeOperations;
@@ -33,35 +28,11 @@ export class TaskService {
   /**
    * Get TaskTree instance with ergonomic tree operations (cached)
    */
-  async getTaskTreeClass(rootId: string, maxDepth?: number): Promise<TaskTree | null> {
+  async getTaskTree(rootId: string, maxDepth?: number): Promise<TaskTree | null> {
     return this.cachedOps.getOrBuildTree(rootId, maxDepth, async () => {
       const treeData = await this.buildTaskTreeData(rootId, maxDepth);
       return treeData ? new TaskTree(treeData) : null;
     });
-  }
-
-  /**
-   * Recursively build the task tree starting from the provided root task ID
-   * @deprecated Use getTaskTreeClass() for new code. This method exists for backward compatibility.
-   */
-  async getTaskTree(rootId: string, maxDepth?: number): Promise<LegacyTaskTree | null> {
-    const rootTask = await this.store.getTask(rootId);
-    if (!rootTask) return null;
-
-    const buildTree = async (task: Task, currentDepth: number): Promise<LegacyTaskTree> => {
-      const children: LegacyTaskTree[] = [];
-
-      if (maxDepth === undefined || currentDepth < maxDepth) {
-        const subtasks = await this.store.listTasks({ parentId: task.id });
-        for (const subtask of subtasks) {
-          children.push(await buildTree(subtask, currentDepth + 1));
-        }
-      }
-
-      return { ...task, children };
-    };
-
-    return buildTree(rootTask, 0);
   }
 
   /**
@@ -142,7 +113,7 @@ export class TaskService {
 
     // Get the root tree for validation context
     const rootId = await this.findRootTask(taskId);
-    const rootTree = rootId ? await this.getTaskTreeClass(rootId) : null;
+    const rootTree = rootId ? await this.getTaskTree(rootId) : null;
 
     if (rootTree) {
       // Validate the move operation
@@ -211,7 +182,7 @@ export class TaskService {
    * Get multiple task trees efficiently
    */
   async getTaskTrees(rootIds: string[], maxDepth?: number): Promise<TaskTree[]> {
-    const trees = await Promise.all(rootIds.map((id) => this.getTaskTreeClass(id, maxDepth)));
+    const trees = await Promise.all(rootIds.map((id) => this.getTaskTree(id, maxDepth)));
 
     return trees.filter((tree): tree is TaskTree => tree !== null);
   }
@@ -220,7 +191,7 @@ export class TaskService {
    * Find tasks matching a predicate within a tree
    */
   async findTasksInTree(rootId: string, predicate: (task: Task) => boolean): Promise<Task[]> {
-    const tree = await this.getTaskTreeClass(rootId);
+    const tree = await this.getTaskTree(rootId);
     if (!tree) return [];
 
     return tree.filter(predicate).map((taskTree) => taskTree.task);
@@ -245,13 +216,13 @@ export class TaskService {
 
     // Get the root task tree for full context
     const rootId = ancestors.length > 0 && ancestors[0] ? ancestors[0].id : taskId;
-    const root = await this.getTaskTreeClass(rootId);
+    const root = await this.getTaskTree(rootId);
 
     // Build descendant trees
     const descendantTrees = await Promise.all(
       descendants
         .filter((d) => d.parentId === taskId) // Only immediate children
-        .map((d) => this.getTaskTreeClass(d.id))
+        .map((d) => this.getTaskTree(d.id))
     );
 
     return {
@@ -273,7 +244,9 @@ export class TaskService {
   /**
    * Enhanced batch operations with caching
    */
-  async batchUpdateTasks(operations: BatchUpdateOperation[]): Promise<{ success: boolean; errors: string[] }> {
+  async batchUpdateTasks(
+    operations: BatchUpdateOperation[]
+  ): Promise<{ success: boolean; errors: string[] }> {
     const errors: string[] = [];
 
     try {
@@ -286,7 +259,9 @@ export class TaskService {
     }
   }
 
-  private async groupOperationsByRoot(operations: BatchUpdateOperation[]): Promise<Map<string, BatchUpdateOperation[]>> {
+  private async groupOperationsByRoot(
+    operations: BatchUpdateOperation[]
+  ): Promise<Map<string, BatchUpdateOperation[]>> {
     const operationsByRoot = new Map<string, BatchUpdateOperation[]>();
 
     for (const op of operations) {
@@ -310,9 +285,6 @@ export class TaskService {
     switch (op.type) {
       case 'update_task':
         return this.findRootTask(op.taskId);
-      case 'add_child':
-      case 'remove_child':
-        return this.findRootTask(op.parentId);
       case 'bulk_status_update':
         if (op.taskIds.length > 0 && op.taskIds[0]) {
           return this.findRootTask(op.taskIds[0]);
@@ -323,9 +295,12 @@ export class TaskService {
     }
   }
 
-  private async applyGroupedOperations(operationsByRoot: Map<string, BatchUpdateOperation[]>, errors: string[]): Promise<void> {
+  private async applyGroupedOperations(
+    operationsByRoot: Map<string, BatchUpdateOperation[]>,
+    errors: string[]
+  ): Promise<void> {
     for (const [rootId, rootOperations] of operationsByRoot) {
-      const tree = await this.getTaskTreeClass(rootId);
+      const tree = await this.getTaskTree(rootId);
       if (!tree) {
         errors.push(`Root tree not found: ${rootId}`);
         continue;
@@ -343,7 +318,7 @@ export class TaskService {
     rootId: string,
     options?: { maxDepth?: number; checkStatusConsistency?: boolean }
   ): Promise<ValidationResult> {
-    const tree = await this.getTaskTreeClass(rootId);
+    const tree = await this.getTaskTree(rootId);
     if (!tree) {
       return {
         isValid: false,
@@ -372,9 +347,7 @@ export class TaskService {
   /**
    * Get aggregated metrics across multiple trees
    */
-  async getTreeMetrics(
-    rootIds: string[]
-  ): Promise<{
+  async getTreeMetrics(rootIds: string[]): Promise<{
     totalTasks: number;
     averageDepth: number;
     maxDepth: number;

@@ -20,12 +20,12 @@ export {
   type TaskTreeData,
   type BatchUpdateOperation,
   type TreeMetrics,
-  validateTaskTree,
 } from './utils/TaskTree.js';
 
 // TaskTree validation
 export {
-  validateTaskTree as validateTaskTreeStructure,
+  validateTaskTree,
+  validateTaskTreeData,
   validateMoveOperation,
   validateTaskForest,
   type ValidationResult,

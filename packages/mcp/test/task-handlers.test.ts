@@ -19,8 +19,7 @@ const mockStore = {
 };
 
 const mockTaskService = {
-  getTaskTree: vi.fn(), // Legacy method - deprecated 
-  getTaskTreeClass: vi.fn(),
+  getTaskTree: vi.fn(),
   getTaskTrees: vi.fn(),
   getTaskWithContext: vi.fn(),
   getTaskAncestors: vi.fn(),

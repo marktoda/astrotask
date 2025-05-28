@@ -36,7 +36,7 @@ export default function Tree({ options }: Props) {
 
 				if (rootId) {
 					// Get specific task and its subtree using TaskTree class
-					const rootTree = await taskService.getTaskTreeClass(rootId, maxDepth);
+					const rootTree = await taskService.getTaskTree(rootId, maxDepth);
 					if (!rootTree) {
 						throw new Error(`Task with ID "${rootId}" not found`);
 					}

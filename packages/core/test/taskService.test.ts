@@ -62,7 +62,7 @@ afterEach(async () => {
 describe('TaskService', () => {
   it('builds a complete task tree', async () => {
     const { A } = (global as any).testTaskIds;
-    const tree = await service.getTaskTreeClass(A);
+    const tree = await service.getTaskTree(A);
     expect(tree).not.toBeNull();
     if (!tree) return;
     expect(tree.task.id).toBe(A);
@@ -79,7 +79,7 @@ describe('TaskService', () => {
 
   it('honours maxDepth when building tree', async () => {
     const { A } = (global as any).testTaskIds;
-    const tree = await service.getTaskTreeClass(A, 1);
+    const tree = await service.getTaskTree(A, 1);
     const children = tree!.getChildren();
     expect(children.length).toBe(2);
     expect(children[0].getChildren().length).toBe(0); // depth limited – grandchildren excluded

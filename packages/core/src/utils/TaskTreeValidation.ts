@@ -1,4 +1,5 @@
-import type { TaskTree } from './TaskTree.js';
+import type { TaskTree, TaskTreeData } from './TaskTree.js';
+import { taskTreeSchema } from './TaskTree.js';
 
 /**
  * TaskTreeValidation - Utilities for validating tree structure and detecting issues
@@ -348,3 +349,15 @@ const defaultValidationOptions: ValidationOptions = {
   checkStatusConsistency: true,
   allowOrphanedTasks: false,
 };
+
+/**
+ * Validation helper for TaskTreeData schema validation
+ */
+export function validateTaskTreeData(data: unknown): data is TaskTreeData {
+  try {
+    taskTreeSchema.parse(data);
+    return true;
+  } catch {
+    return false;
+  }
+}
