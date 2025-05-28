@@ -339,9 +339,9 @@ export class TaskService {
   }
 
   /**
-   * Store a complete task tree atomically (storage layer interface)
+   * Create a complete task tree atomically (storage layer interface)
    */
-  async storeTaskTree(trackingTree: TrackingTaskTree): Promise<TaskTree> {
+  async createTaskTree(trackingTree: TrackingTaskTree): Promise<TaskTree> {
     // Create reconciliation plan
     const plan = trackingTree.createReconciliationPlan();
 

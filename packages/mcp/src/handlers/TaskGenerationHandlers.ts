@@ -29,17 +29,10 @@ export interface GenerateTasksInput {
   };
   /** Generator-specific metadata and options */
   metadata?: Record<string, unknown>;
-}
-
-export interface GenerateTaskTreeInput {
-  /** Generator type (currently only 'prd' supported) */
-  type: string;
-  /** Source content to generate task tree from */
-  content: string;
-  /** Optional metadata and options */
-  metadata?: Record<string, unknown>;
   /** Whether to persist the generated tree to database */
   persist?: boolean;
+  /** Whether to return hierarchical structure (default: true) */
+  hierarchical?: boolean;
 }
 
 export interface ListGeneratorsInput {
@@ -69,6 +62,7 @@ export class TaskGenerationHandlers implements MCPHandler {
 
   /**
    * Generate tasks from input content using specified generator
+   * Now supports both hierarchical (default) and flat task generation
    */
   async generateTasks(params: GenerateTasksInput): Promise<object> {
     // Only support PRD generation for now
@@ -78,61 +72,135 @@ export class TaskGenerationHandlers implements MCPHandler {
       );
     }
 
+    const useHierarchical = params.hierarchical !== false; // Default to true
+
     try {
       // Create PRD generator
-      const prdGenerator = createPRDTaskGenerator(
-        this.logger
-      );
+      const prdGenerator = createPRDTaskGenerator(this.logger);
 
-      // Load existing tasks for context if requested
-      let existingTasks: Task[] = [];
-      if (params.context?.existingTasks) {
-        const taskPromises = params.context.existingTasks.map((id) => 
-          this.context.store.getTask(id)
-        );
-        const tasks = await Promise.all(taskPromises);
-        existingTasks = tasks.filter((task): task is Task => task !== null);
-      }
-
-      // Generate tasks
-      const createTasks = await prdGenerator.generate(
-        {
+      if (useHierarchical) {
+        // Generate hierarchical task tree
+        const trackingTree = await prdGenerator.generateTaskTree({
           content: params.content,
-          context: {
-            existingTasks,
-            parentTaskId: params.context?.parentTaskId,
-          },
           metadata: params.metadata,
-        },
-        params.context?.parentTaskId ?? null
-      );
+        });
 
-      // Convert to API format by creating complete Task objects with required fields
-      const apiTasks = createTasks.map((task) => taskToApi({
-        ...task,
-        id: 'generated-' + Math.random().toString(36).substring(2, 11), // Temporary ID
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        parentId: task.parentId ?? null,
-        description: task.description ?? null,
-        prd: task.prd ?? null,
-        contextDigest: task.contextDigest ?? null,
-      }));
+        if (params.persist) {
+          // Create TaskService and persist the tree
+          const taskService = new TaskService(this.context.store);
+          const persistedTree = await taskService.createTaskTree(trackingTree);
 
-      return {
-        tasks: apiTasks,
-        metadata: {
-          generator: 'prd',
-          tasksGenerated: createTasks.length,
-          requestId: this.context.requestId,
-          timestamp: this.context.timestamp,
-        },
-      };
+          // Return persisted tree with real IDs
+          return {
+            tree: {
+              id: persistedTree.id,
+              title: persistedTree.task.title,
+              description: persistedTree.task.description,
+              status: persistedTree.task.status,
+              priority: persistedTree.task.priority,
+              childCount: persistedTree.getChildren().length,
+              children: persistedTree.getChildren().map(child => ({
+                id: child.id,
+                title: child.task.title,
+                description: child.task.description,
+                status: child.task.status,
+                priority: child.task.priority,
+              })),
+            },
+            metadata: {
+              generator: 'prd',
+              persisted: true,
+              hierarchical: true,
+              rootTaskId: persistedTree.id,
+              totalTasks: 1 + persistedTree.getChildren().length,
+              requestId: this.context.requestId,
+              timestamp: this.context.timestamp,
+            },
+          };
+        } else {
+          // Return unpersisted tree with temporary IDs
+          return {
+            tree: {
+              id: trackingTree.id,
+              title: trackingTree.task.title,
+              description: trackingTree.task.description,
+              status: trackingTree.task.status,
+              priority: trackingTree.task.priority,
+              childCount: trackingTree.getChildren().length,
+              pendingOperations: trackingTree.pendingOperations.length,
+              children: trackingTree.getChildren().map(child => ({
+                id: child.id,
+                title: child.task.title,
+                description: child.task.description,
+                status: child.task.status,
+                priority: child.task.priority,
+              })),
+            },
+            metadata: {
+              generator: 'prd',
+              persisted: false,
+              hierarchical: true,
+              totalTasks: 1 + trackingTree.getChildren().length,
+              hasPendingOperations: trackingTree.hasPendingChanges,
+              requestId: this.context.requestId,
+              timestamp: this.context.timestamp,
+            },
+          };
+        }
+      } else {
+        // Legacy flat task generation for backward compatibility
+        // Load existing tasks for context if requested
+        let existingTasks: Task[] = [];
+        if (params.context?.existingTasks) {
+          const taskPromises = params.context.existingTasks.map((id) => 
+            this.context.store.getTask(id)
+          );
+          const tasks = await Promise.all(taskPromises);
+          existingTasks = tasks.filter((task): task is Task => task !== null);
+        }
+
+        // Generate tasks
+        const createTasks = await prdGenerator.generate(
+          {
+            content: params.content,
+            context: {
+              existingTasks,
+              parentTaskId: params.context?.parentTaskId,
+            },
+            metadata: params.metadata,
+          },
+          params.context?.parentTaskId ?? null
+        );
+
+        // Convert to API format by creating complete Task objects with required fields
+        const apiTasks = createTasks.map((task) => taskToApi({
+          ...task,
+          id: 'generated-' + Math.random().toString(36).substring(2, 11), // Temporary ID
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          parentId: task.parentId ?? null,
+          description: task.description ?? null,
+          prd: task.prd ?? null,
+          contextDigest: task.contextDigest ?? null,
+        }));
+
+        return {
+          tasks: apiTasks,
+          metadata: {
+            generator: 'prd',
+            hierarchical: false,
+            tasksGenerated: createTasks.length,
+            requestId: this.context.requestId,
+            timestamp: this.context.timestamp,
+          },
+        };
+      }
 
     } catch (error) {
       this.logger.error('Task generation failed', {
         error: error instanceof Error ? error.message : String(error),
         type: params.type,
+        hierarchical: useHierarchical,
         contentLength: params.content.length,
         requestId: this.context.requestId,
       });
@@ -226,103 +294,4 @@ export class TaskGenerationHandlers implements MCPHandler {
     }
   }
 
-  /**
-   * Generate a hierarchical task tree and optionally persist it
-   */
-  async generateTaskTree(params: GenerateTaskTreeInput): Promise<object> {
-    // Only support PRD generation for now
-    if (params.type !== 'prd') {
-      throw new Error(
-        `Unsupported generator type: ${params.type}. Only 'prd' is currently supported.`
-      );
-    }
-
-    try {
-      // Create PRD generator
-      const prdGenerator = createPRDTaskGenerator(this.logger);
-
-      // Generate tracking task tree
-      const trackingTree = await prdGenerator.generateTaskTree({
-        content: params.content,
-        metadata: params.metadata,
-      });
-
-      if (params.persist) {
-        // Create TaskService and persist the tree
-        const taskService = new TaskService(this.context.store);
-        const persistedTree = await taskService.storeTaskTree(trackingTree);
-
-        // Return persisted tree with real IDs
-        return {
-          tree: {
-            id: persistedTree.id,
-            title: persistedTree.task.title,
-            description: persistedTree.task.description,
-            status: persistedTree.task.status,
-            priority: persistedTree.task.priority,
-            childCount: persistedTree.getChildren().length,
-            children: persistedTree.getChildren().map(child => ({
-              id: child.id,
-              title: child.task.title,
-              description: child.task.description,
-              status: child.task.status,
-              priority: child.task.priority,
-            })),
-          },
-          metadata: {
-            generator: 'prd',
-            persisted: true,
-            rootTaskId: persistedTree.id,
-            totalTasks: 1 + persistedTree.getChildren().length,
-            requestId: this.context.requestId,
-            timestamp: this.context.timestamp,
-          },
-        };
-      } else {
-        // Return unpersisted tree with temporary IDs
-        return {
-          tree: {
-            id: trackingTree.id,
-            title: trackingTree.task.title,
-            description: trackingTree.task.description,
-            status: trackingTree.task.status,
-            priority: trackingTree.task.priority,
-            childCount: trackingTree.getChildren().length,
-            pendingOperations: trackingTree.pendingOperations.length,
-            children: trackingTree.getChildren().map(child => ({
-              id: child.id,
-              title: child.task.title,
-              description: child.task.description,
-              status: child.task.status,
-              priority: child.task.priority,
-            })),
-          },
-          metadata: {
-            generator: 'prd',
-            persisted: false,
-            totalTasks: 1 + trackingTree.getChildren().length,
-            hasPendingOperations: trackingTree.hasPendingChanges,
-            requestId: this.context.requestId,
-            timestamp: this.context.timestamp,
-          },
-        };
-      }
-
-    } catch (error) {
-      this.logger.error('Task tree generation failed', {
-        error: error instanceof Error ? error.message : String(error),
-        type: params.type,
-        contentLength: params.content.length,
-        persist: params.persist,
-        requestId: this.context.requestId,
-      });
-
-      if (error instanceof Error && 'type' in error) {
-        const genError = error as GenerationError;
-        throw new Error(`Tree generation failed: ${genError.message} (${genError.type})`);
-      }
-
-      throw new Error(`Task tree generation failed: ${error instanceof Error ? error.message : String(error)}`);
-    }
-  }
 } 
