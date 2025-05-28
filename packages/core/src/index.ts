@@ -14,7 +14,35 @@ export const APP_NAME = 'Astrolabe';
 // Core functionality
 export * from './database/index.js';
 export { TaskService } from './services/TaskService.js';
-export { TaskTree, type TaskTreeData, validateTaskTree } from './utils/TaskTree.js';
+// TaskTree utilities
+export {
+  TaskTree,
+  type TaskTreeData,
+  type BatchUpdateOperation,
+  type TreeMetrics,
+  validateTaskTree,
+} from './utils/TaskTree.js';
+
+// TaskTree validation
+export {
+  validateTaskTree as validateTaskTreeStructure,
+  validateMoveOperation,
+  validateTaskForest,
+  type ValidationResult,
+  type ValidationError,
+  type ValidationWarning,
+  type ValidationOptions,
+} from './utils/TaskTreeValidation.js';
+
+// TaskTree caching
+export {
+  TaskTreeCache,
+  CachedTaskTreeOperations,
+  LRUCache,
+  type CacheStats,
+  type TaskTreeCacheStats,
+  type TaskTreeMetadata,
+} from './utils/TaskTreeCache.js';
 
 // Task generation exports
 export * from './services/generators/TaskGenerator.js';
