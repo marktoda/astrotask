@@ -1,3 +1,4 @@
+import { taskPriority, taskStatus } from "@astrolabe/core";
 import { Text } from "ink";
 import { useEffect, useState } from "react";
 import zod from "zod";
@@ -9,7 +10,8 @@ export const options = zod.object({
 	id: zod.string().describe("Task ID to update"),
 	title: zod.string().optional().describe("New task title"),
 	description: zod.string().optional().describe("New task description"),
-	status: zod.string().optional().describe("New task status"),
+	status: taskStatus.optional().describe("New task status"),
+	priority: taskPriority.optional().describe("New task priority"),
 	parent: zod.string().optional().describe("New parent task ID"),
 });
 
@@ -31,6 +33,7 @@ export default function Update({ options }: Props) {
 				if (options.description !== undefined)
 					updates["description"] = options.description;
 				if (options.status) updates["status"] = options.status;
+				if (options.priority) updates["priority"] = options.priority;
 				if (options.parent !== undefined) updates["parentId"] = options.parent;
 
 				const updated = await db.updateTask(options.id, updates);

@@ -1,4 +1,5 @@
 import type { NewTask } from "@astrolabe/core";
+import { taskPriority } from "@astrolabe/core";
 import { Text } from "ink";
 import { useEffect, useState } from "react";
 import zod from "zod";
@@ -10,10 +11,7 @@ export const options = zod.object({
 	title: zod.string().describe("Task title"),
 	description: zod.string().optional().describe("Task description"),
 	parent: zod.string().optional().describe("Parent task ID"),
-	priority: zod
-		.enum(["low", "medium", "high"])
-		.default("medium")
-		.describe("Task priority"),
+	priority: taskPriority.describe("Task priority"),
 });
 
 type Props = {

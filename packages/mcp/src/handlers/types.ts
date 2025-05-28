@@ -16,8 +16,10 @@ import {
   taskPriority, 
   createTaskSchema as coreCreateTaskSchema,
   updateTaskSchema as coreUpdateTaskSchema,
-  taskSchema
-} from '@astrolabe/core/dist/schemas/index.js';
+  taskSchema,
+  type TaskStatus,
+  type TaskPriority
+} from '@astrolabe/core';
 import type { Store, TaskService } from '@astrolabe/core';
 
 /**
@@ -36,7 +38,7 @@ export interface PRDMetadata {
   /** Include implementation details */
   includeDetails?: boolean;
   /** Preferred task priority */
-  defaultPriority?: 'low' | 'medium' | 'high';
+  defaultPriority?: TaskPriority;
 }
 
 /**
@@ -85,9 +87,9 @@ export interface TaskTreeNode {
   /** Task description */
   description?: string | null;
   /** Task status */
-  status: 'pending' | 'in-progress' | 'done' | 'cancelled' | 'archived';
+  status: TaskStatus;
   /** Task priority */
-  priority: 'low' | 'medium' | 'high';
+  priority: TaskPriority;
   /** Number of child tasks */
   childCount?: number;
   /** Child task nodes */
