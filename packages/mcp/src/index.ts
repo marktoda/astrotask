@@ -2,7 +2,7 @@
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { createDatabase, type DatabaseOptions, TaskService } from '@astrolabe/core';
+import { createDatabase, type DatabaseOptions, TaskService, createModuleLogger, logShutdown } from '@astrolabe/core';
 import {
   TaskHandlers,
   TaskGenerationHandlers,
@@ -16,6 +16,8 @@ import {
   listGeneratorsSchema,
   validateGenerationInputSchema
 } from './handlers/index.js';
+
+const logger = createModuleLogger('mcp-server');
 
 /**
  * Wraps handler responses in the standard MCP response format
@@ -163,22 +165,22 @@ async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
 
-  console.error('Astrolabe MCP Server started successfully with task generation support');
+  logger.info('Astrolabe MCP Server started successfully with task generation support');
 }
 
 // Handle cleanup on process termination
 process.on('SIGINT', async () => {
-  console.error('Shutting down Astrolabe MCP Server...');
+  await logShutdown(logger, 'SIGINT');
   process.exit(0);
 });
 
 process.on('SIGTERM', async () => {
-  console.error('Shutting down Astrolabe MCP Server...');
+  await logShutdown(logger, 'SIGTERM');
   process.exit(0);
 });
 
 // Start the server
 main().catch((error) => {
-  console.error('Fatal error starting Astrolabe MCP Server:', error);
+  logger.fatal({ error }, 'Fatal error starting Astrolabe MCP Server');
   process.exit(1);
 });

@@ -1,6 +1,9 @@
+import { createModuleLogger } from '../utils/logger.js';
 import { initializeDatabase } from './config.js';
 import { createStore } from './electric.js';
 import type { Store } from './store.js';
+
+const logger = createModuleLogger('database');
 
 /**
  * Configuration options for creating a database
@@ -48,7 +51,7 @@ export async function createDatabase(options: DatabaseOptions = {}): Promise<Sto
   });
 
   if (verbose) {
-    console.info('Database store created successfully');
+    logger.info('Database store created successfully');
   }
 
   return store;
