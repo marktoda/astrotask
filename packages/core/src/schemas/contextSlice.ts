@@ -49,13 +49,13 @@ export const createContextSliceApiSchema = createContextSliceSchema.extend({
   contextDigest: z.string().optional(),
 });
 
-// Transformation utilities for database <-> API compatibility
+// Basic transformation functions for database <-> API compatibility
 export function contextSliceToApi(contextSlice: ContextSlice): ContextSliceApi {
   return {
     ...contextSlice,
-    description: contextSlice.description ?? undefined, // null -> undefined
-    taskId: contextSlice.taskId ?? undefined, // null -> undefined
-    contextDigest: contextSlice.contextDigest ?? undefined, // null -> undefined
+    description: contextSlice.description ?? undefined,
+    taskId: contextSlice.taskId ?? undefined,
+    contextDigest: contextSlice.contextDigest ?? undefined,
     createdAt: contextSlice.createdAt.toISOString(),
     updatedAt: contextSlice.updatedAt.toISOString(),
   };
@@ -66,9 +66,9 @@ export function contextSliceFromApi(
 ): Omit<ContextSlice, 'id' | 'createdAt' | 'updatedAt'> {
   return {
     ...apiContextSlice,
-    description: apiContextSlice.description ?? null, // undefined -> null
-    taskId: apiContextSlice.taskId ?? null, // undefined -> null
-    contextDigest: apiContextSlice.contextDigest ?? null, // undefined -> null
+    description: apiContextSlice.description ?? null,
+    taskId: apiContextSlice.taskId ?? null,
+    contextDigest: apiContextSlice.contextDigest ?? null,
   };
 }
 

@@ -63,14 +63,14 @@ export const createTaskApiSchema = createTaskSchema.extend({
   contextDigest: z.string().optional(),
 });
 
-// Transformation utilities for database <-> API compatibility
+// Basic transformation functions for database <-> API compatibility
 export function taskToApi(task: Task): TaskApi {
   return {
     ...task,
-    parentId: task.parentId ?? undefined, // null -> undefined
-    description: task.description ?? undefined, // null -> undefined
-    prd: task.prd ?? undefined, // null -> undefined
-    contextDigest: task.contextDigest ?? undefined, // null -> undefined
+    parentId: task.parentId ?? undefined,
+    description: task.description ?? undefined, 
+    prd: task.prd ?? undefined,
+    contextDigest: task.contextDigest ?? undefined,
     createdAt: task.createdAt.toISOString(),
     updatedAt: task.updatedAt.toISOString(),
   };
@@ -79,10 +79,10 @@ export function taskToApi(task: Task): TaskApi {
 export function taskFromApi(apiTask: TaskApi): Omit<Task, 'id' | 'createdAt' | 'updatedAt'> {
   return {
     ...apiTask,
-    parentId: apiTask.parentId ?? null, // undefined -> null
-    description: apiTask.description ?? null, // undefined -> null
-    prd: apiTask.prd ?? null, // undefined -> null
-    contextDigest: apiTask.contextDigest ?? null, // undefined -> null
+    parentId: apiTask.parentId ?? null,
+    description: apiTask.description ?? null,
+    prd: apiTask.prd ?? null,
+    contextDigest: apiTask.contextDigest ?? null,
   };
 }
 
