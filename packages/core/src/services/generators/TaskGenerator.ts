@@ -9,6 +9,7 @@
  */
 
 import type { CreateTask } from '../../schemas/task.js';
+import type { TrackingTaskTree } from '../../utils/TrackingTaskTree.js';
 import type { GenerationInput, ValidationResult } from './schemas.js';
 
 /**
@@ -55,4 +56,17 @@ export interface TaskGenerator {
    * @returns Promise resolving to validation results with errors/warnings/suggestions
    */
   validate(input: GenerationInput): Promise<ValidationResult>;
+
+  /**
+   * Generate a hierarchical task tree from the provided input
+   *
+   * This method creates a root task representing the entire generation context
+   * with generated subtasks as children, enabling atomic tree operations.
+   *
+   * @param input - The input content and context for generation
+   * @returns Promise resolving to a TrackingTaskTree with root task and generated children
+   *
+   * @throws {Error} When generation fails due to invalid input or processing errors
+   */
+  generateTaskTree?(input: GenerationInput): Promise<TrackingTaskTree>;
 }

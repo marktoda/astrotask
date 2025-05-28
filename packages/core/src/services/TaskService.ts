@@ -1,5 +1,5 @@
 import type { Store } from '../database/store.js';
-import type { Task, TaskStatus } from '../schemas/task.js';
+import type { CreateTask, Task, TaskStatus } from '../schemas/task.js';
 import { TaskTree, type TaskTreeData } from '../utils/TaskTree.js';
 import { CachedTaskTreeOperations, TaskTreeCache } from '../utils/TaskTreeCache.js';
 import {
@@ -7,6 +7,7 @@ import {
   validateMoveOperation,
   validateTaskTree,
 } from '../utils/TaskTreeValidation.js';
+import { type ReconciliationPlan, TrackingTaskTree } from '../utils/TrackingTaskTree.js';
 
 /**
  * TaskService - Business logic layer for hierarchical task operations
@@ -335,5 +336,158 @@ export class TaskService {
   }> {
     const trees = await this.getTaskTrees(rootIds);
     return TaskTree.aggregateMetrics(trees);
+  }
+
+  /**
+   * Create and persist a complete task tree atomically
+   */
+  async createTaskTree(trackingTree: TrackingTaskTree): Promise<TaskTree> {
+    // Create reconciliation plan
+    const plan = trackingTree.createReconciliationPlan();
+
+    // Execute the reconciliation plan atomically
+    const persistedTree = await this.reconcileTaskTree(plan, trackingTree);
+
+    // Clear cache since we've added new tasks
+    this.clearCache();
+
+    return persistedTree;
+  }
+
+  /**
+   * Generate a task tree using a generator and persist it atomically
+   */
+  async generateAndCreateTaskTree(
+    generator: { generateTaskTree(input: unknown): Promise<TrackingTaskTree> },
+    input: unknown
+  ): Promise<TaskTree> {
+    // Generate the tracking tree
+    const trackingTree = await generator.generateTaskTree(input);
+
+    // Persist it atomically
+    return this.createTaskTree(trackingTree);
+  }
+
+  /**
+   * Reconcile a TrackingTaskTree with the store based on a reconciliation plan
+   */
+  private async reconcileTaskTree(
+    _plan: ReconciliationPlan,
+    trackingTree: TrackingTaskTree
+  ): Promise<TaskTree> {
+    // For this implementation, we'll create all tasks from the tree
+    // In the future, this could be more sophisticated with partial updates
+
+    const createdTasks: Task[] = [];
+    const taskMap = new Map<string, string>(); // temp ID -> real ID
+
+    try {
+      // Create root task first
+      const rootTaskData = this.convertToCreateTask(trackingTree.task);
+      const rootTask = await this.store.addTask(rootTaskData);
+      if (!rootTask) {
+        throw new Error('Failed to create root task');
+      }
+
+      createdTasks.push(rootTask);
+      taskMap.set(trackingTree.id, rootTask.id);
+
+      // Create children recursively
+      await this.createChildrenRecursively(trackingTree, rootTask.id, taskMap, createdTasks);
+
+      // Build the final tree from persisted tasks
+      const finalTree = await this.getTaskTree(rootTask.id);
+      if (!finalTree) {
+        throw new Error('Failed to retrieve created tree');
+      }
+
+      return finalTree;
+    } catch (error) {
+      // Rollback - delete any created tasks
+      for (const task of createdTasks.reverse()) {
+        try {
+          await this.store.deleteTask(task.id);
+        } catch (deleteError) {
+          // Log but don't throw - we're already in error state
+          console.error('Failed to rollback task during reconciliation error:', deleteError);
+        }
+      }
+
+      throw new Error(
+        `Task tree reconciliation failed: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+  }
+
+  /**
+   * Recursively create children tasks with proper parent relationships
+   */
+  private async createChildrenRecursively(
+    parentTree: TrackingTaskTree | TaskTree,
+    realParentId: string,
+    taskMap: Map<string, string>,
+    createdTasks: Task[]
+  ): Promise<void> {
+    for (const child of parentTree.getChildren()) {
+      // Convert child to CreateTask format
+      const childTaskData = this.convertToCreateTask(child.task);
+      childTaskData.parentId = realParentId; // Set correct parent ID
+
+      // Create the child task
+      const childTask = await this.store.addTask(childTaskData);
+      if (!childTask) {
+        throw new Error(`Failed to create child task: ${child.task.title}`);
+      }
+
+      createdTasks.push(childTask);
+      taskMap.set(child.id, childTask.id);
+
+      // Recursively create grandchildren
+      if (child.getChildren().length > 0) {
+        await this.createChildrenRecursively(child, childTask.id, taskMap, createdTasks);
+      }
+    }
+  }
+
+  /**
+   * Convert a Task to CreateTask format for persistence
+   */
+  private convertToCreateTask(task: Task): CreateTask {
+    return {
+      parentId: task.parentId ?? undefined,
+      title: task.title,
+      description: task.description ?? undefined,
+      status: task.status,
+      priority: task.priority,
+      prd: task.prd ?? undefined,
+      contextDigest: task.contextDigest ?? undefined,
+    };
+  }
+
+  /**
+   * Get a TrackingTaskTree for making optimistic updates
+   */
+  async getTrackingTaskTree(rootId: string, maxDepth?: number): Promise<TrackingTaskTree | null> {
+    const tree = await this.getTaskTree(rootId, maxDepth);
+    if (!tree) return null;
+
+    return TrackingTaskTree.fromTaskTree(tree);
+  }
+
+  /**
+   * Apply pending operations from a TrackingTaskTree to the store
+   */
+  async applyTrackingTreeChanges(trackingTree: TrackingTaskTree): Promise<TaskTree> {
+    if (!trackingTree.hasPendingChanges) {
+      // No changes to apply, just return current tree
+      const currentTree = await this.getTaskTree(trackingTree.id);
+      if (!currentTree) {
+        throw new Error('Task tree not found');
+      }
+      return currentTree;
+    }
+
+    const plan = trackingTree.createReconciliationPlan();
+    return this.reconcileTaskTree(plan, trackingTree);
   }
 }
