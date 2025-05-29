@@ -555,46 +555,6 @@ export const getEffectiveTaskDependenciesSchema = z.object({
   taskId: z.string(),
 });
 
-/**
- * Schema for getting hierarchical task dependencies via MCP.
- * Retrieves comprehensive dependency graph considering inheritance.
- * 
- * @constant
- * @type {z.ZodObject}
- * @example
- * ```typescript
- * const request = { taskId: "task_123" };
- * ```
- */
-export const getHierarchicalTaskDependenciesSchema = z.object({
-  /** Task ID to get hierarchical dependency information for */
-  taskId: z.string(),
-});
-
-/**
- * Schema for getting hierarchically available tasks via MCP.
- * Retrieves tasks that can be started considering hierarchical dependency inheritance.
- * 
- * @constant
- * @type {z.ZodObject}
- * @example
- * ```typescript
- * // Get all hierarchically available tasks
- * const all = {};
- * 
- * // Get available pending tasks with inheritance
- * const pending = { status: "pending" };
- * 
- * // Get available high priority tasks with inheritance
- * const highPriority = { priority: "high" };
- * ```
- */
-export const getHierarchicallyAvailableTasksSchema = z.object({
-  /** Optional status filter - only return available tasks with this status */
-  status: taskStatus.optional(),
-  /** Optional priority filter - only return available tasks with this priority */
-  priority: taskPriority.optional(),
-});
 
 /**
  * TypeScript types inferred from the dependency Zod schemas above.
@@ -629,9 +589,3 @@ export type GetTopologicalOrderInput = z.infer<typeof getTopologicalOrderSchema>
 
 /** Input type for getting effective task dependencies */
 export type GetEffectiveTaskDependenciesInput = z.infer<typeof getEffectiveTaskDependenciesSchema>;
-
-/** Input type for getting hierarchical task dependencies */
-export type GetHierarchicalTaskDependenciesInput = z.infer<typeof getHierarchicalTaskDependenciesSchema>;
-
-/** Input type for getting hierarchically available tasks */
-export type GetHierarchicallyAvailableTasksInput = z.infer<typeof getHierarchicallyAvailableTasksSchema>;

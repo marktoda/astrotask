@@ -122,18 +122,23 @@ export class DependencyHandlers {
 
   /**
    * Get tasks that can be started immediately (no incomplete dependencies)
+   * Uses hierarchical dependency inheritance automatically.
    */
   async getAvailableTasks(args: GetAvailableTasksInput): Promise<Task[]> {
-    const filter: { status?: any; priority?: string } = {};
+    const executableTasks = await this.context.dependencyService.getExecutableTasks();
+    
+    // Apply additional filters if provided
+    let filteredTasks = executableTasks;
     
     if (args.status) {
-      filter.status = args.status as any;
+      filteredTasks = filteredTasks.filter(task => task.status === args.status);
     }
+    
     if (args.priority) {
-      filter.priority = args.priority;
+      filteredTasks = filteredTasks.filter(task => task.priority === args.priority);
     }
-
-    return await this.context.taskService.getAvailableTasks(filter);
+    
+    return filteredTasks;
   }
 
   /**
@@ -265,39 +270,5 @@ export class DependencyHandlers {
       effectiveDependencies,
       inheritedFrom,
     };
-  }
-
-  /**
-   * Get hierarchical dependency graph for a task (includes inheritance)
-   */
-  async getHierarchicalTaskDependencies(args: GetTaskDependenciesInput): Promise<TaskDependencyGraph> {
-    return await this.context.dependencyService.getHierarchicalDependencyGraph(args.taskId);
-  }
-
-  /**
-   * Get tasks that are blocked considering hierarchical inheritance
-   */
-  async getHierarchicallyBlockedTasks(): Promise<TaskWithDependencies[]> {
-    return await this.context.dependencyService.getHierarchicallyBlockedTasks();
-  }
-
-  /**
-   * Get tasks that can be started immediately considering hierarchical inheritance
-   */
-  async getHierarchicallyAvailableTasks(args: GetAvailableTasksInput): Promise<Task[]> {
-    const executableTasks = await this.context.dependencyService.getExecutableTasks();
-    
-    // Apply additional filters if provided
-    let filteredTasks = executableTasks;
-    
-    if (args.status) {
-      filteredTasks = filteredTasks.filter(task => task.status === args.status);
-    }
-    
-    if (args.priority) {
-      filteredTasks = filteredTasks.filter(task => task.priority === args.priority);
-    }
-    
-    return filteredTasks;
   }
 } 
