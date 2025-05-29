@@ -107,6 +107,13 @@ async function main() {
     })
   );
 
+  server.tool('getNextTask',
+    {},
+    wrapMCPHandler(async () => {
+      return taskHandlers.getNextTask();
+    })
+  );
+
   // Register dependency management tools
   server.tool('addTaskDependency',
     addTaskDependencySchema.shape,
