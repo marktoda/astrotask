@@ -360,88 +360,71 @@ export class TaskService {
       return currentTree;
     }
 
-    return this.executeReconciliationOperations(plan);
+    return this.executeReconciliationOperations(plan).then((result) => result.tree);
   }
 
   /**
-   * Execute reconciliation operations with rollback support
+   * Execute reconciliation operations with rollback support and return ID mappings
+   * This method is used internally and by TrackingTaskTree to get ID mappings for dependency resolution
    */
-  private async executeReconciliationOperations(plan: ReconciliationPlan): Promise<TaskTree> {
+  async executeReconciliationOperations(plan: ReconciliationPlan): Promise<{
+    tree: TaskTree;
+    idMappings: Map<string, string>;
+  }> {
     const updatedTaskIds = new Set<string>();
     const createdTaskIds: string[] = [];
     const rollbackActions: (() => Promise<void>)[] = [];
     
     // ID mapping for temporary IDs to real database IDs
-    const idMapping = new Map<string, string>();
+    const idMappings = new Map<string, string>();
 
     try {
       // Process operations in order
       for (const operation of plan.operations) {
         switch (operation.type) {
-          case 'task_update': {
+          case 'task_update':
             await this.handleTaskUpdate(operation, updatedTaskIds, rollbackActions);
             break;
-          }
-
-          case 'child_add': {
-            await this.handleChildAdd(operation, createdTaskIds, rollbackActions, idMapping);
+          case 'child_add':
+            await this.handleChildAdd(operation, createdTaskIds, rollbackActions, idMappings);
             break;
-          }
-
-          case 'child_remove': {
+          case 'child_remove':
             await this.handleChildRemove(operation, rollbackActions);
             break;
-          }
-
-          default: {
-            const unknownOp = operation as { type: string };
-            throw new Error(`Unknown operation type: ${unknownOp.type}`);
-          }
         }
       }
 
-      return this.finalizeReconciliation(plan.treeId, updatedTaskIds, createdTaskIds);
-    } catch (error) {
-      await this.rollbackOperations(rollbackActions);
-      throw new Error(
-        `Failed to apply reconciliation plan: ${error instanceof Error ? error.message : String(error)}`
-      );
-    }
-  }
-
-  /**
-   * Finalize reconciliation by clearing cache and returning updated tree
-   */
-  private async finalizeReconciliation(
-    treeId: string,
-    updatedTaskIds: Set<string>,
-    createdTaskIds: string[]
-  ): Promise<TaskTree> {
-    // Get the updated tree
-    const finalTree = await this.getTaskTree(treeId);
-    if (!finalTree) {
-      throw new Error('Failed to retrieve updated tree after applying changes');
-    }
-
-    // Clear cache for affected tasks
-    if (updatedTaskIds.size > 0 || createdTaskIds.length > 0) {
+      // Clear cache to ensure fresh data when getting the updated tree
       this.clearCache();
-    }
 
-    return finalTree;
-  }
-
-  /**
-   * Attempt to rollback operations (best effort)
-   */
-  private async rollbackOperations(rollbackActions: (() => Promise<void>)[]): Promise<void> {
-    try {
-      for (const rollback of rollbackActions.reverse()) {
-        await rollback();
+      // Return the updated tree with all changes applied
+      const updatedTree = await this.getTaskTree(plan.treeId);
+      if (!updatedTree) {
+        throw new Error(`Tree not found after applying operations: ${plan.treeId}`);
       }
-      this.clearCache(); // Clear cache after rollback
-    } catch (rollbackError) {
-      console.error('Rollback failed:', rollbackError);
+
+      return { tree: updatedTree, idMappings };
+    } catch (error) {
+      // Rollback all changes on failure
+      console.error('Executing rollback due to reconciliation failure', {
+        error: error instanceof Error ? error.message : String(error),
+        operationsCount: plan.operations.length,
+      });
+
+      for (const rollback of rollbackActions.reverse()) {
+        try {
+          await rollback();
+        } catch (rollbackError) {
+          console.error('Rollback operation failed', {
+            error: rollbackError instanceof Error ? rollbackError.message : String(rollbackError),
+          });
+        }
+      }
+
+      throw new Error(`Failed to apply reconciliation plan: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      // Clear cache again to ensure no stale data persists after the operation
+      this.clearCache();
     }
   }
 

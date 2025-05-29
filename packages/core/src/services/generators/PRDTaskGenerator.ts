@@ -116,14 +116,14 @@ export class PRDTaskGenerator implements TaskGenerator {
       // Generate the task tree first
       const trackingTree = await this.generateTaskTree(input);
 
-      // Create a tracking dependency graph
+      // Create tracking dependency graph with any pending dependencies
       let trackingGraph = TrackingDependencyGraph.empty('generated-dependencies');
 
-      // If we have pending dependencies, convert them to dependency operations
+      // If we have pending dependencies, add them to the tracking graph
       if (this.pendingDependencies) {
         const { dependencies, childTaskIds } = this.pendingDependencies;
 
-        this.logger.info('Converting pending dependencies to tracking graph', {
+        this.logger.info('Adding dependencies to tracking graph', {
           dependenciesCount: dependencies.length,
           childTasksCount: childTaskIds.length,
         });
@@ -145,6 +145,9 @@ export class PRDTaskGenerator implements TaskGenerator {
             }
           }
         }
+        
+        // Clear pending dependencies since they're now in the tracking graph
+        this.pendingDependencies = null;
       }
 
       this.logger.info('Generation completed successfully', {
@@ -469,173 +472,6 @@ export class PRDTaskGenerator implements TaskGenerator {
     });
 
     return trackingTree;
-  }
-
-  /**
-   * Process pending dependencies after task creation
-   * This should be called after the reconciliation plan has been applied
-   */
-  public async processPendingDependencies(persistedTaskIds: string[]): Promise<void> {
-    if (!this.pendingDependencies) {
-      this.logger.info('No pending dependencies to process');
-      return;
-    }
-
-    const { dependencies, childTaskIds } = this.pendingDependencies;
-
-    this.logger.info('Processing pending dependencies', {
-      dependenciesCount: dependencies.length,
-      childTasksCount: childTaskIds.length,
-      originalChildTaskIds: childTaskIds,
-      persistedTaskIds: persistedTaskIds,
-    });
-
-    // Create a mapping from original child task IDs to persisted task IDs
-    const taskIdMapping = this.createTaskIdMapping(childTaskIds, persistedTaskIds);
-
-    this.logger.info('Task ID mapping created', {
-      mappingSize: taskIdMapping.size,
-      mapping: Object.fromEntries(taskIdMapping),
-    });
-
-    // Process each dependency
-    await this.processDependencies(dependencies, childTaskIds, taskIdMapping);
-
-    // Clear pending dependencies after processing
-    this.pendingDependencies = null;
-
-    this.logger.info('Finished processing pending dependencies');
-  }
-
-  /**
-   * Create mapping from original child task IDs to persisted task IDs
-   */
-  private createTaskIdMapping(
-    childTaskIds: string[],
-    persistedTaskIds: string[]
-  ): Map<string, string> {
-    const taskIdMapping = new Map<string, string>();
-    const maxIndex = Math.min(childTaskIds.length, persistedTaskIds.length);
-
-    for (let i = 0; i < maxIndex; i++) {
-      const persistedId = persistedTaskIds[i];
-      const originalId = childTaskIds[i];
-
-      if (persistedId && originalId) {
-        taskIdMapping.set(originalId, persistedId);
-      }
-    }
-
-    return taskIdMapping;
-  }
-
-  /**
-   * Process all dependencies with proper validation
-   */
-  private async processDependencies(
-    dependencies: Array<{
-      dependentTaskIndex: number;
-      dependencyTaskIndex: number;
-      reason?: string | undefined;
-    }>,
-    childTaskIds: string[],
-    taskIdMapping: Map<string, string>
-  ): Promise<void> {
-    for (const dep of dependencies) {
-      try {
-        await this.processSingleDependency(dep, childTaskIds, taskIdMapping);
-      } catch (error) {
-        this.logger.error('Failed to create dependency', {
-          dependency: dep,
-          error: error instanceof Error ? error.message : String(error),
-        });
-        // Continue processing other dependencies even if one fails
-      }
-    }
-  }
-
-  /**
-   * Process a single dependency with validation
-   */
-  private async processSingleDependency(
-    dep: { dependentTaskIndex: number; dependencyTaskIndex: number; reason?: string | undefined },
-    childTaskIds: string[],
-    taskIdMapping: Map<string, string>
-  ): Promise<void> {
-    this.logger.debug('Processing single dependency', {
-      dependency: dep,
-      childTasksCount: childTaskIds.length,
-    });
-
-    // Validate indices are within bounds
-    if (!this.areIndicesValid(dep, childTaskIds.length)) {
-      this.logger.warn('Invalid dependency indices', {
-        dependency: dep,
-        childTasksCount: childTaskIds.length,
-      });
-      return;
-    }
-
-    // Get the actual task IDs from the mapping
-    const dependentOriginalId = childTaskIds[dep.dependentTaskIndex];
-    const dependencyOriginalId = childTaskIds[dep.dependencyTaskIndex];
-
-    this.logger.debug('Retrieved original task IDs', {
-      dependentIndex: dep.dependentTaskIndex,
-      dependencyIndex: dep.dependencyTaskIndex,
-      dependentOriginalId,
-      dependencyOriginalId,
-    });
-
-    if (!dependentOriginalId || !dependencyOriginalId) {
-      this.logger.warn('Invalid dependency task IDs', {
-        dependentIndex: dep.dependentTaskIndex,
-        dependencyIndex: dep.dependencyTaskIndex,
-        dependentOriginalId,
-        dependencyOriginalId,
-      });
-      return;
-    }
-
-    const dependentTaskId = taskIdMapping.get(dependentOriginalId);
-    const dependencyTaskId = taskIdMapping.get(dependencyOriginalId);
-
-    this.logger.debug('Mapped to persisted task IDs', {
-      dependentOriginalId,
-      dependencyOriginalId,
-      dependentTaskId,
-      dependencyTaskId,
-    });
-
-    if (!dependentTaskId || !dependencyTaskId) {
-      this.logger.warn('Could not map task IDs for dependency', {
-        dependentOriginalId,
-        dependencyOriginalId,
-        dependentTaskId,
-        dependencyTaskId,
-      });
-      return;
-    }
-
-    try {
-      // Create the dependency using TaskService method
-      await this.taskService.addTaskDependency(dependentTaskId, dependencyTaskId);
-
-      this.logger.debug('Created dependency successfully', {
-        dependentTaskId,
-        dependencyTaskId,
-        reason: dep.reason,
-      });
-    } catch (error) {
-      this.logger.error('Failed to create dependency - detailed error', {
-        dependentTaskId,
-        dependencyTaskId,
-        reason: dep.reason,
-        error: error instanceof Error ? error.message : String(error),
-        errorStack: error instanceof Error ? error.stack : undefined,
-      });
-      throw error;
-    }
   }
 
   /**

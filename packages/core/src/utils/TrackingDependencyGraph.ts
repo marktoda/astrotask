@@ -367,6 +367,37 @@ export class TrackingDependencyGraph extends DependencyGraph {
       }
     );
   }
+
+  /**
+   * Apply ID mappings to resolve temporary IDs in dependency operations
+   * This allows dependencies created with temporary IDs to be resolved to real database IDs
+   * before flushing to the dependency service.
+   */
+  applyIdMappings(idMappings: Map<string, string>): TrackingDependencyGraph {
+    if (this._pendingOperations.length === 0) {
+      return this; // No operations to map
+    }
+
+    const mappedOperations: DependencyPendingOperation[] = this._pendingOperations.map(op => {
+      const resolvedDependentId = idMappings.get(op.dependentTaskId) || op.dependentTaskId;
+      const resolvedDependencyId = idMappings.get(op.dependencyTaskId) || op.dependencyTaskId;
+
+      return {
+        ...op,
+        dependentTaskId: resolvedDependentId,
+        dependencyTaskId: resolvedDependencyId,
+      };
+    });
+
+    // Create a new tracking graph with mapped operations
+    const mappedGraph = new TrackingDependencyGraph(this.toPlainObject(), {
+      isTracking: this._isTracking,
+      baseVersion: this._baseVersion,
+      pendingOperations: mappedOperations,
+      graphId: this._graphId,
+    });
+    return mappedGraph;
+  }
 }
 
 /**

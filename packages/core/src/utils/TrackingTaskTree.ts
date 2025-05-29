@@ -1,7 +1,6 @@
 import { z } from 'zod';
 import type { Task } from '../schemas/task.js';
 import { TaskTree, type TaskTreeData, type ITaskTree } from './TaskTree.js';
-import type { TaskService } from '../services/TaskService.js';
 
 /**
  * Pending operations that can be applied to a TaskTree
@@ -44,6 +43,7 @@ export interface ReconciliationPlan {
 export interface FlushResult {
   updatedTree: TaskTree;
   clearedTrackingTree: TrackingTaskTree;
+  idMappings: Map<string, string>;
 }
 
 /**
@@ -293,16 +293,30 @@ export class TrackingTaskTree implements ITaskTree {
   }
 
   /**
-   * Flush all operations from the entire tree
+   * Flush all operations from the entire tree and return both the updated tree and ID mappings
    */
-  async flush(taskService: TaskService): Promise<FlushResult> {
+  async flush(taskService: {
+    executeReconciliationOperations(plan: ReconciliationPlan): Promise<{
+      tree: TaskTree;
+      idMappings: Map<string, string>;
+    }>;
+  }): Promise<{
+    updatedTree: TaskTree;
+    clearedTrackingTree: TrackingTaskTree;
+    idMappings: Map<string, string>;
+  }> {
     // Collect operations from all nodes
     const allOperations = this.collectAllOperations();
     
     if (allOperations.length === 0) {
       return {
-        updatedTree: await taskService.getTaskTree() || this.toTaskTree(),
-        clearedTrackingTree: this
+        updatedTree: await taskService.executeReconciliationOperations({
+          treeId: this.id,
+          baseVersion: this._baseVersion,
+          operations: [],
+        }).then(result => result.tree),
+        clearedTrackingTree: this,
+        idMappings: new Map<string, string>(),
       };
     }
     
@@ -314,8 +328,8 @@ export class TrackingTaskTree implements ITaskTree {
     };
     
     try {
-      // Apply all operations at once
-      const updatedTree = await taskService.applyReconciliationPlan(reconciliationPlan);
+      // Use the method that returns ID mappings
+      const result = await taskService.executeReconciliationOperations(reconciliationPlan);
       
       // Clear all operations from all nodes
       this.clearAllOperations();
@@ -324,8 +338,9 @@ export class TrackingTaskTree implements ITaskTree {
       this._baseVersion += allOperations.length;
       
       return {
-        updatedTree,
-        clearedTrackingTree: this
+        updatedTree: result.tree,
+        clearedTrackingTree: this,
+        idMappings: result.idMappings,
       };
     } catch (error) {
       // Don't clear operations on failure - preserve for retry
