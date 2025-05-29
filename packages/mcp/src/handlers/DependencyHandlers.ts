@@ -271,7 +271,7 @@ export class DependencyHandlers {
    * Get hierarchical dependency graph for a task (includes inheritance)
    */
   async getHierarchicalTaskDependencies(args: GetTaskDependenciesInput): Promise<TaskDependencyGraph> {
-    return await this.context.dependencyService.getDependencyGraph(args.taskId);
+    return await this.context.dependencyService.getHierarchicalDependencyGraph(args.taskId);
   }
 
   /**
@@ -285,7 +285,7 @@ export class DependencyHandlers {
    * Get tasks that can be started immediately considering hierarchical inheritance
    */
   async getHierarchicallyAvailableTasks(args: GetAvailableTasksInput): Promise<Task[]> {
-    const executableTasks = await this.context.dependencyService.getHierarchicallyExecutableTasks();
+    const executableTasks = await this.context.dependencyService.getExecutableTasks();
     
     // Apply additional filters if provided
     let filteredTasks = executableTasks;

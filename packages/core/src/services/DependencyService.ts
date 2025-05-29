@@ -348,13 +348,25 @@ export class DependencyService {
   }
 
   /**
-   * Get comprehensive dependency graph information for a task considering hierarchical inheritance.
-   * This includes both direct dependencies and inherited dependencies from parent tasks.
+   * Get comprehensive dependency graph information for a task.
+   * Uses the original graph-based approach for direct dependencies only.
    *
    * @param taskId - ID of the task to get graph information for
    * @returns Promise resolving to dependency graph information
    */
   async getDependencyGraph(taskId: string): Promise<TaskDependencyGraph> {
+    const graph = await this.createDependencyGraph();
+    return graph.getTaskDependencyGraph(taskId);
+  }
+
+  /**
+   * Get comprehensive dependency graph information for a task considering hierarchical inheritance.
+   * This includes both direct dependencies and inherited dependencies from parent tasks.
+   *
+   * @param taskId - ID of the task to get hierarchical graph information for
+   * @returns Promise resolving to hierarchical dependency graph information
+   */
+  async getHierarchicalDependencyGraph(taskId: string): Promise<TaskDependencyGraph> {
     const effectiveDependencies = await this.getEffectiveDependencies(taskId);
     const dependents = await this.getDependents(taskId);
     const blockedBy: string[] = [];
@@ -377,33 +389,12 @@ export class DependencyService {
   }
 
   /**
-   * Get tasks that can be started immediately (no incomplete dependencies).
-   * Uses the original graph-based approach for direct dependencies only.
+   * Get tasks that can be started immediately considering hierarchical dependency inheritance.
+   * This method considers both direct dependencies and inherited dependencies from parent tasks.
    *
    * @returns Promise resolving to array of executable tasks
    */
   async getExecutableTasks(): Promise<Task[]> {
-    const graph = await this.createDependencyGraph();
-    const executableTaskIds = graph.getExecutableTasks();
-
-    const executableTasks: Task[] = [];
-    for (const taskId of executableTaskIds) {
-      const task = await this.store.getTask(taskId);
-      if (task) {
-        executableTasks.push(task);
-      }
-    }
-
-    return executableTasks;
-  }
-
-  /**
-   * Get tasks that can be started immediately considering hierarchical dependency inheritance.
-   * This method considers both direct dependencies and inherited dependencies from parent tasks.
-   *
-   * @returns Promise resolving to array of hierarchically executable tasks
-   */
-  async getHierarchicallyExecutableTasks(): Promise<Task[]> {
     const allTasks = await this.store.listTasks();
     const executableTasks: Task[] = [];
 
