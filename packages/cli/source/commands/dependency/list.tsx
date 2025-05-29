@@ -189,4 +189,4 @@ export default function Dependencies({ options }: Props) {
 			)}
 		</Box>
 	);
-}
+} 

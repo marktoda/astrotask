@@ -165,10 +165,10 @@ export default function ValidateDependencies({ options }: Props) {
 
 			<Box marginTop={1}>
 				<Text color="gray">
-					💡 Tip: Use <Text color="cyan">astrolabe task remove-dependency</Text>{" "}
+					💡 Tip: Use <Text color="cyan">astrolabe dependency remove</Text>{" "}
 					to break cycles
 				</Text>
 			</Box>
 		</Box>
 	);
-}
+} 
