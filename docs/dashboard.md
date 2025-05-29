@@ -1,39 +1,38 @@
-# Astrolabe Terminal UI – Comprehensive Design Document
+# Astrolabe Terminal UI – Comprehensive Design Document
 
-**Version**: 0.2 | **Date**: 2025‑05‑28 | **Author**: ChatGPT (revised to use Ink + Pastel)
+**Version**: 0.1  |  **Date**: 2025‑05‑28  |  **Author**: ChatGPT (draft – awaiting team review)
 
 ---
 
-## 1 Purpose & Scope
+## 1  Purpose & Scope
 
-Astrolabe is a **local‑first** task‑management tool for AI‑augmented teams. This document specifies the architecture and user‑experience of the **terminal UI (TUI)** built with **Ink (React for CLIs) and Pastel**. The TUI must enable engineers (and agents) to:
+Astrolabe is a _local‑first_ task‑management tool for AI‑augmented teams. This document specifies the architecture and user‑experience of the **terminal UI (TUI)** built with **TypeScript + blessed**. The TUI must enable engineers (and agents) to:
 
 - browse open projects and their nested subtasks
 - view real‑time percent‑complete at every node of the task tree
 - add or delete tasks at any depth
-- define or remove cross‑task **dependencies** ("blocked‑by" edges)
+- define or remove cross‑task _dependencies_ (“blocked‑by” edges)
 - operate entirely offline, with eventual sync handled elsewhere
 
 Non‑goals: full graphical Gantt charts, Kanban, or mobile UX; those may be addressed in later milestones.
 
 ---
 
-## 2 Tech Stack
+## 2  Tech Stack
 
-| Layer         | Choice                                     | Rationale                                                     |
-| ------------- | ------------------------------------------ | ------------------------------------------------------------- |
-| Runtime       | Node ≥ 20                                  | ES2022 features; good Ink support                             |
-| Language      | TypeScript (strict)                        | Type‑safety across UI & domain logic                          |
-| CLI Framework | **Pastel**                                 | Minimal boilerplate for command bootstrap, routing, packaging |
-| TUI render    | **Ink** (+ ink‑gradient, ink‑select‑input) | React mental‑model; declarative; fast diff renderer           |
-| Styling       | chalk & ink‑gradient                       | Readable colour abstractions                                  |
-| State         | **Zustand** (React store)                  | Lightweight, hooks‑friendly                                   |
-| Persistence   | ElectricSQL client → PGlite / SQLite       | Local‑first, CRDT‑backed sync                                 |
-| Tests         | Vitest + **ink‑testing‑library**           | Snapshot, hook testing                                        |
+| Layer            | Choice                                 | Rationale                                     |
+| ---------------- | -------------------------------------- | --------------------------------------------- |
+| Runtime          | Node ≥ 20                              | ES2022 features & prompt blessed support      |
+| Language         | TypeScript (strict)                    | Type‑safety across UI & domain logic          |
+| TUI lib          | **blessed** + @types/blessed           | Mature, composable widgets, good key handling |
+| Rendering extras | blessed‑contrib (sparklines), chalk    | Lightweight visuals                           |
+| State            | **Zustand** or custom Redux‑lite store | Reactive updates without Magick               |
+| Persistence      | ElectricSQL client → PGlite / SQLite   | Local‑first, CRDT‑backed sync                 |
+| Tests            | Vitest + blessing (mock terminal)      | Fast, footgun‑free                            |
 
 ---
 
-## 3 Domain Model ⇄ UI Mapping
+## 3  Domain Model ⇄ UI Mapping
 
 ```ts
 interface Task {
@@ -47,196 +46,210 @@ interface Task {
 }
 ```
 
-- **Task Tree** ⇒ vertical outline (main pane) rendered via recursive Ink component.
-- **Dependency Graph** ⇒ on‑demand overlay component (ascii‑dag + chalk colours).
-- **Percent Complete** for a node = `(doneLeaves / totalLeaves) × 100`, leaves exclude cancelled.
+- **Task Tree** ⇒ vertical outline view (main pane). Root level = project.
+- **Dependency Graph** (DAG) ⇒ on‑demand overlay / detail pane.
+- **Percent Complete** for a node = `(doneLeaves / totalLeaves) × 100` where leaves exclude cancelled.
 
-Store keeps two indices:
+The store keeps two indices:
 
-- `childrenByParent: Map<id, id[]>`
-- `depsByTask: Map<id, id[]>`
+- `childrenByParent: Map<id, id[]>`
+- `depsByTask: Map<id, id[]>`
+
+These support O(1) lookup for rendering.
 
 ---
 
-## 4 UI Layout (Concept)
+## 4  UI Layout
 
 ```
-┌──────────── Project List ─────────────┐
-│ ▸ Project Alpha (75 %)               │
-│   Project Beta (20 %)                │
-└───────────────────────────────────────┘
-┌───────────── Task Tree ───────────────┐
-│ • [ ] Build CLI parser                │
-│   • [x] Choose Ink lib                │
-│   • [ ] Draft keybindings             │
-│ • [ ] Write unit tests                │
-└───────────────────────────────────────┘
-┌──────── Detail / Dependency ──────────┐
-│ Task: Draft keybindings               │
-│ Status: in‑progress                   │
-│ Blocked by: #123 Write spec           │
-└───────────────────────────────────────┘
+┌──────────────── Project Sidebar ───────────────┐┐
+│ ▸ Project Alpha (75%)                         ││
+│   Project Beta (20%)                          ││
+│                                                ││
+└───────────────────────────────────────────────┘│
+│┌───────────── Task Tree ─────────────────────┐ │
+││ • [ ] Build CLI parser                      │ │
+││   • [x] Choose blessed lib                  │ │
+││   • [ ] Draft keybindings                   │ │
+││ • [ ] Write unit tests                      │ │
+│└──────────────────────────────────────────────┘ │
+│┌────────── Details / Dependency Pane ────────┐ │
+││ Task: Draft keybindings                     │ │
+││ Status: in‑progress                         │ │
+││ Blocked by: #123 Write spec                 │ │
+││ Due: —                                      │ │
+│└──────────────────────────────────────────────┘ │
+└──────────────────── Status Bar ────────────────┘
 ```
 
-Ink uses Flex‑box‑like sizing; we compose with `<Box flexDirection="column">` wrappers.
+- **Sidebar** – collapsible project list (⇧⇩ to select, ↵ to focus).
+- **Task Tree Pane** – hierarchical view with check‑boxes; left/right arrow to fold/unfold; _g_/_G_ top/bottom.
+- **Detail Pane** – toggled with _d_. Shows description, deps, metadata.
+- **Status Bar** – mode indicator, hints, last message.
+- **Command Palette** – modal overlay opened with `:` (vim‑style) for power commands.
 
 ---
 
-## 5 Keybindings (Default)
+## 5  Keybindings (Default)
 
-| Key   | Action                         |
-| ----- | ------------------------------ |
-| ↑ / k | Move cursor up                 |
-| ↓ / j | Move cursor down               |
-| ← / h | Collapse node                  |
-| → / l | Expand node                    |
-| ⏎     | Toggle checkbox / mark done    |
-| a     | **Add sibling** task below     |
-| A     | **Add child** task             |
-| D     | Delete selected task (confirm) |
-| %     | Recalculate progress (auto)    |
-| b     | Add dependency (prompt)        |
-| B     | Remove dependency              |
-| :     | Open command palette           |
-| ?     | Help overlay                   |
-| q     | Quit (double‑tap safety)       |
+| Key   | Action                                 |
+| ----- | -------------------------------------- |
+| ↑ / k | Move cursor up                         |
+| ↓ / j | Move cursor down                       |
+| ← / h | Collapse node                          |
+| → / l | Expand node                            |
+| ⏎     | Toggle checkbox / mark done            |
+| a     | _Add_ sibling task below               |
+| A     | Add _child_ task                       |
+| D     | Delete selected task (confirm)         |
+| %     | Recalculate progress (auto on tick)    |
+| b     | Add dependency (prompts for target id) |
+| B     | Remove dependency                      |
+| :     | Open command palette                   |
+| ?     | Show help overlay                      |
+| q     | Quit (double‑tap safety)               |
 
-Ink captures raw keystrokes via `useInput`.
-
----
-
-## 6 Command Palette Grammar
-
-Powered by Pastel’s command routing but exposed inside Ink modal. Examples:
-
-- `add "Build auth" under 42`
-- `delete 108`
-- `dep 108 -> 42`
-- `move 55 to 42`
-
-Parser built with `commander` or `zod‑cli`.
+All keys are configurable via a JSON config (\~/.config/astrolabe/keys.json).
 
 ---
 
-## 7 Progress Calculation & Streaming Updates
+## 6  Command Palette Grammar
 
-1. Store maintains set of parents dirty when a leaf status changes.
-2. Debounced worker recalculates subtree percentages (post‑order DFS).
-3. React state slice triggers Ink diff‑render; only affected nodes update.
-4. ElectricSQL sync layer pushes merges; store hydrates; UI re‑renders.
+Example commands (autocompletion via fuzzy):
 
----
+- `add "Build auth" under 42` – inserts child under id 42.
+- `delete 108` – removes task.
+- `dep 108 -> 42` – declare dependency.
+- `move 55 to 42` – re‑parent.
+- `import linear.csv` – bulk import (future).
 
-## 8 Dependency Visualisation
-
-1. **Inline Icons** – glyph (⏳) next to tasks that are blocked; tooltip via Ink Tooltip.
-2. **Overlay Graph** – press `v` → component renders ascii‑dag with chalk colours; arrows show edges; blocked path in red.
-
-Edge operations via keyboard or palette commands.
+Internally parsed via `commander` + custom DSL.
 
 ---
 
-## 9 Architecture & Modules
+## 7  Progress Calculation & Streaming Updates
+
+1. Store maintains dirty set of parents when a leaf status changes.
+2. Debounced worker recalculates subtree completion % using post‑order DFS.
+3. UI listens to `progressUpdated` events and re‑renders minimal diff – blessed performs diff rendering natively.
+4. Sync writes (CRDT merges) fire separate events; UI reconciles via same store.
+
+---
+
+## 8  Dependency Visualization
+
+Two modes:
+
+1. **Inline Icons** – a glyph (⎋) next to tasks that are blocked; tooltip lists blockers.
+2. **Overlay Graph** – press _v_ to open a zoomed graph (rendered with ascii‑dag or blessed‑contrib graph). Arrows show edges, colouring blocked paths in red.
+
+Edge operations:
+
+- _b_ prompts for task id (or fuzzy search) then adds edge.
+- Selecting a blocker in graph view jumps cursor to that task.
+
+---
+
+## 9  Architecture & Modules
 
 ```
 src/
-  cli.ts            // Pastel entrypoint – registers default command
-  app.tsx           // <App/> root component (Ink)
+  index.ts         // CLI bootstrap
   ui/
+    layout.ts      // bless layout factory
     components/
-      ProjectList.tsx
-      TaskTree.tsx
-      DetailPane.tsx
-      StatusBar.tsx
-      CommandPalette.tsx
+      projectList.ts
+      taskTree.ts
+      detailPane.ts
+      statusBar.ts
+      commandPalette.ts
   store/
-    index.ts        // Zustand store + selectors
+    index.ts       // Zustand store + selectors
     calcProgress.ts
   domain/
-    models.ts       // Task interfaces
-    repo.ts         // ElectricSQL CRUD adapter
+    models.ts      // Task interfaces
+    repo.ts        // ElectricSQL CRUD adapter
   services/
-    sync.ts         // offline ↔ cloud replication
-    keymap.ts       // load & dispatch keymaps
+    sync.ts        // offline ↔ cloud replication
+    keymap.ts      // load & dispatch keymaps
   tests/
 ```
 
-Pastel’s `run()` auto‑parses CLI flags then calls Ink’s `render(<App />)`.
+_Decoupling principle_: UI components **never** make DB calls – they dispatch actions to the store. The repo triggers `hydrate` on app start and merges updates from the sync layer.
 
 ---
 
-## 10 Performance Notes
+## 10  Performance Notes
 
-- Ink’s reconciler is efficient but very deep trees (>10 k nodes) still need virtualisation – render only visible slice based on scroll offset.
-- Use `fast‑diff` for ascii‑dag updates to avoid realloc.
-- Batch CRDT merge events – throttle to 30 FPS for smooth UI.
-
----
-
-## 11 Error Handling UX
-
-| Scenario             | UX Response                                  |
-| -------------------- | -------------------------------------------- |
-| DB write fails       | Status bar flashes red; hint to retry (_r_)  |
-| Duplicate dependency | Inline warning; keep focus                   |
-| Invalid command      | Palette shows error message, preserves input |
-| Unsaved exit         | Prompt if pending local ops > 0              |
-
-Errors propagate as discriminated union `AppError`; `<ErrorBoundary>` component maps variant → chalk styling.
+- Blessed diff‑renders but large trees (>10 k tasks) can choke. Virtualise by rendering only visible slice.
+- Use `nanobus` event emitter (200 B) for low‑overhead events.
+- Batch CRDT merges – throttle to 30 FPS for smooth UI.
 
 ---
 
-## 12 Testing Strategy
+## 11  Error Handling UX
+
+| Scenario             | UX Response                                           |
+| -------------------- | ----------------------------------------------------- |
+| DB write fails       | Status bar flashes red with reason; offer retry (_r_) |
+| Duplicate dependency | Modal warning; keep both sides intact                 |
+| Invalid command      | Palette highlights error & keeps input                |
+| Unsaved exits        | Prompt if pending local ops (> 0)                     |
+
+Errors bubble via `AppError` discriminated unions; renderer maps variant → message + severity.
+
+---
+
+## 12  Testing Strategy
 
 - **Unit** – store reducers, progress calc, command parser.
-- **Integration** – render components with `ink‑testing‑library`; assert snapshot.
-- **E2E** – spawn child process via `execa`, pipe pseudo‑tty keystrokes, diff stdout.
+- **Integration** – simulate key streams with `blessed.testing` harness; assert screen snapshots (ansi‑diff).
+- **E2E** – spawn child process, feed pseudo‑tty keystrokes, diff stdout against golden snapshots.
 
-CI runs on Node 20 & 22.
-
----
-
-## 13 Extensibility & Future Work
-
-| Idea                   | Notes                                                         |
-| ---------------------- | ------------------------------------------------------------- |
-| Plugin API             | Expose React context hooks: `useTaskAdded`, `registerOverlay` |
-| Theming                | Ink‑gradient + Pastel flag `--theme dark`                     |
-| Notifications          | Desktop (node‑notifier) when blockers clear                   |
-| Git‑style patch export | `astrolabe format‑patch` for reviews                          |
+CI runs on Node 20 & 22 to catch regressions.
 
 ---
 
-## 14 Milestones & Timeline (Indicative)
+## 13  Extensibility & Future Work
+
+| Idea                   | Notes                                         |
+| ---------------------- | --------------------------------------------- |
+| Plugin API             | Publish hooks: `onTaskAdded`, `renderOverlay` |
+| Theming                | Support solarized/dark via chalk theme tokens |
+| Notifications          | Desktop popup when blocker unblocks           |
+| Git‑style patch export | `astrolabe format‑patch` for reviews          |
+
+---
+
+## 14  Milestones & Timeline (Indicative)
 
 | Week | Deliverable                                |
 | ---- | ------------------------------------------ |
-| 1    | Spike Ink layout, tree rendering           |
+| 1    | Spike blessed layout, prove tree rendering |
 | 2    | Store + CRUD wired to ElectricSQL local db |
 | 3    | Progress calc + status bar                 |
 | 4    | Dependency commands & overlay              |
-| 5    | Command palette via Pastel routing         |
+| 5    | Command palette, configurable keys         |
 | 6    | Beta release, dog‑food inside team         |
 
 ---
 
-## 15 Open Questions
+## 15  Open Questions
 
 1. How should task ordering be stored? (manual index vs timestamp sort)
 2. Do we require encrypted local db? (agent privacy)
 3. Should dependency edges allow cycles with warning or hard‑prevent?
-4. Accessibility: does Ink need screen‑reader accommodations? (Ink currently passes through raw output – may not be screen‑reader friendly.)
+4. Accessibility: is screen‑reader support a requirement?
 
 ---
 
-## 16 Glossary
+## 16  Glossary
 
-- **Task Tree** – hierarchical representation of work items.
-- **Dependency Graph** – DAG indicating blocking relationships.
-- **TUI** – Terminal User Interface built with Ink.
-- **Pastel** – Minimal CLI framework for Node.
+- **Task Tree** – hierarchical representation of work items.
+- **Dependency Graph** – DAG indicating blocking relationships.
+- **TUI** – Terminal User Interface.
 - **CRDT** – Conflict‑free Replicated Data Type.
 
 ---
 
-> *“Good software, like wine, takes time.”* — Joel Spolsky
+> _“Simplicity is prerequisite for reliability.”_ ― Edsger Dijkstra
