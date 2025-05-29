@@ -2,6 +2,49 @@ import { z } from 'zod';
 import type { Task, TaskStatus } from '../schemas/task.js';
 
 /**
+ * Common interface for all TaskTree implementations
+ * This ensures both immutable (TaskTree) and mutable (TrackingTaskTree) versions
+ * maintain the same public API
+ */
+export interface ITaskTree {
+  // Core properties
+  readonly task: Task;
+  readonly id: string;
+  readonly title: string;
+  readonly status: TaskStatus;
+  
+  // Navigation methods
+  getParent(): ITaskTree | null;
+  getChildren(): readonly ITaskTree[];
+  getSiblings(): ITaskTree[];
+  getRoot(): ITaskTree;
+  
+  // Traversal methods
+  walkDepthFirst(visitor: (node: ITaskTree) => void | false): void;
+  walkBreadthFirst(visitor: (node: ITaskTree) => void): void;
+  find(predicate: (task: Task) => boolean): ITaskTree | null;
+  filter(predicate: (task: Task) => boolean): ITaskTree[];
+  
+  // Query methods
+  getPath(): ITaskTree[];
+  getDepth(): number;
+  getDescendantCount(): number;
+  getAllDescendants(): ITaskTree[];
+  isAncestorOf(other: ITaskTree): boolean;
+  isDescendantOf(other: ITaskTree): boolean;
+  isSiblingOf(other: ITaskTree): boolean;
+  
+  // Transformation methods
+  withTask(updates: Partial<Task>): ITaskTree;
+  addChild(child: ITaskTree): ITaskTree;
+  removeChild(childId: string): ITaskTree;
+  
+  // Serialization methods
+  toPlainObject(): TaskTreeData;
+  toTaskTree?(): TaskTree; // Optional - for TrackingTaskTree to convert to immutable
+}
+
+/**
  * TaskTree Schema - Recursive task structure with children
  */
 export const taskTreeSchema: z.ZodType<TaskTreeData> = z.lazy(() =>
@@ -36,7 +79,7 @@ export type TaskTreeData = {
  * - Performance: Lazy loading and caching where possible
  * - Backward compatible: Works with existing TaskService interface
  */
-export class TaskTree {
+export class TaskTree implements ITaskTree {
   private readonly _task: Task;
   private readonly _children: TaskTree[];
   private readonly _parent: TaskTree | null;
@@ -96,7 +139,7 @@ export class TaskTree {
    * This traversal order is useful for operations that need to process
    * parent nodes before their children (e.g., validation, aggregation).
    *
-   * @param visitor - Function called for each node during traversal
+   * @param visitor - Function called for each node during traversal. Return false to stop traversal.
    *
    * @complexity O(n) where n = total number of nodes in subtree
    * @space O(h) where h = height of tree (due to recursion stack)
@@ -107,8 +150,10 @@ export class TaskTree {
    *
    * @algorithm Pre-order DFS: Node → Left subtrees → Right subtrees
    */
-  walkDepthFirst(visitor: (node: TaskTree) => void): void {
-    visitor(this);
+  walkDepthFirst(visitor: (node: TaskTree) => void | false): void {
+    const shouldContinue = visitor(this);
+    if (shouldContinue === false) return;
+    
     for (const child of this._children) {
       child.walkDepthFirst(visitor);
     }
@@ -185,7 +230,11 @@ export class TaskTree {
 
   getDescendantCount(): number {
     let count = 0;
-    this.walkDepthFirst(() => count++);
+    this.walkDepthFirst(() => {
+      count++;
+      // Explicitly return undefined to satisfy the visitor signature
+      return undefined;
+    });
     return count - 1; // Exclude self
   }
 

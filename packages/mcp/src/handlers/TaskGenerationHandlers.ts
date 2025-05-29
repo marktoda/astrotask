@@ -59,7 +59,7 @@ export class TaskGenerationHandlers implements MCPHandler {
       status: tree.task.status,
       priority: tree.task.priority,
       childCount: tree.getChildren().length,
-      children: tree.getChildren().map(child => this.taskTreeToNode(child)),
+      children: tree.getChildren().map(child => this.trackingTreeToNode(child)),
       parentId: tree.getParent()?.id ?? null,
     };
   }
@@ -94,11 +94,11 @@ export class TaskGenerationHandlers implements MCPHandler {
 
         if (params.persist) {
           // Apply both the task tree and dependency graph directly
-          const { updatedTree } = await result.tree.apply(this.context.taskService);
+          const { updatedTree } = await result.tree.flush(this.context.taskService);
           
           // Apply dependency graph if it has operations
           if (result.graph.hasPendingChanges) {
-            await result.graph.apply(this.context.dependencyService);
+            await result.graph.flush(this.context.dependencyService);
           }
           
           // Return persisted tree with real IDs
@@ -156,11 +156,11 @@ export class TaskGenerationHandlers implements MCPHandler {
         });
 
         // Apply the task tree reconciliation plan
-        const { updatedTree } = await result.tree.apply(this.context.taskService);
+        const { updatedTree } = await result.tree.flush(this.context.taskService);
 
         // Apply dependency graph if it has operations
         if (result.graph.hasPendingChanges) {
-          await result.graph.apply(this.context.dependencyService);
+          await result.graph.flush(this.context.dependencyService);
         }
 
         // Get all tasks from the updated tree (root + children)

@@ -185,9 +185,9 @@ export default function Generate({ options }: Props) {
 
 				// Preview mode - don't save to database
 				if (options.dry) {
-					// For dry run, just extract tasks from the tracking tree without applying it
-					const plan = result.tree.createReconciliationPlan();
-					const previewTasks = plan.operations
+					// For dry run, extract tasks from pending operations without applying them
+					const pendingOps = result.tree.pendingOperations;
+					const previewTasks = pendingOps
 						.filter((op: any) => op.type === "child_add")
 						.map((op: any) => {
 							const childData = op.childData as any;
@@ -209,14 +209,14 @@ export default function Generate({ options }: Props) {
 					return;
 				}
 
-				// Apply both the task tree and dependency graph
+				// Apply both the task tree and dependency graph using flush
 				const taskService = new TaskService(db);
-				const { updatedTree } = await result.tree.apply(taskService);
+				const { updatedTree } = await result.tree.flush(taskService);
 
 				// Apply dependency graph if it has operations
 				if (result.graph.hasPendingChanges) {
 					const dependencyService = new DependencyService(db);
-					await result.graph.apply(dependencyService);
+					await result.graph.flush(dependencyService);
 				}
 
 				// Get all tasks from the updated tree (root + children)

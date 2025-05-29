@@ -9,6 +9,9 @@ export interface DashboardState {
   selectedTaskId: string | null;
   expandedTaskIds: Set<string>;
   
+  // Version counter for triggering React re-renders after mutations
+  treeVersion: number;
+  
   // UI state
   activePanel: "sidebar" | "tree" | "details";
   commandPaletteOpen: boolean;
@@ -44,11 +47,14 @@ export interface DashboardActions {
   expandAll: () => void;
   collapseAll: () => void;
   
-  // Task CRUD - immediate tracking tree updates
+  // Task CRUD - immediate tracking tree updates with mutable operations
   addTask: (parentId: string | null, title: string) => void;
   updateTaskStatus: (taskId: string, status: Task["status"]) => void;
   updateTask: (taskId: string, updates: Partial<Task>) => void;
   deleteTask: (taskId: string) => void;
+  
+  // Helper to trigger re-renders after mutations
+  triggerTreeUpdate: () => void;
   
   // Persistence control
   flushChanges: () => Promise<void>;
@@ -77,8 +83,8 @@ export interface DashboardActions {
   // Dependency queries (using TrackingDependencyGraph)
   getTaskDependencies: (taskId: string) => string[];
   getTaskDependents: (taskId: string) => string[];
-  isTaskBlocked: (taskId: string) => boolean;
   getBlockingTasks: (taskId: string) => string[];
+  isTaskBlocked: (taskId: string) => boolean;
   
   // Progress calculation
   calculateProgress: (taskId: string) => number;
@@ -107,6 +113,7 @@ export function createDashboardStore(db: DatabaseStore) {
     trackingDependencyGraph: null,
     selectedTaskId: null,
     expandedTaskIds: new Set(),
+    treeVersion: 0,
     activePanel: "tree",
     commandPaletteOpen: false,
     helpOverlayOpen: false,
@@ -118,6 +125,11 @@ export function createDashboardStore(db: DatabaseStore) {
     hasUnsavedChanges: false,
     lastFlushTime: 0,
     autoFlushEnabled: false,
+    
+    // Helper to trigger re-renders after mutations
+    triggerTreeUpdate: () => {
+      set({ treeVersion: get().treeVersion + 1 });
+    },
     
     // Task actions
     loadTasks: async () => {
@@ -133,7 +145,8 @@ export function createDashboardStore(db: DatabaseStore) {
             trackingDependencyGraph: null,
             projects: [],
             statusMessage: "No tasks found",
-            hasUnsavedChanges: false
+            hasUnsavedChanges: false,
+            treeVersion: get().treeVersion + 1
           });
           return;
         }
@@ -159,7 +172,7 @@ export function createDashboardStore(db: DatabaseStore) {
           projects,
           statusMessage: "Tasks loaded successfully",
           hasUnsavedChanges: false,
-          lastFlushTime: Date.now()
+          treeVersion: get().treeVersion + 1
         });
         
         // Calculate progress
@@ -205,10 +218,9 @@ export function createDashboardStore(db: DatabaseStore) {
       set({ expandedTaskIds: new Set() });
     },
     
-    // Task CRUD - simplified approach to avoid complex tree rebuilding
+    // Task CRUD - now using mutable operations
     addTask: (parentId, title) => {
-      const state = get();
-      const { trackingTree } = state;
+      const { trackingTree } = get();
       
       if (!trackingTree) {
         set({ statusMessage: "No task tree loaded" });
@@ -218,8 +230,8 @@ export function createDashboardStore(db: DatabaseStore) {
       try {
         // Create new task
         const newTask: Task = {
-          id: `temp-${Date.now()}`, // Temporary ID
-          parentId: parentId,
+          id: `temp-${Date.now()}`, // Temporary ID - will be replaced on flush
+          parentId,
           title,
           description: null,
           status: "pending",
@@ -230,28 +242,28 @@ export function createDashboardStore(db: DatabaseStore) {
           updatedAt: new Date(),
         };
         
-        let updatedTree: TrackingTaskTree;
-        
         if (parentId) {
-          // For nested additions, we need to find the parent and add the child
-          // But this requires rebuilding the tree structure which creates many operations
-          // For now, let's just add to root and set parentId correctly
-          // The tree structure will be corrected on next reload
-          const childTree = TrackingTaskTree.fromTask({ ...newTask, parentId: null });
-          updatedTree = trackingTree.addChild(childTree) as TrackingTaskTree;
+          // Find parent and add child - mutable operation
+          const parentNode = trackingTree.find(task => task.id === parentId);
+          if (parentNode) {
+            const childTree = TrackingTaskTree.fromTask(newTask);
+            parentNode.addChild(childTree); // Mutation recorded automatically
+          } else {
+            set({ statusMessage: `Parent task ${parentId} not found` });
+            return;
+          }
         } else {
-          // Add as root child - this is simple
+          // Add as root child - mutable operation
           const childTree = TrackingTaskTree.fromTask(newTask);
-          updatedTree = trackingTree.addChild(childTree) as TrackingTaskTree;
+          trackingTree.addChild(childTree); // Mutation recorded automatically
         }
         
-        set({
-          trackingTree: updatedTree,
-          statusMessage: `Added task: ${title}`
-        });
-        
+        // Trigger UI update
+        get().triggerTreeUpdate();
         get().updateUnsavedChangesFlag();
         get().recalculateAllProgress();
+        
+        set({ statusMessage: `Added task: ${title}` });
         
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
@@ -264,57 +276,7 @@ export function createDashboardStore(db: DatabaseStore) {
     },
     
     updateTask: (taskId, updates) => {
-      const state = get();
-      const { trackingTree } = state;
-      
-      if (!trackingTree) {
-        set({ statusMessage: "No task tree loaded" });
-        return;
-      }
-      
-      try {
-        // Find the task anywhere in the tree using the built-in find method
-        const taskNode = trackingTree.find(task => task.id === taskId);
-        if (!taskNode) {
-          set({ statusMessage: `Task ${taskId} not found` });
-          return;
-        }
-        
-        if (trackingTree.task.id === taskId) {
-          // Root task update - this works perfectly
-          const updatedTree = trackingTree.withTask(updates) as TrackingTaskTree;
-          set({
-            trackingTree: updatedTree,
-            statusMessage: `Updated task`
-          });
-          
-          get().updateUnsavedChangesFlag();
-          get().recalculateAllProgress();
-        } else {
-          // Nested task updates: The TrackingTaskTree architecture makes this complex
-          // For now, we'll flush pending changes and reload after the update is persisted
-          set({ statusMessage: `Nested task updates require database persistence. Flushing...` });
-          
-          // For immediate feedback, let's manually update the task and mark as having changes
-          // This creates a pending operation that will be persisted on flush
-          
-          // Note: The tree structure update is complex, so we'll rely on the next flush/reload cycle
-          // This ensures data consistency while avoiding complex tree reconstruction
-          set({ 
-            statusMessage: `Nested task updated. Changes will persist on next auto-save.`,
-            hasUnsavedChanges: true 
-          });
-        }
-        
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        set({ statusMessage: `Error updating task: ${errorMessage}` });
-      }
-    },
-    
-    deleteTask: (taskId) => {
-      const state = get();
-      const { trackingTree } = state;
+      const { trackingTree } = get();
       
       if (!trackingTree) {
         set({ statusMessage: "No task tree loaded" });
@@ -329,21 +291,52 @@ export function createDashboardStore(db: DatabaseStore) {
           return;
         }
         
-        // For now, only support deleting direct children to avoid complex tree rebuilding
-        const hasDirectChild = trackingTree.getChildren().some(child => child.task.id === taskId);
+        // Simple mutation - operation recorded automatically
+        taskNode.withTask(updates);
         
-        if (hasDirectChild) {
-          const updatedTree = trackingTree.removeChild(taskId) as TrackingTaskTree;
-          set({
-            trackingTree: updatedTree,
-            statusMessage: "Task deleted"
-          });
-          
-          get().updateUnsavedChangesFlag();
-          get().recalculateAllProgress();
-        } else {
-          set({ statusMessage: `Task found but can only delete direct children for now. Task is nested deeper.` });
+        // Trigger UI update
+        get().triggerTreeUpdate();
+        get().updateUnsavedChangesFlag();
+        get().recalculateAllProgress();
+        
+        set({ statusMessage: `Updated task ${taskId}` });
+        
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        set({ statusMessage: `Error updating task: ${errorMessage}` });
+      }
+    },
+    
+    deleteTask: (taskId) => {
+      const { trackingTree } = get();
+      
+      if (!trackingTree) {
+        set({ statusMessage: "No task tree loaded" });
+        return;
+      }
+      
+      try {
+        // Find the task anywhere in the tree
+        const taskNode = trackingTree.find(task => task.id === taskId);
+        if (!taskNode) {
+          set({ statusMessage: `Task ${taskId} not found` });
+          return;
         }
+        
+        const parent = taskNode.getParent();
+        if (parent) {
+          parent.removeChild(taskId); // Mutation recorded automatically
+        } else if (trackingTree.id === taskId) {
+          // Deleting root - handle specially
+          set({ statusMessage: "Cannot delete root task" });
+          return;
+        }
+        
+        // Trigger UI update
+        get().triggerTreeUpdate();
+        get().updateUnsavedChangesFlag();
+        
+        set({ statusMessage: "Task deleted" });
         
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
@@ -351,20 +344,11 @@ export function createDashboardStore(db: DatabaseStore) {
       }
     },
     
-    // Persistence control
+    // Persistence control - now works for ALL pending operations
     flushChanges: async () => {
-      const state = get();
-      const { trackingTree, trackingDependencyGraph } = state;
+      const { trackingTree, trackingDependencyGraph } = get();
       
-      if (!trackingTree && !trackingDependencyGraph) {
-        set({ statusMessage: "No data to save" });
-        return;
-      }
-      
-      const hasTreeChanges = trackingTree?.hasPendingChanges || false;
-      const hasDependencyChanges = trackingDependencyGraph?.hasPendingChanges || false;
-      
-      if (!hasTreeChanges && !hasDependencyChanges) {
+      if (!trackingTree?.hasPendingChanges && !trackingDependencyGraph?.hasPendingChanges) {
         set({ statusMessage: "No changes to save" });
         return;
       }
@@ -372,32 +356,28 @@ export function createDashboardStore(db: DatabaseStore) {
       try {
         set({ statusMessage: "Saving changes..." });
         
-        let newTrackingTree = trackingTree;
-        let newTrackingDependencyGraph = trackingDependencyGraph;
-        
         // Apply tree changes first
-        if (trackingTree && hasTreeChanges) {
-          const treeResult = await trackingTree.flush(taskService);
-          newTrackingTree = treeResult.clearedTrackingTree;
+        if (trackingTree && trackingTree.hasPendingChanges) {
+          const result = await trackingTree.flush(taskService);
+          set({ trackingTree: result.clearedTrackingTree });
         }
         
         // Apply dependency changes
-        if (trackingDependencyGraph && hasDependencyChanges) {
-          const dependencyResult = await trackingDependencyGraph.flush(dependencyService);
-          newTrackingDependencyGraph = dependencyResult.clearedTrackingGraph;
+        if (trackingDependencyGraph && trackingDependencyGraph.hasPendingChanges) {
+          const result = await trackingDependencyGraph.flush(dependencyService);
+          set({ trackingDependencyGraph: result.clearedTrackingGraph });
         }
         
         set({
-          trackingTree: newTrackingTree,
-          trackingDependencyGraph: newTrackingDependencyGraph,
+          statusMessage: "Changes saved successfully",
           hasUnsavedChanges: false,
           lastFlushTime: Date.now(),
-          statusMessage: "Changes saved successfully"
+          treeVersion: get().treeVersion + 1
         });
         
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
-        set({ statusMessage: `Error saving changes: ${errorMessage}` });
+        set({ statusMessage: `Error saving: ${errorMessage}` });
       }
     },
     
@@ -425,8 +405,7 @@ export function createDashboardStore(db: DatabaseStore) {
     
     // Dependency actions - using TrackingDependencyGraph operations
     addDependency: (taskId, dependsOnId) => {
-      const state = get();
-      const { trackingDependencyGraph } = state;
+      const { trackingDependencyGraph } = get();
       
       if (!trackingDependencyGraph) {
         set({ statusMessage: "No dependency graph loaded" });
@@ -434,7 +413,7 @@ export function createDashboardStore(db: DatabaseStore) {
       }
       
       try {
-        // Use TrackingDependencyGraph's immutable withDependency operation
+        // TrackingDependencyGraph uses immutable operations, so we need to update the store
         const updatedGraph = trackingDependencyGraph.withDependency(taskId, dependsOnId);
         
         set({
@@ -451,8 +430,7 @@ export function createDashboardStore(db: DatabaseStore) {
     },
     
     removeDependency: (taskId, dependsOnId) => {
-      const state = get();
-      const { trackingDependencyGraph } = state;
+      const { trackingDependencyGraph } = get();
       
       if (!trackingDependencyGraph) {
         set({ statusMessage: "No dependency graph loaded" });
@@ -460,7 +438,7 @@ export function createDashboardStore(db: DatabaseStore) {
       }
       
       try {
-        // Use TrackingDependencyGraph's immutable withoutDependency operation
+        // TrackingDependencyGraph uses immutable operations, so we need to update the store
         const updatedGraph = trackingDependencyGraph.withoutDependency(taskId, dependsOnId);
         
         set({
@@ -506,7 +484,8 @@ export function createDashboardStore(db: DatabaseStore) {
     getTaskTree: (taskId: string) => {
       const trackingTree = get().trackingTree;
       if (!trackingTree) return null;
-      return trackingTree.find(task => task.id === taskId);
+      const node = trackingTree.find(task => task.id === taskId);
+      return node ? node.toTaskTree() : null;
     },
     
     getAllTasks: () => {
@@ -522,7 +501,7 @@ export function createDashboardStore(db: DatabaseStore) {
     getProjects: () => {
       const trackingTree = get().trackingTree;
       if (!trackingTree) return [];
-      return [...trackingTree.getChildren()];
+      return trackingTree.getChildren().map(child => child.toTaskTree());
     },
     
     // Dependency queries (using TrackingDependencyGraph)
@@ -538,22 +517,21 @@ export function createDashboardStore(db: DatabaseStore) {
       return trackingDependencyGraph.getDependents(taskId);
     },
     
-    isTaskBlocked: (taskId: string) => {
-      const trackingDependencyGraph = get().trackingDependencyGraph;
-      if (!trackingDependencyGraph) return false;
-      return trackingDependencyGraph.getTaskDependencyGraph(taskId).isBlocked;
-    },
-    
     getBlockingTasks: (taskId: string) => {
       const trackingDependencyGraph = get().trackingDependencyGraph;
       if (!trackingDependencyGraph) return [];
       return trackingDependencyGraph.getTaskDependencyGraph(taskId).blockedBy;
     },
     
+    isTaskBlocked: (taskId: string) => {
+      const trackingDependencyGraph = get().trackingDependencyGraph;
+      if (!trackingDependencyGraph) return false;
+      return trackingDependencyGraph.getTaskDependencyGraph(taskId).isBlocked;
+    },
+    
     // Progress calculation (using TrackingTaskTree structure)
     calculateProgress: (taskId: string) => {
-      const state = get();
-      const trackingTree = state.trackingTree;
+      const trackingTree = get().trackingTree;
       if (!trackingTree) return 0;
       
       const taskNode = trackingTree.find(task => task.id === taskId);
@@ -571,7 +549,7 @@ export function createDashboardStore(db: DatabaseStore) {
       
       for (const child of children) {
         if (child.task.status !== "cancelled" && child.task.status !== "archived") {
-          totalProgress += state.calculateProgress(child.task.id);
+          totalProgress += get().calculateProgress(child.task.id);
           validChildren++;
         }
       }
@@ -580,19 +558,18 @@ export function createDashboardStore(db: DatabaseStore) {
     },
     
     recalculateAllProgress: () => {
-      const state = get();
-      const trackingTree = state.trackingTree;
+      const trackingTree = get().trackingTree;
       if (!trackingTree) return;
       
       const progressByTaskId = new Map<string, number>();
       
       // Calculate progress for all tasks using TrackingTaskTree traversal
       trackingTree.walkDepthFirst((node) => {
-        progressByTaskId.set(node.task.id, state.calculateProgress(node.task.id));
+        progressByTaskId.set(node.task.id, get().calculateProgress(node.task.id));
       });
       
       // Update project progress
-      const projects = state.projects.map((project) => ({
+      const projects = get().projects.map((project) => ({
         ...project,
         progress: progressByTaskId.get(project.rootTaskId) || 0
       }));
@@ -605,42 +582,27 @@ export function createDashboardStore(db: DatabaseStore) {
       try {
         set({ statusMessage: "Reloading from database..." });
         
-        // Flush any pending changes first
-        const state = get();
-        const hasChanges = (state.trackingTree?.hasPendingChanges || false) || 
-                          (state.trackingDependencyGraph?.hasPendingChanges || false);
-        
-        if (hasChanges) {
+        // First flush any pending changes
+        if (get().hasUnsavedChanges) {
           await get().flushChanges();
         }
         
-        // Now reload fresh data
+        // Then reload fresh data
         await get().loadTasks();
         
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
-        set({ statusMessage: `Error reloading from database: ${errorMessage}` });
+        set({ statusMessage: `Error reloading: ${errorMessage}` });
       }
     },
     
     // Helper methods
     updateUnsavedChangesFlag: () => {
-      const state = get();
-      const { trackingTree, trackingDependencyGraph } = state;
-      
-      if (!trackingTree && !trackingDependencyGraph) {
-        set({ hasUnsavedChanges: false });
-        return;
-      }
-      
-      const hasTreeChanges = trackingTree?.hasPendingChanges || false;
-      const hasDependencyChanges = trackingDependencyGraph?.hasPendingChanges || false;
-      
-      if (hasTreeChanges || hasDependencyChanges) {
-        set({ hasUnsavedChanges: true });
-      } else {
-        set({ hasUnsavedChanges: false });
-      }
+      const { trackingTree, trackingDependencyGraph } = get();
+      const hasUnsavedChanges = Boolean(
+        trackingTree?.hasPendingChanges || trackingDependencyGraph?.hasPendingChanges
+      );
+      set({ hasUnsavedChanges });
     }
   }));
 

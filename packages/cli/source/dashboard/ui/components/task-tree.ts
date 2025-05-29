@@ -1,4 +1,4 @@
-import type { Task, TaskTree } from "@astrolabe/core";
+import type { Task, TaskTree, TrackingTaskTree } from "@astrolabe/core";
 import blessed from "blessed";
 import type { StoreApi } from "zustand";
 import type { DashboardStore } from "../../store/index.js";
@@ -346,7 +346,7 @@ export class TaskTreeComponent {
 
 		const items: TaskTreeItem[] = [];
 
-		const addTreeNode = (node: TaskTree, depth: number) => {
+		const addTreeNode = (node: TaskTree | TrackingTaskTree, depth: number) => {
 			const hasChildren = node.getChildren().length > 0;
 			const isExpanded = expandedTaskIds.has(node.task.id);
 

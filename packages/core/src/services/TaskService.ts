@@ -370,6 +370,9 @@ export class TaskService {
     const updatedTaskIds = new Set<string>();
     const createdTaskIds: string[] = [];
     const rollbackActions: (() => Promise<void>)[] = [];
+    
+    // ID mapping for temporary IDs to real database IDs
+    const idMapping = new Map<string, string>();
 
     try {
       // Process operations in order
@@ -381,7 +384,7 @@ export class TaskService {
           }
 
           case 'child_add': {
-            await this.handleChildAdd(operation, createdTaskIds, rollbackActions);
+            await this.handleChildAdd(operation, createdTaskIds, rollbackActions, idMapping);
             break;
           }
 
@@ -486,7 +489,8 @@ export class TaskService {
   private async handleChildAdd(
     operation: { parentId?: string; childData?: unknown },
     createdTaskIds: string[],
-    rollbackActions: (() => Promise<void>)[]
+    rollbackActions: (() => Promise<void>)[],
+    idMapping: Map<string, string>
   ): Promise<void> {
     if (!operation.parentId) {
       throw new Error('child_add operation missing parentId');
@@ -496,8 +500,12 @@ export class TaskService {
     }
 
     const childData = operation.childData as TaskTreeData;
+    
+    // Resolve parent ID - check if it's a temporary ID that needs mapping
+    const resolvedParentId = idMapping.get(operation.parentId) || operation.parentId;
+    
     const createTask: CreateTask = {
-      parentId: operation.parentId,
+      parentId: resolvedParentId,
       title: childData.task.title,
       description: childData.task.description || undefined,
       status: childData.task.status,
@@ -508,6 +516,11 @@ export class TaskService {
 
     const createdTask = await this.store.addTask(createTask);
     createdTaskIds.push(createdTask.id);
+    
+    // Map the temporary ID to the real database ID
+    if (childData.task.id && childData.task.id !== createdTask.id) {
+      idMapping.set(childData.task.id, createdTask.id);
+    }
 
     // Add rollback action
     rollbackActions.push(async () => {
@@ -516,7 +529,7 @@ export class TaskService {
 
     // Recursively create children if they exist
     if (childData.children && childData.children.length > 0) {
-      await this.createChildrenRecursively(childData.children, createdTask.id, rollbackActions);
+      await this.createChildrenRecursively(childData.children, createdTask.id, rollbackActions, idMapping);
     }
   }
 
@@ -548,7 +561,8 @@ export class TaskService {
   private async createChildrenRecursively(
     childrenData: TaskTreeData[],
     parentId: string,
-    rollbackActions?: (() => Promise<void>)[]
+    rollbackActions?: (() => Promise<void>)[],
+    idMapping?: Map<string, string>
   ): Promise<void> {
     for (const childData of childrenData) {
       const createTask: CreateTask = {
@@ -562,6 +576,11 @@ export class TaskService {
       };
 
       const createdChild = await this.store.addTask(createTask);
+      
+      // Map the temporary ID to the real database ID if idMapping is provided
+      if (idMapping && childData.task.id && childData.task.id !== createdChild.id) {
+        idMapping.set(childData.task.id, createdChild.id);
+      }
 
       // Add rollback action if provided
       if (rollbackActions) {
@@ -572,7 +591,7 @@ export class TaskService {
 
       // Recursively create grandchildren
       if (childData.children && childData.children.length > 0) {
-        await this.createChildrenRecursively(childData.children, createdChild.id, rollbackActions);
+        await this.createChildrenRecursively(childData.children, createdChild.id, rollbackActions, idMapping);
       }
     }
   }

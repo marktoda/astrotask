@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { Task } from '../schemas/task.js';
-import { TaskTree, type TaskTreeData } from './TaskTree.js';
+import { TaskTree, type TaskTreeData, type ITaskTree } from './TaskTree.js';
+import type { TaskService } from '../services/TaskService.js';
 
 /**
  * Pending operations that can be applied to a TaskTree
@@ -38,328 +39,534 @@ export interface ReconciliationPlan {
 }
 
 /**
- * TrackingTaskTree extends TaskTree to capture all mutations for later reconciliation.
- *
- * Key features:
- * - Same interface as TaskTree (transparent drop-in replacement)
- * - Captures all mutations as pending operations
- * - Supports optimistic updates with rollback capability
- * - Enables batch reconciliation to store
- * - Maintains operation ordering for conflict resolution
+ * Result of flushing operations to the task service
  */
-export class TrackingTaskTree extends TaskTree {
-  private readonly _pendingOperations: PendingOperation[] = [];
-  private readonly _isTracking: boolean;
-  private readonly _baseVersion: number;
+export interface FlushResult {
+  updatedTree: TaskTree;
+  clearedTrackingTree: TrackingTaskTree;
+}
+
+/**
+ * Mutable TrackingTaskTree that records operations in place for later reconciliation.
+ * 
+ * Key features:
+ * - Mutable operations that update the tree in place
+ * - Automatic operation recording for all mutations
+ * - Tree-wide operation collection and flushing
+ * - Optimistic updates with conflict resolution
+ * - Compatible interface with TaskTree via ITaskTree
+ */
+export class TrackingTaskTree implements ITaskTree {
+  private _pendingOperations: PendingOperation[] = [];
+  private _baseVersion: number = 0;
+  private _children: TrackingTaskTree[] = [];
+  private readonly _parent: TrackingTaskTree | null = null;
+  private _task: Task;
 
   constructor(
     data: TaskTreeData,
     parent: TrackingTaskTree | null = null,
     options: {
-      isTracking?: boolean;
       baseVersion?: number;
-      pendingOperations?: PendingOperation[];
     } = {}
   ) {
-    super(data, parent);
-
-    this._isTracking = options.isTracking ?? true;
+    this._parent = parent;
     this._baseVersion = options.baseVersion ?? 0;
-    this._pendingOperations = [...(options.pendingOperations ?? [])];
+    this._task = { ...data.task }; // Make a copy for mutation
+    
+    // Convert children to TrackingTaskTree instances
+    this._children = data.children.map((childData) => 
+      new TrackingTaskTree(childData, this, options)
+    );
   }
 
-  // Getters for tracking state
-  get isTracking(): boolean {
-    return this._isTracking;
+  // Core getters (compatible with TaskTree)
+  get task(): Task {
+    return this._task;
   }
 
+  get id(): string {
+    return this._task.id;
+  }
+
+  get title(): string {
+    return this._task.title;
+  }
+
+  get status(): Task['status'] {
+    return this._task.status;
+  }
+
+  // Navigation methods (compatible with TaskTree)
+  getParent(): TrackingTaskTree | null {
+    return this._parent;
+  }
+
+  getChildren(): TrackingTaskTree[] {
+    return this._children;
+  }
+
+  getSiblings(): TrackingTaskTree[] {
+    if (!this._parent) return [];
+    return this._parent.getChildren().filter((child) => child.id !== this.id);
+  }
+
+  getRoot(): TrackingTaskTree {
+    let current: TrackingTaskTree = this;
+    while (current._parent) {
+      current = current._parent;
+    }
+    return current;
+  }
+
+  // Traversal methods (compatible with TaskTree)
+  walkDepthFirst(visitor: (node: TrackingTaskTree) => void | false): void {
+    const shouldContinue = visitor(this);
+    if (shouldContinue === false) return;
+    
+    for (const child of this._children) {
+      child.walkDepthFirst(visitor);
+    }
+  }
+
+  walkBreadthFirst(visitor: (node: TrackingTaskTree) => void): void {
+    const queue: TrackingTaskTree[] = [this];
+
+    while (queue.length > 0) {
+      const current = queue.shift();
+      if (!current) break;
+      visitor(current);
+      queue.push(...current._children);
+    }
+  }
+
+  find(predicate: (task: Task) => boolean): TrackingTaskTree | null {
+    if (predicate(this._task)) return this;
+
+    for (const child of this._children) {
+      const found = child.find(predicate);
+      if (found) return found;
+    }
+
+    return null;
+  }
+
+  filter(predicate: (task: Task) => boolean): TrackingTaskTree[] {
+    const results: TrackingTaskTree[] = [];
+
+    this.walkDepthFirst((node) => {
+      if (predicate(node._task)) {
+        results.push(node);
+      }
+    });
+
+    return results;
+  }
+
+  // Query methods (compatible with TaskTree)
+  getPath(): TrackingTaskTree[] {
+    const path: TrackingTaskTree[] = [];
+    let current: TrackingTaskTree | null = this;
+
+    while (current) {
+      path.unshift(current);
+      current = current._parent;
+    }
+
+    return path;
+  }
+
+  getDepth(): number {
+    return this.getPath().length - 1;
+  }
+
+  getDescendantCount(): number {
+    let count = 0;
+    this.walkDepthFirst(() => {
+      count++;
+    });
+    return count - 1; // Exclude self
+  }
+
+  getAllDescendants(): TrackingTaskTree[] {
+    const descendants: TrackingTaskTree[] = [];
+    this.walkDepthFirst((node) => {
+      if (node !== this) {
+        descendants.push(node);
+      }
+    });
+    return descendants;
+  }
+
+  isAncestorOf(other: TrackingTaskTree): boolean {
+    return other.getPath().some((ancestor) => ancestor.id === this.id);
+  }
+
+  isDescendantOf(other: TrackingTaskTree): boolean {
+    return other.isAncestorOf(this);
+  }
+
+  isSiblingOf(other: TrackingTaskTree): boolean {
+    return this._parent?.id === other._parent?.id && this.id !== other.id;
+  }
+
+  /**
+   * Update this task in place and record the operation
+   */
+  withTask(updates: Partial<Task>): this {
+    const operation: PendingOperation = {
+      type: 'task_update',
+      taskId: this.id,
+      updates: updates as Record<string, unknown>,
+      timestamp: new Date(),
+    };
+    
+    // Add operation to this node
+    this._pendingOperations.push(operation);
+    
+    // Update task data in place
+    Object.assign(this._task, updates);
+    
+    return this;
+  }
+
+  /**
+   * Add child in place and record the operation
+   */
+  addChild(child: TaskTree | TrackingTaskTree): this {
+    const trackingChild = child instanceof TrackingTaskTree 
+      ? child 
+      : TrackingTaskTree.fromTaskTree(child);
+      
+    const operation: PendingOperation = {
+      type: 'child_add',
+      parentId: this.id,
+      childData: trackingChild.toPlainObject(),
+      timestamp: new Date(),
+    };
+    
+    this._pendingOperations.push(operation);
+    
+    // Add child to actual tree structure
+    this._children.push(trackingChild);
+    
+    return this;
+  }
+
+  /**
+   * Remove child in place and record the operation
+   */
+  removeChild(childId: string): this {
+    const operation: PendingOperation = {
+      type: 'child_remove',
+      parentId: this.id,
+      childId,
+      timestamp: new Date(),
+    };
+    
+    this._pendingOperations.push(operation);
+    
+    // Remove from actual tree structure
+    this._children = this._children.filter(child => child.id !== childId);
+    
+    return this;
+  }
+
+  /**
+   * Check if any node in the tree has pending changes
+   */
+  get hasPendingChanges(): boolean {
+    let hasChanges = this._pendingOperations.length > 0;
+    
+    if (!hasChanges) {
+      this.walkDepthFirst(node => {
+        if (node._pendingOperations?.length > 0) {
+          hasChanges = true;
+          return false; // Stop traversal
+        }
+        // Explicitly return undefined (continue traversal)
+        return undefined;
+      });
+    }
+    
+    return hasChanges;
+  }
+
+  /**
+   * Flush all operations from the entire tree
+   */
+  async flush(taskService: TaskService): Promise<FlushResult> {
+    // Collect operations from all nodes
+    const allOperations = this.collectAllOperations();
+    
+    if (allOperations.length === 0) {
+      return {
+        updatedTree: await taskService.getTaskTree() || this.toTaskTree(),
+        clearedTrackingTree: this
+      };
+    }
+    
+    // Create reconciliation plan from all operations
+    const reconciliationPlan: ReconciliationPlan = {
+      treeId: this.id,
+      baseVersion: this._baseVersion,
+      operations: this.consolidateOperations(allOperations),
+    };
+    
+    try {
+      // Apply all operations at once
+      const updatedTree = await taskService.applyReconciliationPlan(reconciliationPlan);
+      
+      // Clear all operations from all nodes
+      this.clearAllOperations();
+      
+      // Update base version
+      this._baseVersion += allOperations.length;
+      
+      return {
+        updatedTree,
+        clearedTrackingTree: this
+      };
+    } catch (error) {
+      // Don't clear operations on failure - preserve for retry
+      throw new Error(`Failed to flush operations: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  /**
+   * Collect operations from all nodes in the tree
+   */
+  private collectAllOperations(): PendingOperation[] {
+    const operations: PendingOperation[] = [];
+    
+    this.walkDepthFirst(node => {
+      if (node._pendingOperations) {
+        operations.push(...node._pendingOperations);
+      }
+    });
+    
+    // Sort by timestamp to maintain operation order
+    return operations.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+  }
+
+  /**
+   * Clear operations from all nodes in the tree
+   */
+  private clearAllOperations(): void {
+    this.walkDepthFirst(node => {
+      if (node._pendingOperations) {
+        node._pendingOperations.length = 0; // Clear in place
+      }
+    });
+  }
+
+  /**
+   * Consolidate operations (e.g., merge multiple updates to same task)
+   * and ensure proper ordering for database constraints
+   */
+  private consolidateOperations(operations: PendingOperation[]): PendingOperation[] {
+    const taskUpdates = new Map<string, PendingOperation>();
+    const childAddOperations: PendingOperation[] = [];
+    const childRemoveOperations: PendingOperation[] = [];
+    
+    for (const op of operations) {
+      if (op.type === 'task_update') {
+        // Keep only the latest update for each task
+        const existing = taskUpdates.get(op.taskId);
+        if (!existing || op.timestamp >= existing.timestamp) {
+          // Merge updates if there's an existing one
+          if (existing && existing.type === 'task_update') {
+            const mergedOp: PendingOperation = {
+              ...op,
+              updates: { ...existing.updates, ...op.updates }
+            };
+            taskUpdates.set(op.taskId, mergedOp);
+          } else {
+            taskUpdates.set(op.taskId, op);
+          }
+        }
+      } else if (op.type === 'child_add') {
+        childAddOperations.push(op);
+      } else if (op.type === 'child_remove') {
+        childRemoveOperations.push(op);
+      }
+    }
+    
+    // Sort child_add operations by depth to ensure parents are created before children
+    const sortedChildAdds = this.sortChildAddOperationsByDepth(childAddOperations);
+    
+    // Sort child_remove operations by reverse depth to ensure children are removed before parents
+    const sortedChildRemoves = childRemoveOperations.sort((a, b) => {
+      const depthA = this.getOperationDepth(a);
+      const depthB = this.getOperationDepth(b);
+      return depthB - depthA; // Reverse order: deeper children first
+    });
+    
+    // Final order: task updates first, then child additions (parents before children), then child removals (children before parents)
+    return [
+      ...Array.from(taskUpdates.values()).sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime()),
+      ...sortedChildAdds,
+      ...sortedChildRemoves
+    ];
+  }
+
+  /**
+   * Sort child_add operations by depth to ensure parent tasks are created before child tasks
+   */
+  private sortChildAddOperationsByDepth(operations: PendingOperation[]): PendingOperation[] {
+    return operations.sort((a, b) => {
+      const depthA = this.getOperationDepth(a);
+      const depthB = this.getOperationDepth(b);
+      
+      if (depthA !== depthB) {
+        return depthA - depthB; // Shallower (parents) first
+      }
+      
+      // Same depth, sort by timestamp
+      return a.timestamp.getTime() - b.timestamp.getTime();
+    });
+  }
+
+  /**
+   * Get the depth of an operation by finding the corresponding node in the tree
+   */
+  private getOperationDepth(operation: PendingOperation): number {
+    if (operation.type === 'child_add') {
+      // Find the parent node to determine depth
+      const parentNode = this.getRoot().find(task => task.id === operation.parentId);
+      return parentNode ? parentNode.getDepth() + 1 : 0;
+    } else if (operation.type === 'child_remove' || operation.type === 'task_update') {
+      // Find the target node to determine depth
+      const targetId = operation.type === 'child_remove' ? operation.childId : operation.taskId;
+      const targetNode = this.getRoot().find(task => task.id === targetId);
+      return targetNode ? targetNode.getDepth() : 0;
+    }
+    return 0;
+  }
+
+  /**
+   * Convert to plain TaskTreeData for serialization
+   */
+  toPlainObject(): TaskTreeData {
+    return {
+      task: this._task,
+      children: this._children.map((child) => child.toPlainObject()),
+    };
+  }
+
+  /**
+   * Convert to regular TaskTree
+   */
+  toTaskTree(): TaskTree {
+    return new TaskTree(this.toPlainObject(), null);
+  }
+
+  /**
+   * Factory method to create TrackingTaskTree from regular TaskTree
+   */
+  static fromTaskTree(tree: TaskTree): TrackingTaskTree {
+    return new TrackingTaskTree(tree.toPlainObject());
+  }
+
+  /**
+   * Factory method to create TrackingTaskTree from Task
+   */
+  static fromTask(task: Task, children: TrackingTaskTree[] = []): TrackingTaskTree {
+    const data: TaskTreeData = {
+      task,
+      children: children.map((child) => child.toPlainObject()),
+    };
+    return new TrackingTaskTree(data);
+  }
+
+  /**
+   * Access to pending operations (read-only)
+   */
   get pendingOperations(): readonly PendingOperation[] {
     return this._pendingOperations;
   }
 
-  get hasPendingChanges(): boolean {
-    return this._pendingOperations.length > 0;
-  }
-
+  /**
+   * Access to base version (for serialization)
+   */
   get baseVersion(): number {
     return this._baseVersion;
   }
 
-  // Override core mutation methods to capture operations
-  override withTask(updates: Partial<Task>): TrackingTaskTree {
-    const result = super.withTask(updates);
-
-    const newOperations = this._isTracking
-      ? [
-          ...this._pendingOperations,
-          {
-            type: 'task_update' as const,
-            taskId: this.id,
-            updates: updates as Record<string, unknown>,
-            timestamp: new Date(),
-          },
-        ]
-      : this._pendingOperations;
-
-    return new TrackingTaskTree(result.toPlainObject(), this.getParent() as TrackingTaskTree, {
-      isTracking: this._isTracking,
-      baseVersion: this._baseVersion,
-      pendingOperations: newOperations,
-    });
-  }
-
-  override addChild(child: TaskTree | TrackingTaskTree): TrackingTaskTree {
-    const result = super.addChild(child);
-
-    const newOperations = this._isTracking
-      ? [
-          ...this._pendingOperations,
-          {
-            type: 'child_add' as const,
-            parentId: this.id,
-            childData: child.toPlainObject(),
-            timestamp: new Date(),
-          },
-        ]
-      : this._pendingOperations;
-
-    return new TrackingTaskTree(result.toPlainObject(), this.getParent() as TrackingTaskTree, {
-      isTracking: this._isTracking,
-      baseVersion: this._baseVersion,
-      pendingOperations: newOperations,
-    });
-  }
-
-  override removeChild(childId: string): TrackingTaskTree {
-    const result = super.removeChild(childId);
-
-    const newOperations = this._isTracking
-      ? [
-          ...this._pendingOperations,
-          {
-            type: 'child_remove' as const,
-            parentId: this.id,
-            childId,
-            timestamp: new Date(),
-          },
-        ]
-      : this._pendingOperations;
-
-    return new TrackingTaskTree(result.toPlainObject(), this.getParent() as TrackingTaskTree, {
-      isTracking: this._isTracking,
-      baseVersion: this._baseVersion,
-      pendingOperations: newOperations,
-    });
-  }
-
-  // Tracking-specific methods
-
   /**
-   * Start tracking changes (if not already tracking)
+   * Check if tracking is enabled (always true for TrackingTaskTree)
    */
-  startTracking(): TrackingTaskTree {
-    if (this._isTracking) return this;
-
-    return new TrackingTaskTree(this.toPlainObject(), this.getParent() as TrackingTaskTree, {
-      isTracking: true,
-      baseVersion: this._baseVersion,
-      pendingOperations: [],
-    });
+  get isTracking(): boolean {
+    return true;
   }
 
   /**
-   * Stop tracking changes and return a regular TaskTree
+   * Stop tracking and return a regular TaskTree
    */
   stopTracking(): TaskTree {
-    return new TaskTree(this.toPlainObject(), this.getParent());
+    return this.toTaskTree();
   }
 
   /**
-   * Clear all pending operations (usually after successful reconciliation)
+   * Clear all pending operations
+   * Note: In mutable approach, this modifies the tree in place
    */
-  clearPendingOperations(): TrackingTaskTree {
-    return new TrackingTaskTree(this.toPlainObject(), this.getParent() as TrackingTaskTree, {
-      isTracking: this._isTracking,
-      baseVersion: this._baseVersion + this._pendingOperations.length,
-      pendingOperations: [],
-    });
-  }
-
-  /**
-   * Apply all pending operations to a TaskService and clear them on success
-   * This is the recommended way to persist changes from a TrackingTaskTree
-   *
-   * @param taskService - The TaskService to apply changes to
-   * @returns Promise of the updated TaskTree from the store and the cleared TrackingTaskTree
-   */
-  async apply(taskService: {
-    applyReconciliationPlan(plan: ReconciliationPlan): Promise<TaskTree>;
-  }): Promise<{
-    updatedTree: TaskTree;
-    clearedTrackingTree: TrackingTaskTree;
-  }> {
-    if (!this.hasPendingChanges) {
-      // No changes to apply, just return current state
-      const currentTree = await taskService.applyReconciliationPlan({
-        treeId: this.id,
-        baseVersion: this._baseVersion,
-        operations: [],
-      });
-
-      return {
-        updatedTree: currentTree,
-        clearedTrackingTree: this,
-      };
+  clearPendingOperations(): this {
+    if (this._pendingOperations.length > 0) {
+      this._baseVersion += this._pendingOperations.length;
+      this._pendingOperations.length = 0;
     }
-
-    // Create reconciliation plan
-    const plan = this.createReconciliationPlan();
-
-    try {
-      // Apply the plan to the task service
-      const updatedTree = await taskService.applyReconciliationPlan(plan);
-
-      // Clear pending operations on success
-      const clearedTrackingTree = this.clearPendingOperations();
-
-      return {
-        updatedTree,
-        clearedTrackingTree,
-      };
-    } catch (error) {
-      // Don't clear pending operations on failure - preserve them for retry
-      throw new Error(
-        `Failed to apply tracking tree changes: ${error instanceof Error ? error.message : String(error)}`
-      );
-    }
-  }
-
-  /**
-   * Alias for apply() - more intuitive name for "flushing" pending changes to the store
-   */
-  async flush(taskService: {
-    applyReconciliationPlan(plan: ReconciliationPlan): Promise<TaskTree>;
-  }): Promise<{
-    updatedTree: TaskTree;
-    clearedTrackingTree: TrackingTaskTree;
-  }> {
-    return this.apply(taskService);
+    return this;
   }
 
   /**
    * Get operations since a specific version
    */
   getOperationsSince(version: number): PendingOperation[] {
-    const sinceIndex = version - this._baseVersion;
-    return this._pendingOperations.slice(Math.max(0, sinceIndex));
+    // Simple implementation: if asking for operations since a version
+    // less than or equal to our base version, return all pending operations
+    // If asking for operations since a future version, return none
+    return version <= this._baseVersion ? [...this._pendingOperations] : [];
   }
 
   /**
-   * Merge operations from another tracking tree (for collaborative editing)
+   * Merge operations from another source
    */
-  mergeOperations(otherOperations: readonly PendingOperation[]): TrackingTaskTree {
-    // Simple merge - in practice, this would need conflict resolution
-    const mergedOperations = [...this._pendingOperations, ...otherOperations].sort(
-      (a, b) => a.timestamp.getTime() - b.timestamp.getTime()
-    );
-
-    return new TrackingTaskTree(this.toPlainObject(), this.getParent() as TrackingTaskTree, {
-      isTracking: this._isTracking,
-      baseVersion: this._baseVersion,
-      pendingOperations: mergedOperations,
-    });
+  mergeOperations(otherOperations: readonly PendingOperation[]): this {
+    this._pendingOperations.push(...otherOperations);
+    return this;
   }
 
   /**
-   * Creates a reconciliation plan for resolving pending operations with conflict detection
-   *
-   * Analyzes all pending operations to detect conflicts (multiple updates to the same task)
-   * and generates a reconciled set of operations using the "last update wins" strategy.
-   * This is essential for optimistic UI updates that need to be synchronized with the backend.
-   *
-   * @returns ReconciliationPlan containing resolved operations and metadata
-   *
-   * @complexity O(n log n) where n = number of pending operations (due to timestamp sorting)
-   * @space O(n) for operation grouping and conflict detection data structures
-   *
-   * @sideEffects
-   * - Logs conflict warnings for observability
-   * - Does not modify the tree state (read-only analysis)
-   *
-   * @algorithm
-   * 1. Group operations by type (task updates vs structural changes)
-   * 2. Detect conflicts within task update groups
-   * 3. Apply last-update-wins resolution for conflicting operations
-   * 4. Preserve all non-conflicting operations in original order
-   *
-   * @conflictResolution
-   * - Task updates: Use latest timestamp (last update wins)
-   * - Structural operations: No conflicts possible, preserve all
-   * - Cross-type conflicts: Not currently detected/resolved
+   * Create a reconciliation plan from pending operations
    */
   createReconciliationPlan(): ReconciliationPlan {
-    const consolidatedOperations = this.consolidateOperations([...this._pendingOperations]);
-
     return {
       treeId: this.id,
       baseVersion: this._baseVersion,
-      operations: consolidatedOperations,
+      operations: this.consolidateOperations(this._pendingOperations),
     };
   }
 
   /**
-   * Consolidate operations, keeping only the latest update for each task
+   * Convert tree to markdown format
    */
-  private consolidateOperations(operations: PendingOperation[]): PendingOperation[] {
-    const taskUpdates = new Map<string, PendingOperation>();
-    const otherOperations: PendingOperation[] = [];
+  toMarkdown(indentLevel = 0): string {
+    const indent = '  '.repeat(indentLevel);
+    const status = this._task.status === 'done' ? '[x]' : '[ ]';
+    const priority = this._task.priority !== 'medium' ? ` (${this._task.priority})` : '';
 
-    // Separate task updates from other operations
-    for (const op of operations) {
-      if (op.type === 'task_update') {
-        // For task updates, keep only the latest one per task
-        const existing = taskUpdates.get(op.taskId);
-        if (!existing || op.timestamp >= existing.timestamp) {
-          taskUpdates.set(op.taskId, op);
-        }
-      } else {
-        // Other operations (child_add, child_remove) don't conflict
-        otherOperations.push(op);
-      }
+    let markdown = `${indent}- ${status} ${this._task.title}${priority}\n`;
+
+    if (this._task.description) {
+      markdown += `${indent}  ${this._task.description}\n`;
     }
 
-    // Combine and sort by timestamp to maintain operation order
-    const allOperations = [...otherOperations, ...taskUpdates.values()];
-    return allOperations.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
-  }
+    for (const child of this._children) {
+      markdown += child.toMarkdown(indentLevel + 1);
+    }
 
-  // Factory methods
-
-  /**
-   * Create a TrackingTaskTree from an existing TaskTree
-   */
-  static fromTaskTree(tree: TaskTree): TrackingTaskTree {
-    return new TrackingTaskTree(tree.toPlainObject(), null, {
-      isTracking: true,
-      baseVersion: 0,
-      pendingOperations: [],
-    });
-  }
-
-  /**
-   * Create a TrackingTaskTree from a plain task
-   */
-  static override fromTask(task: Task, children: TrackingTaskTree[] = []): TrackingTaskTree {
-    const data: TaskTreeData = {
-      task,
-      children: children.map((child) => child.toPlainObject()),
-    };
-
-    return new TrackingTaskTree(data, null, {
-      isTracking: true,
-      baseVersion: 0,
-      pendingOperations: [],
-    });
+    return markdown;
   }
 }
 
