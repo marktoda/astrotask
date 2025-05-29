@@ -366,19 +366,10 @@ export class DependencyService {
         continue;
       }
 
-      const effectiveDependencies = await this.getEffectiveDependencies(task.id);
-      let isBlocked = false;
-
-      // Check if any effective dependencies are incomplete
-      for (const depId of effectiveDependencies) {
-        const depTask = await this.store.getTask(depId);
-        if (!depTask || depTask.status !== 'done') {
-          isBlocked = true;
-          break;
-        }
-      }
-
-      if (!isBlocked) {
+      // Use getDependencyGraph to check if task is blocked
+      const dependencyGraph = await this.getDependencyGraph(task.id);
+      
+      if (!dependencyGraph.isBlocked) {
         executableTasks.push(task);
       }
     }
