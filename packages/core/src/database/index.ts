@@ -1,4 +1,4 @@
-import { TASK_IDENTIFIERS } from '../utils/TaskTreeConstants.js';
+import { TASK_IDENTIFIERS } from '../entities/TaskTreeConstants.js';
 import { createModuleLogger } from '../utils/logger.js';
 import { initializeDatabase } from './config.js';
 import { createStore } from './electric.js';

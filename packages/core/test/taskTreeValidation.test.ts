@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { TaskTree } from '../src/utils/TaskTree.js';
-import { validateTaskTree, validateMoveOperation, validateTaskForest } from '../src/utils/TaskTreeValidation.js';
+import { TaskTree } from '../src/entities/TaskTree.js';
+import { validateTaskTree, validateMoveOperation, validateTaskForest } from '../src/entities/TaskTreeValidation.js';
 import type { Task } from '../src/schemas/task.js';
 
 function createMockTask(id: string, title: string, parentId: string | null = null): Task {

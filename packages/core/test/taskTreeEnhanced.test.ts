@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { TaskTree, type BatchUpdateOperation } from '../src/utils/TaskTree.js';
+import { TaskTree, type BatchUpdateOperation } from '../src/entities/TaskTree.js';
 import type { Task } from '../src/schemas/task.js';
 
 function createMockTask(id: string, title: string, status: string = 'pending', priority: string = 'medium'): Task {

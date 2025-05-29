@@ -13,7 +13,7 @@ import {
 } from '../src/utils/taskId.js';
 import { taskId as taskIdSchema } from '../src/schemas/base.js';
 import { createDatabase } from '../src/database/index.js';
-import { TASK_IDENTIFIERS } from '../src/utils/TaskTreeConstants.js';
+import { TASK_IDENTIFIERS } from '../src/entities/TaskTreeConstants.js';
 import type { Store } from '../src/database/store.js';
 
 describe('Task ID Utilities', () => {

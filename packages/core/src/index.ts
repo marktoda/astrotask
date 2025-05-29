@@ -14,8 +14,8 @@ export const APP_NAME = 'Astrolabe';
 // Core functionality
 export * from './database/index.js';
 export { TaskService } from './services/TaskService.js';
-export { DependencyService } from './services/DependencyService.js';
-export { DependencyGraph } from './utils/DependencyGraph.js';
+export { DependencyService } from './entities/DependencyService.js';
+export { DependencyGraph } from './entities/DependencyGraph.js';
 
 // Schema exports
 export {
@@ -62,7 +62,7 @@ export {
   type TaskTreeData,
   type BatchUpdateOperation,
   type TreeMetrics,
-} from './utils/TaskTree.js';
+} from './entities/TaskTree.js';
 
 // TrackingTaskTree utilities
 export {
@@ -71,7 +71,7 @@ export {
   type ReconciliationPlan,
   serializeTrackingState,
   deserializeTrackingState,
-} from './utils/TrackingTaskTree.js';
+} from './entities/TrackingTaskTree.js';
 
 // TrackingDependencyGraph utilities
 export {
@@ -80,7 +80,7 @@ export {
   type DependencyReconciliationPlan,
   serializeDependencyTrackingState,
   deserializeDependencyTrackingState,
-} from './utils/TrackingDependencyGraph.js';
+} from './entities/TrackingDependencyGraph.js';
 
 // TaskTree validation
 export {
@@ -90,7 +90,7 @@ export {
   validateTaskForest,
   type ValidationWarning,
   type ValidationOptions,
-} from './utils/TaskTreeValidation.js';
+} from './entities/TaskTreeValidation.js';
 
 // TaskTree caching
 export {
@@ -100,7 +100,7 @@ export {
   type CacheStats,
   type TaskTreeCacheStats,
   type TaskTreeMetadata,
-} from './utils/TaskTreeCache.js';
+} from './entities/TaskTreeCache.js';
 
 // Task generation exports
 export type {

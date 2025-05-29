@@ -6,7 +6,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { DependencyGraph, type DependencyGraphData, type TaskData } from '../src/utils/DependencyGraph.js';
+import { DependencyGraph, type DependencyGraphData, type TaskData } from '../src/entities/DependencyGraph.js';
 
 describe('DependencyGraph', () => {
   // Test data

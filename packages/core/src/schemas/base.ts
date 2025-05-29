@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { TASK_IDENTIFIERS } from '../utils/TaskTreeConstants.js';
+import { TASK_IDENTIFIERS } from '../entities/TaskTreeConstants.js';
 import { CONSTRAINTS } from './types.js';
 
 // Task ID patterns for human-readable IDs

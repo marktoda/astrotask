@@ -9,7 +9,7 @@ import {
 } from '../src/database/config';
 import { createDatabase } from '../src/database/index';
 import { cfg } from '../src/utils/config';
-import { TASK_IDENTIFIERS } from '../src/utils/TaskTreeConstants';
+import { TASK_IDENTIFIERS } from '../src/entities/TaskTreeConstants.js';
 
 describe('Database Configuration', () => {
   const testDbDir = join(tmpdir(), 'astrolabe-test');

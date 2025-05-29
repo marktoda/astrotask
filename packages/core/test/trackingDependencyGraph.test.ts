@@ -12,8 +12,8 @@ import {
   type DependencyReconciliationPlan,
   serializeDependencyTrackingState, 
   deserializeDependencyTrackingState 
-} from '../src/utils/TrackingDependencyGraph.js';
-import { DependencyGraph, type DependencyGraphData, type TaskData } from '../src/utils/DependencyGraph.js';
+} from '../src/entities/TrackingDependencyGraph.js';
+import { DependencyGraph, type DependencyGraphData, type TaskData } from '../src/entities/DependencyGraph.js';
 
 describe('TrackingDependencyGraph', () => {
   // Test data

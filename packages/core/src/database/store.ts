@@ -7,7 +7,7 @@ import type {
   CreateContextSlice as NewContextSlice,
 } from '../schemas/contextSlice.js';
 import type { CreateTask as NewTask, Task, TaskStatus } from '../schemas/task.js';
-import { TASK_IDENTIFIERS } from '../utils/TaskTreeConstants.js';
+import { TASK_IDENTIFIERS } from '../entities/TaskTreeConstants.js';
 import { generateNextTaskId } from '../utils/taskId.js';
 import type { ElectricConnection } from './electric.js';
 import * as schema from './schema.js';
