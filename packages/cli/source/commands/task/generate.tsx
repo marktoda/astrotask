@@ -1,8 +1,8 @@
 import {
+	DependencyService,
 	type GenerationError,
 	type Task,
 	TaskService,
-	DependencyService,
 	createModuleLogger,
 	createPRDTaskGenerator,
 } from "@astrolabe/core";

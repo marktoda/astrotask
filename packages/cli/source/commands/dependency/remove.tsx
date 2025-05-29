@@ -49,4 +49,4 @@ export default function RemoveDependency({ options }: Props) {
 	if (result) return <Text color="green">{result}</Text>;
 
 	return <Text>Removing dependency...</Text>;
-} 
+}

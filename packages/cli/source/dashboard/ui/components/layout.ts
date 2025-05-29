@@ -1,14 +1,14 @@
 import blessed from "blessed";
 import type { StoreApi } from "zustand";
-import type { DashboardStore } from "../../store/index.js";
 import type { KeymapService } from "../../services/keymap.js";
-import { ProjectSidebar } from "./project-sidebar.js";
-import { TaskTreeComponent } from "./task-tree.js";
-import { DetailPane } from "./detail-pane.js";
-import { StatusBar } from "./status-bar.js";
+import type { DashboardStore } from "../../store/index.js";
 import { CommandPalette } from "./command-palette.js";
+import { DetailPane } from "./detail-pane.js";
 import { HelpOverlay } from "./help-overlay.js";
 import { Legend } from "./legend.js";
+import { ProjectSidebar } from "./project-sidebar.js";
+import { StatusBar } from "./status-bar.js";
+import { TaskTreeComponent } from "./task-tree.js";
 
 export class DashboardLayout {
 	private projectSidebar: ProjectSidebar;
@@ -23,7 +23,7 @@ export class DashboardLayout {
 	constructor(
 		private screen: blessed.Widgets.Screen,
 		private store: StoreApi<DashboardStore>,
-		_keymapService: KeymapService
+		_keymapService: KeymapService,
 	) {
 		// Create layout containers
 		const mainContainer = blessed.box({
@@ -48,7 +48,7 @@ export class DashboardLayout {
 		this.setupKeyBindings();
 
 		// Subscribe to store changes
-		this.unsubscribe = () => { };
+		this.unsubscribe = () => {};
 	}
 
 	private setupLayout() {
@@ -66,7 +66,7 @@ export class DashboardLayout {
 			top: 0,
 			left: 0,
 			width: sidebarWidth,
-			height: screenHeight
+			height: screenHeight,
 		} as any);
 
 		// Task tree (center)
@@ -74,7 +74,7 @@ export class DashboardLayout {
 			top: 0,
 			left: sidebarWidth,
 			width: treeWidth,
-			height: screenHeight
+			height: screenHeight,
 		} as any);
 
 		// Detail pane (right)
@@ -82,7 +82,7 @@ export class DashboardLayout {
 			top: 0,
 			left: sidebarWidth + treeWidth,
 			width: detailWidth,
-			height: screenHeight
+			height: screenHeight,
 		} as any);
 
 		// Legend (above status bar)
@@ -90,7 +90,7 @@ export class DashboardLayout {
 			bottom: 1,
 			left: 0,
 			right: 0,
-			height: 3
+			height: 3,
 		} as any);
 
 		// Status bar (bottom)
@@ -98,7 +98,7 @@ export class DashboardLayout {
 			bottom: 0,
 			left: 0,
 			right: 0,
-			height: 1
+			height: 1,
 		} as any);
 	}
 
@@ -159,10 +159,15 @@ export class DashboardLayout {
 
 	private cycleActivePanel(reverse = false) {
 		const state = this.store.getState();
-		const panels: Array<DashboardStore["activePanel"]> = ["sidebar", "tree", "details"];
+		const panels: Array<DashboardStore["activePanel"]> = [
+			"sidebar",
+			"tree",
+			"details",
+		];
 		const currentIndex = panels.indexOf(state.activePanel);
 		const direction = reverse ? -1 : 1;
-		const nextIndex = (currentIndex + direction + panels.length) % panels.length;
+		const nextIndex =
+			(currentIndex + direction + panels.length) % panels.length;
 		const nextPanel = panels[nextIndex];
 		if (nextPanel) {
 			state.setActivePanel(nextPanel);

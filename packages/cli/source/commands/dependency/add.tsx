@@ -42,4 +42,4 @@ export default function AddDependency({ options }: Props) {
 	if (result) return <Text color="green">{result}</Text>;
 
 	return <Text>Adding dependency...</Text>;
-} 
+}

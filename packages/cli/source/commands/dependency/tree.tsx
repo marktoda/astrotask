@@ -31,7 +31,10 @@ interface TaskNode {
 interface DependencyTreeData {
 	rootNodes: TaskNode[];
 	allTasks: Map<string, Task>;
-	dependencyGraph: Map<string, { dependencies: string[]; dependents: string[]; isBlocked: boolean }>;
+	dependencyGraph: Map<
+		string,
+		{ dependencies: string[]; dependents: string[]; isBlocked: boolean }
+	>;
 }
 
 export default function DependencyTree({ options }: Props) {
@@ -46,11 +49,14 @@ export default function DependencyTree({ options }: Props) {
 			try {
 				// Get all tasks
 				const allTasks = await store.listTasks();
-				const taskMap = new Map(allTasks.map(task => [task.id, task]));
+				const taskMap = new Map(allTasks.map((task) => [task.id, task]));
 
 				// Build dependency graph for all tasks
-				const dependencyGraph = new Map<string, { dependencies: string[]; dependents: string[]; isBlocked: boolean }>();
-				
+				const dependencyGraph = new Map<
+					string,
+					{ dependencies: string[]; dependents: string[]; isBlocked: boolean }
+				>();
+
 				for (const task of allTasks) {
 					const graph = await taskService.getTaskDependencyGraph(task.id);
 					dependencyGraph.set(task.id, graph);
@@ -63,8 +69,15 @@ export default function DependencyTree({ options }: Props) {
 						setError(`Task ${options.root} not found`);
 						return;
 					}
-					
-					const rootNode = buildTaskNode(rootTask, taskMap, dependencyGraph, 0, options.depth, new Set());
+
+					const rootNode = buildTaskNode(
+						rootTask,
+						taskMap,
+						dependencyGraph,
+						0,
+						options.depth,
+						new Set(),
+					);
 					setTreeData({
 						rootNodes: [rootNode],
 						allTasks: taskMap,
@@ -72,13 +85,20 @@ export default function DependencyTree({ options }: Props) {
 					});
 				} else {
 					// Find all root tasks (tasks with no dependencies)
-					const rootTasks = allTasks.filter(task => {
+					const rootTasks = allTasks.filter((task) => {
 						const graph = dependencyGraph.get(task.id);
 						return graph && graph.dependencies.length === 0;
 					});
 
-					const rootNodes = rootTasks.map(task => 
-						buildTaskNode(task, taskMap, dependencyGraph, 0, options.depth, new Set())
+					const rootNodes = rootTasks.map((task) =>
+						buildTaskNode(
+							task,
+							taskMap,
+							dependencyGraph,
+							0,
+							options.depth,
+							new Set(),
+						),
 					);
 
 					setTreeData({
@@ -89,9 +109,7 @@ export default function DependencyTree({ options }: Props) {
 				}
 			} catch (err) {
 				setError(
-					err instanceof Error
-						? err.message
-						: "Failed to load dependency tree",
+					err instanceof Error ? err.message : "Failed to load dependency tree",
 				);
 			} finally {
 				setLoading(false);
@@ -134,7 +152,11 @@ export default function DependencyTree({ options }: Props) {
 		}
 	};
 
-	const renderTaskNode = (node: TaskNode, prefix: string = "", isLast: boolean = true): JSX.Element[] => {
+	const renderTaskNode = (
+		node: TaskNode,
+		prefix: string = "",
+		isLast: boolean = true,
+	): JSX.Element[] => {
 		const elements: JSX.Element[] = [];
 		const connector = isLast ? "└── " : "├── ";
 		const nextPrefix = prefix + (isLast ? "    " : "│   ");
@@ -142,18 +164,25 @@ export default function DependencyTree({ options }: Props) {
 		// Task line
 		const taskLine = (
 			<Box key={`task-${node.task.id}`}>
-				<Text color="gray">{prefix}{connector}</Text>
-				{!options.hideStatus && (
-					<Text>{getStatusIcon(node.task.status)} </Text>
-				)}
+				<Text color="gray">
+					{prefix}
+					{connector}
+				</Text>
+				{!options.hideStatus && <Text>{getStatusIcon(node.task.status)} </Text>}
 				<Text color="cyan">{node.task.id}</Text>
 				<Text> - {node.task.title}</Text>
 				{!options.hideStatus && (
-					<Text color={getStatusColor(node.task.status)}> [{node.task.status}]</Text>
+					<Text color={getStatusColor(node.task.status)}>
+						{" "}
+						[{node.task.status}]
+					</Text>
 				)}
 				<Text color="magenta"> [{node.task.priority}]</Text>
 				{options.showBlocked && node.isBlocked && (
-					<Text color="red" bold> 🚫 BLOCKED</Text>
+					<Text color="red" bold>
+						{" "}
+						🚫 BLOCKED
+					</Text>
 				)}
 			</Box>
 		);
@@ -163,7 +192,9 @@ export default function DependencyTree({ options }: Props) {
 		if (node.dependents.length > 0) {
 			node.dependents.forEach((dependent, index) => {
 				const isLastDependent = index === node.dependents.length - 1;
-				elements.push(...renderTaskNode(dependent, nextPrefix, isLastDependent));
+				elements.push(
+					...renderTaskNode(dependent, nextPrefix, isLastDependent),
+				);
 			});
 		}
 
@@ -174,19 +205,23 @@ export default function DependencyTree({ options }: Props) {
 		<Box flexDirection="column">
 			<Text bold>
 				{options.root ? (
-					<>Dependency Tree for Task: <Text color="cyan">{options.root}</Text></>
+					<>
+						Dependency Tree for Task: <Text color="cyan">{options.root}</Text>
+					</>
 				) : (
 					"Complete Dependency Tree"
 				)}
 			</Text>
-			
+
 			{options.depth && (
 				<Text color="gray">Maximum depth: {options.depth}</Text>
 			)}
 
 			{treeData.rootNodes.length === 0 ? (
 				<Box marginTop={1}>
-					<Text color="yellow">No root tasks found (all tasks have dependencies)</Text>
+					<Text color="yellow">
+						No root tasks found (all tasks have dependencies)
+					</Text>
 				</Box>
 			) : (
 				<Box flexDirection="column" marginTop={1}>
@@ -213,10 +248,13 @@ export default function DependencyTree({ options }: Props) {
 function buildTaskNode(
 	task: Task,
 	taskMap: Map<string, Task>,
-	dependencyGraph: Map<string, { dependencies: string[]; dependents: string[]; isBlocked: boolean }>,
+	dependencyGraph: Map<
+		string,
+		{ dependencies: string[]; dependents: string[]; isBlocked: boolean }
+	>,
 	currentDepth: number,
 	maxDepth: number | undefined,
-	visited: Set<string>
+	visited: Set<string>,
 ): TaskNode {
 	// Prevent infinite loops
 	if (visited.has(task.id)) {
@@ -242,7 +280,7 @@ function buildTaskNode(
 
 	visited.add(task.id);
 	const graph = dependencyGraph.get(task.id);
-	
+
 	if (!graph) {
 		return {
 			task,
@@ -255,18 +293,32 @@ function buildTaskNode(
 
 	// Build dependent nodes (tasks that depend on this one)
 	const dependents = graph.dependents
-		.map(id => taskMap.get(id))
+		.map((id) => taskMap.get(id))
 		.filter((t): t is Task => t !== null)
-		.map(dependentTask => 
-			buildTaskNode(dependentTask, taskMap, dependencyGraph, currentDepth + 1, maxDepth, new Set(visited))
+		.map((dependentTask) =>
+			buildTaskNode(
+				dependentTask,
+				taskMap,
+				dependencyGraph,
+				currentDepth + 1,
+				maxDepth,
+				new Set(visited),
+			),
 		);
 
 	// Build dependency nodes (tasks this one depends on)
 	const dependencies = graph.dependencies
-		.map(id => taskMap.get(id))
+		.map((id) => taskMap.get(id))
 		.filter((t): t is Task => t !== null)
-		.map(dependencyTask => 
-			buildTaskNode(dependencyTask, taskMap, dependencyGraph, currentDepth + 1, maxDepth, new Set(visited))
+		.map((dependencyTask) =>
+			buildTaskNode(
+				dependencyTask,
+				taskMap,
+				dependencyGraph,
+				currentDepth + 1,
+				maxDepth,
+				new Set(visited),
+			),
 		);
 
 	visited.delete(task.id);
@@ -278,4 +330,4 @@ function buildTaskNode(
 		isBlocked: graph.isBlocked,
 		depth: currentDepth,
 	};
-} 
+}
