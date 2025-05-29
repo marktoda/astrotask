@@ -18,7 +18,9 @@ export {
   type ValidateTaskDependencyInput,
   type GetAvailableTasksInput,
   type UpdateTaskStatusInput,
-  type GetTasksWithDependenciesInput
+  type GetTasksWithDependenciesInput,
+  type GetNextTaskInput,
+  type GetOrderedTasksInput
 } from './DependencyHandlers.js';
 export * from './types.js';
 export { 
@@ -38,5 +40,7 @@ export {
   getAvailableTasksSchema,
   updateTaskStatusSchema,
   getTasksWithDependenciesSchema,
-  getTopologicalOrderSchema
+  getTopologicalOrderSchema,
+  getNextTaskSchema,
+  getOrderedTasksSchema
 } from './types.js';

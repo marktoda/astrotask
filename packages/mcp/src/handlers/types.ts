@@ -569,3 +569,65 @@ export type GetTasksWithDependenciesInput = z.infer<typeof getTasksWithDependenc
 
 /** Input type for getting topological order */
 export type GetTopologicalOrderInput = z.infer<typeof getTopologicalOrderSchema>;
+
+/**
+ * Schema for getting the next best task to work on via MCP.
+ * Uses intelligent prioritization algorithm to select the optimal task.
+ * 
+ * @constant
+ * @type {z.ZodObject}
+ * @example
+ * ```typescript
+ * // Get next task with no filters
+ * const simple = {};
+ * 
+ * // Get next pending task
+ * const pending = { status: "pending" };
+ * 
+ * // Get next high priority task within depth 3
+ * const filtered = { priority: "high", maxDepth: 3 };
+ * ```
+ */
+export const getNextTaskSchema = z.object({
+  /** Optional status filter - only consider tasks with this status */
+  status: taskStatus.optional(),
+  /** Optional priority filter - only consider tasks with this priority */
+  priority: taskPriority.optional(),
+  /** Optional maximum depth filter - exclude tasks deeper than this level */
+  maxDepth: z.number().min(0).optional(),
+});
+
+/**
+ * Schema for getting ordered tasks via MCP.
+ * Returns all available tasks sorted by intelligent priority algorithm.
+ * 
+ * @constant
+ * @type {z.ZodObject}
+ * @example
+ * ```typescript
+ * // Get all ordered tasks
+ * const all = {};
+ * 
+ * // Get top 5 pending tasks
+ * const topPending = { status: "pending", limit: 5 };
+ * 
+ * // Get high priority tasks within depth 3
+ * const filtered = { priority: "high", maxDepth: 3, limit: 10 };
+ * ```
+ */
+export const getOrderedTasksSchema = z.object({
+  /** Optional status filter - only consider tasks with this status */
+  status: taskStatus.optional(),
+  /** Optional priority filter - only consider tasks with this priority */
+  priority: taskPriority.optional(),
+  /** Optional maximum depth filter - exclude tasks deeper than this level */
+  maxDepth: z.number().min(0).optional(),
+  /** Optional limit on number of tasks returned */
+  limit: z.number().min(1).optional(),
+});
+
+/** Input type for getting the next best task */
+export type GetNextTaskInput = z.infer<typeof getNextTaskSchema>;
+
+/** Input type for getting ordered tasks */
+export type GetOrderedTasksInput = z.infer<typeof getOrderedTasksSchema>;

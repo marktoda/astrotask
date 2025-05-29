@@ -52,6 +52,19 @@ export interface GetTasksWithDependenciesInput {
   taskIds: string[];
 }
 
+export interface GetNextTaskInput {
+  status?: string;
+  priority?: string;
+  maxDepth?: number;
+}
+
+export interface GetOrderedTasksInput {
+  status?: string;
+  priority?: string;
+  maxDepth?: number;
+  limit?: number;
+}
+
 /**
  * Enhanced task context that includes dependency information
  */
@@ -244,5 +257,31 @@ export class DependencyHandlers {
         cycles: cycles.length > 0 ? cycles : undefined 
       };
     }
+  }
+
+  /**
+   * Get the next best task to work on using intelligent prioritization.
+   * Uses dependency graph to find tasks with no incomplete dependencies,
+   * then applies smart prioritization algorithm.
+   */
+  async getNextTask(args: GetNextTaskInput): Promise<Task | null> {
+    return await this.context.taskService.getNextTask({
+      status: args.status,
+      priority: args.priority,
+      maxDepth: args.maxDepth,
+    });
+  }
+
+  /**
+   * Get tasks ordered by intelligent priority algorithm.
+   * Returns all available tasks sorted by priority score.
+   */
+  async getOrderedTasks(args: GetOrderedTasksInput): Promise<Task[]> {
+    return await this.context.taskService.getOrderedTasks({
+      status: args.status,
+      priority: args.priority,
+      maxDepth: args.maxDepth,
+      limit: args.limit,
+    });
   }
 } 

@@ -738,4 +738,140 @@ export class TaskService {
   async findDependencyCycles(): Promise<string[][]> {
     return this.dependencyService.findCycles();
   }
+
+  /**
+   * Get the next best task to work on using intelligent prioritization.
+   * Considers task priority, hierarchy depth, subtask count, and dependencies.
+   *
+   * @param filter Optional filter criteria
+   * @returns The highest priority available task, or null if none available
+   */
+  async getNextTask(filter?: {
+    status?: string;
+    priority?: string;
+    maxDepth?: number;
+  }): Promise<Task | null> {
+    // First get all executable tasks (no incomplete dependencies)
+    const filterObj: { status?: TaskStatus; priority?: string } | undefined = filter
+      ? {
+          ...(filter.status && { status: filter.status as TaskStatus }),
+          ...(filter.priority && { priority: filter.priority }),
+        }
+      : undefined;
+
+    const availableTasks = await this.getAvailableTasks(filterObj);
+
+    if (availableTasks.length === 0) {
+      return null;
+    }
+
+    if (availableTasks.length === 1) {
+      return availableTasks[0];
+    }
+
+    // Score tasks using intelligent prioritization
+    const scoredTasks = await Promise.all(
+      availableTasks.map(async (task) => {
+        const score = await this.calculateTaskPriorityScore(task, filter?.maxDepth);
+        return { task, score };
+      })
+    );
+
+    // Sort by score (highest first) and return the best task
+    scoredTasks.sort((a, b) => b.score - a.score);
+    return scoredTasks[0]?.task || null;
+  }
+
+  /**
+   * Calculate a priority score for task selection.
+   * Higher scores indicate higher priority tasks.
+   */
+  private async calculateTaskPriorityScore(task: Task, maxDepth?: number): Promise<number> {
+    let score = 0;
+
+    // Base priority scoring (high=3, medium=2, low=1)
+    const priorityWeight = 100;
+    switch (task.priority) {
+      case 'high':
+        score += 3 * priorityWeight;
+        break;
+      case 'medium':
+        score += 2 * priorityWeight;
+        break;
+      case 'low':
+        score += 1 * priorityWeight;
+        break;
+    }
+
+    // Prefer leaf tasks (tasks with no subtasks) - they can be completed immediately
+    const subtasks = await this.store.listTasks({ parentId: task.id });
+    const leafTaskBonus = 50;
+    if (subtasks.length === 0) {
+      score += leafTaskBonus;
+    }
+
+    // Depth consideration - prefer tasks closer to root (less nested)
+    const depth = await this.getTaskDepth(task.id);
+    const depthPenalty = 10;
+    score -= depth * depthPenalty;
+
+    // Apply max depth filter if specified
+    if (maxDepth !== undefined && depth > maxDepth) {
+      score -= 1000; // Heavy penalty for exceeding max depth
+    }
+
+    // Bonus for tasks that would unblock many dependents
+    const dependents = await this.dependencyService.getDependents(task.id);
+    const unblockingBonus = 20;
+    score += dependents.length * unblockingBonus;
+
+    // Slight bonus for recently updated tasks (within last 24 hours)
+    const now = new Date();
+    const dayInMs = 24 * 60 * 60 * 1000;
+    const recentUpdateBonus = 5;
+    if (now.getTime() - task.updatedAt.getTime() < dayInMs) {
+      score += recentUpdateBonus;
+    }
+
+    return score;
+  }
+
+  /**
+   * Get tasks ordered by intelligent priority algorithm.
+   * Returns all available tasks sorted by priority score.
+   */
+  async getOrderedTasks(filter?: {
+    status?: string;
+    priority?: string;
+    maxDepth?: number;
+    limit?: number;
+  }): Promise<Task[]> {
+    const filterObj: { status?: TaskStatus; priority?: string } | undefined = filter
+      ? {
+          ...(filter.status && { status: filter.status as TaskStatus }),
+          ...(filter.priority && { priority: filter.priority }),
+        }
+      : undefined;
+
+    const availableTasks = await this.getAvailableTasks(filterObj);
+
+    if (availableTasks.length === 0) {
+      return [];
+    }
+
+    // Score and sort all tasks
+    const scoredTasks = await Promise.all(
+      availableTasks.map(async (task) => {
+        const score = await this.calculateTaskPriorityScore(task, filter?.maxDepth);
+        return { task, score };
+      })
+    );
+
+    scoredTasks.sort((a, b) => b.score - a.score);
+
+    const orderedTasks = scoredTasks.map(({ task }) => task);
+
+    // Apply limit if specified
+    return filter?.limit ? orderedTasks.slice(0, filter.limit) : orderedTasks;
+  }
 }

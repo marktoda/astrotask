@@ -23,7 +23,9 @@ import {
   getAvailableTasksSchema,
   updateTaskStatusSchema,
   getTasksWithDependenciesSchema,
-  getTopologicalOrderSchema
+  getTopologicalOrderSchema,
+  getNextTaskSchema,
+  getOrderedTasksSchema
 } from './handlers/index.js';
 import { wrapMCPHandler } from './utils/response.js';
 
@@ -175,6 +177,20 @@ async function main() {
     getTopologicalOrderSchema.shape,
     wrapMCPHandler(async (args) => {
       return dependencyHandlers.getTopologicalOrder(args);
+    })
+  );
+
+  server.tool('getNextTask',
+    getNextTaskSchema.shape,
+    wrapMCPHandler(async (args) => {
+      return dependencyHandlers.getNextTask(args);
+    })
+  );
+
+  server.tool('getOrderedTasks',
+    getOrderedTasksSchema.shape,
+    wrapMCPHandler(async (args) => {
+      return dependencyHandlers.getOrderedTasks(args);
     })
   );
 
