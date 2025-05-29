@@ -738,4 +738,34 @@ export class TaskService {
   async findDependencyCycles(): Promise<string[][]> {
     return this.dependencyService.findCycles();
   }
+
+  /**
+   * Get the next task to work on based on priority, dependencies, and creation order.
+   * Returns the highest priority task that has no incomplete dependencies.
+   */
+  async getNextTask(): Promise<Task | null> {
+    // Get all available tasks (no incomplete dependencies)
+    const availableTasks = await this.getAvailableTasks({ status: 'pending' });
+
+    if (availableTasks.length === 0) {
+      return null;
+    }
+
+    // Sort by priority (high > medium > low), then by creation date (oldest first)
+    const sortedTasks = availableTasks.sort((a, b) => {
+      // Priority order: high = 0, medium = 1, low = 2
+      const priorityOrder: Record<string, number> = { high: 0, medium: 1, low: 2 };
+      const aPriority = priorityOrder[a.priority] ?? 1; // Default to medium if unknown
+      const bPriority = priorityOrder[b.priority] ?? 1; // Default to medium if unknown
+
+      if (aPriority !== bPriority) {
+        return aPriority - bPriority; // Higher priority first
+      }
+
+      // Same priority, sort by creation date (oldest first)
+      return a.createdAt.getTime() - b.createdAt.getTime();
+    });
+
+    return sortedTasks[0] ?? null;
+  }
 }

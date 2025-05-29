@@ -193,4 +193,8 @@ export class TaskHandlers {
 
     return context;
   }
+
+  async getNextTask(): Promise<Task | null> {
+    return await this.context.taskService.getNextTask();
+  }
 }
