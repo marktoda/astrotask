@@ -245,4 +245,59 @@ export class DependencyHandlers {
       };
     }
   }
+
+  /**
+   * Get effective dependencies for a task (including inherited from parents)
+   */
+  async getEffectiveTaskDependencies(args: GetTaskDependenciesInput): Promise<{ 
+    directDependencies: string[];
+    effectiveDependencies: string[];
+    inheritedFrom: string[];
+  }> {
+    const directDependencies = await this.context.dependencyService.getDependencies(args.taskId);
+    const effectiveDependencies = await this.context.dependencyService.getEffectiveDependencies(args.taskId);
+    
+    // Find which dependencies are inherited (not direct)
+    const inheritedFrom = effectiveDependencies.filter(dep => !directDependencies.includes(dep));
+
+    return {
+      directDependencies,
+      effectiveDependencies,
+      inheritedFrom,
+    };
+  }
+
+  /**
+   * Get hierarchical dependency graph for a task (includes inheritance)
+   */
+  async getHierarchicalTaskDependencies(args: GetTaskDependenciesInput): Promise<TaskDependencyGraph> {
+    return await this.context.dependencyService.getHierarchicalDependencyGraph(args.taskId);
+  }
+
+  /**
+   * Get tasks that are blocked considering hierarchical inheritance
+   */
+  async getHierarchicallyBlockedTasks(): Promise<TaskWithDependencies[]> {
+    return await this.context.dependencyService.getHierarchicallyBlockedTasks();
+  }
+
+  /**
+   * Get tasks that can be started immediately considering hierarchical inheritance
+   */
+  async getHierarchicallyAvailableTasks(args: GetAvailableTasksInput): Promise<Task[]> {
+    const executableTasks = await this.context.dependencyService.getHierarchicallyExecutableTasks();
+    
+    // Apply additional filters if provided
+    let filteredTasks = executableTasks;
+    
+    if (args.status) {
+      filteredTasks = filteredTasks.filter(task => task.status === args.status);
+    }
+    
+    if (args.priority) {
+      filteredTasks = filteredTasks.filter(task => task.priority === args.priority);
+    }
+    
+    return filteredTasks;
+  }
 } 

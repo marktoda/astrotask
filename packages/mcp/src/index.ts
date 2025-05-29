@@ -23,7 +23,10 @@ import {
   getAvailableTasksSchema,
   updateTaskStatusSchema,
   getTasksWithDependenciesSchema,
-  getTopologicalOrderSchema
+  getTopologicalOrderSchema,
+  getEffectiveTaskDependenciesSchema,
+  getHierarchicalTaskDependenciesSchema,
+  getHierarchicallyAvailableTasksSchema
 } from './handlers/index.js';
 import { wrapMCPHandler } from './utils/response.js';
 
@@ -175,6 +178,35 @@ async function main() {
     getTopologicalOrderSchema.shape,
     wrapMCPHandler(async (args) => {
       return dependencyHandlers.getTopologicalOrder(args);
+    })
+  );
+
+  // Register hierarchical dependency management tools
+  server.tool('getEffectiveTaskDependencies',
+    getEffectiveTaskDependenciesSchema.shape,
+    wrapMCPHandler(async (args) => {
+      return dependencyHandlers.getEffectiveTaskDependencies(args);
+    })
+  );
+
+  server.tool('getHierarchicalTaskDependencies',
+    getHierarchicalTaskDependenciesSchema.shape,
+    wrapMCPHandler(async (args) => {
+      return dependencyHandlers.getHierarchicalTaskDependencies(args);
+    })
+  );
+
+  server.tool('getHierarchicallyBlockedTasks',
+    {},
+    wrapMCPHandler(async () => {
+      return dependencyHandlers.getHierarchicallyBlockedTasks();
+    })
+  );
+
+  server.tool('getHierarchicallyAvailableTasks',
+    getHierarchicallyAvailableTasksSchema.shape,
+    wrapMCPHandler(async (args) => {
+      return dependencyHandlers.getHierarchicallyAvailableTasks(args);
     })
   );
 

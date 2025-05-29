@@ -96,7 +96,7 @@ export class DependencyService {
   }
 
   /**
-   * Get all task IDs that a specific task depends on.
+   * Get all task IDs that a specific task depends on (direct dependencies only).
    *
    * @param taskId - ID of the task to get dependencies for
    * @returns Promise resolving to array of dependency task IDs
@@ -108,6 +108,38 @@ export class DependencyService {
       .where(eq(taskDependencies.dependentTaskId, taskId));
 
     return dependencies.map((d: { dependencyTaskId: string }) => d.dependencyTaskId);
+  }
+
+  /**
+   * Get all task IDs that a specific task effectively depends on, including inherited dependencies.
+   * This includes direct dependencies and all dependencies inherited from parent tasks.
+   *
+   * @param taskId - ID of the task to get effective dependencies for
+   * @returns Promise resolving to array of effective dependency task IDs
+   */
+  async getEffectiveDependencies(taskId: string): Promise<string[]> {
+    const visited = new Set<string>();
+    const effectiveDependencies = new Set<string>();
+
+    const collectDependencies = async (currentTaskId: string): Promise<void> => {
+      if (visited.has(currentTaskId)) return;
+      visited.add(currentTaskId);
+
+      // Get direct dependencies for this task
+      const directDependencies = await this.getDependencies(currentTaskId);
+      for (const depId of directDependencies) {
+        effectiveDependencies.add(depId);
+      }
+
+      // Get parent task and inherit its dependencies
+      const task = await this.store.getTask(currentTaskId);
+      if (task?.parentId) {
+        await collectDependencies(task.parentId);
+      }
+    };
+
+    await collectDependencies(taskId);
+    return Array.from(effectiveDependencies);
   }
 
   /**
@@ -170,7 +202,8 @@ export class DependencyService {
 
   /**
    * Validate whether a dependency can be safely added.
-   * Checks for self-dependencies, duplicates, task existence, and cycles.
+   * Checks for self-dependencies, duplicates, task existence, cycles, and hierarchy constraints.
+   * Dependencies are only allowed between sibling tasks (same parent).
    *
    * @param dependentId - ID of the dependent task
    * @param dependencyId - ID of the dependency task
@@ -201,8 +234,15 @@ export class DependencyService {
       errors.push(`Dependency task ${dependencyId} does not exist`);
     }
 
-    // Check for duplicate dependency
+    // Check sibling constraint: tasks must have the same parent
     if (dependentTask && dependencyTask) {
+      if (dependentTask.parentId !== dependencyTask.parentId) {
+        errors.push(
+          'Dependencies can only be created between sibling tasks (tasks with the same parent)'
+        );
+      }
+
+      // Check for duplicate dependency
       const existingDependencies = await this.getDependencies(dependentId);
       if (existingDependencies.includes(dependencyId)) {
         errors.push('Dependency already exists');
@@ -243,6 +283,7 @@ export class DependencyService {
 
   /**
    * Get tasks that are currently blocked by incomplete dependencies.
+   * Uses the original graph-based approach for direct dependencies only.
    *
    * @returns Promise resolving to array of tasks with dependency information
    */
@@ -269,7 +310,46 @@ export class DependencyService {
   }
 
   /**
+   * Get tasks that are currently blocked considering hierarchical dependency inheritance.
+   * This method considers both direct dependencies and inherited dependencies from parent tasks.
+   *
+   * @returns Promise resolving to array of tasks with hierarchical dependency information
+   */
+  async getHierarchicallyBlockedTasks(): Promise<TaskWithDependencies[]> {
+    const allTasks = await this.store.listTasks();
+    const blockedTasks: TaskWithDependencies[] = [];
+
+    for (const task of allTasks) {
+      const effectiveDependencies = await this.getEffectiveDependencies(task.id);
+      const blockedBy: string[] = [];
+
+      // Check which effective dependencies are incomplete
+      for (const depId of effectiveDependencies) {
+        const depTask = await this.store.getTask(depId);
+        if (!depTask || depTask.status !== 'done') {
+          blockedBy.push(depId);
+        }
+      }
+
+      if (blockedBy.length > 0) {
+        const dependents = await this.getDependents(task.id);
+
+        blockedTasks.push({
+          ...task,
+          dependencies: effectiveDependencies,
+          dependents,
+          isBlocked: true,
+          blockedBy,
+        });
+      }
+    }
+
+    return blockedTasks;
+  }
+
+  /**
    * Get comprehensive dependency graph information for a task.
+   * Uses the original graph-based approach for direct dependencies only.
    *
    * @param taskId - ID of the task to get graph information for
    * @returns Promise resolving to dependency graph information
@@ -280,7 +360,37 @@ export class DependencyService {
   }
 
   /**
+   * Get comprehensive dependency graph information for a task considering hierarchical inheritance.
+   * This includes both direct dependencies and inherited dependencies from parent tasks.
+   *
+   * @param taskId - ID of the task to get hierarchical graph information for
+   * @returns Promise resolving to hierarchical dependency graph information
+   */
+  async getHierarchicalDependencyGraph(taskId: string): Promise<TaskDependencyGraph> {
+    const effectiveDependencies = await this.getEffectiveDependencies(taskId);
+    const dependents = await this.getDependents(taskId);
+    const blockedBy: string[] = [];
+
+    // Check which effective dependencies are incomplete
+    for (const depId of effectiveDependencies) {
+      const depTask = await this.store.getTask(depId);
+      if (!depTask || depTask.status !== 'done') {
+        blockedBy.push(depId);
+      }
+    }
+
+    return {
+      taskId,
+      dependencies: effectiveDependencies,
+      dependents,
+      isBlocked: blockedBy.length > 0,
+      blockedBy,
+    };
+  }
+
+  /**
    * Get tasks that can be started immediately (no incomplete dependencies).
+   * Uses the original graph-based approach for direct dependencies only.
    *
    * @returns Promise resolving to array of executable tasks
    */
@@ -292,6 +402,42 @@ export class DependencyService {
     for (const taskId of executableTaskIds) {
       const task = await this.store.getTask(taskId);
       if (task) {
+        executableTasks.push(task);
+      }
+    }
+
+    return executableTasks;
+  }
+
+  /**
+   * Get tasks that can be started immediately considering hierarchical dependency inheritance.
+   * This method considers both direct dependencies and inherited dependencies from parent tasks.
+   *
+   * @returns Promise resolving to array of hierarchically executable tasks
+   */
+  async getHierarchicallyExecutableTasks(): Promise<Task[]> {
+    const allTasks = await this.store.listTasks();
+    const executableTasks: Task[] = [];
+
+    for (const task of allTasks) {
+      // Skip tasks that are already done or in progress
+      if (task.status === 'done' || task.status === 'in-progress') {
+        continue;
+      }
+
+      const effectiveDependencies = await this.getEffectiveDependencies(task.id);
+      let isBlocked = false;
+
+      // Check if any effective dependencies are incomplete
+      for (const depId of effectiveDependencies) {
+        const depTask = await this.store.getTask(depId);
+        if (!depTask || depTask.status !== 'done') {
+          isBlocked = true;
+          break;
+        }
+      }
+
+      if (!isBlocked) {
         executableTasks.push(task);
       }
     }

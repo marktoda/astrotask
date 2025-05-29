@@ -38,5 +38,8 @@ export {
   getAvailableTasksSchema,
   updateTaskStatusSchema,
   getTasksWithDependenciesSchema,
-  getTopologicalOrderSchema
+  getTopologicalOrderSchema,
+  getEffectiveTaskDependenciesSchema,
+  getHierarchicalTaskDependenciesSchema,
+  getHierarchicallyAvailableTasksSchema
 } from './types.js';
