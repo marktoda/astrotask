@@ -283,39 +283,11 @@ export class DependencyService {
 
   /**
    * Get tasks that are currently blocked by incomplete dependencies.
-   * Uses the original graph-based approach for direct dependencies only.
-   *
-   * @returns Promise resolving to array of tasks with dependency information
-   */
-  async getBlockedTasks(): Promise<TaskWithDependencies[]> {
-    const graph = await this.createDependencyGraph();
-    const blockedTaskIds = graph.getBlockedTasks();
-
-    const blockedTasks: TaskWithDependencies[] = [];
-    for (const taskId of blockedTaskIds) {
-      const task = await this.store.getTask(taskId);
-      if (task) {
-        const dependencyGraph = graph.getTaskDependencyGraph(taskId);
-        blockedTasks.push({
-          ...task,
-          dependencies: dependencyGraph.dependencies,
-          dependents: dependencyGraph.dependents,
-          isBlocked: dependencyGraph.isBlocked,
-          blockedBy: dependencyGraph.blockedBy,
-        });
-      }
-    }
-
-    return blockedTasks;
-  }
-
-  /**
-   * Get tasks that are currently blocked considering hierarchical dependency inheritance.
    * This method considers both direct dependencies and inherited dependencies from parent tasks.
    *
    * @returns Promise resolving to array of tasks with hierarchical dependency information
    */
-  async getHierarchicallyBlockedTasks(): Promise<TaskWithDependencies[]> {
+  async getBlockedTasks(): Promise<TaskWithDependencies[]> {
     const allTasks = await this.store.listTasks();
     const blockedTasks: TaskWithDependencies[] = [];
 
