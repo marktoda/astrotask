@@ -13,8 +13,12 @@ export interface AppState {
   showCommandPalette: boolean;
   commandPaletteInput: string;
   
-  // Scroll state
+  // Enhanced scroll state
   scrollOffset: number;
+  scrollMode: 'auto' | 'manual'; // Track if user is manually scrolling
+  lastManualScrollTime: number; // Timestamp of last manual scroll
+  viewportHeight: number; // Current viewport height
+  totalContentHeight: number; // Total content height
   
   // Progress tracking
   progressByTask: Map<string, number>;
@@ -32,7 +36,8 @@ export interface AppState {
   setCurrentView: (view: 'tree' | 'dependencies' | 'help') => void;
   toggleCommandPalette: () => void;
   setCommandPaletteInput: (input: string) => void;
-  setScrollOffset: (offset: number) => void;
+  setScrollOffset: (offset: number, mode?: 'auto' | 'manual') => void;
+  setViewportDimensions: (height: number, contentHeight: number) => void;
   updateProgress: (taskId: string, progress: number) => void;
   markProgressDirty: (taskId: string) => void;
   clearDirtyProgress: () => void;
@@ -49,6 +54,10 @@ export const useAppStore = create<AppState>((set, get) => ({
   showCommandPalette: false,
   commandPaletteInput: '',
   scrollOffset: 0,
+  scrollMode: 'auto',
+  lastManualScrollTime: 0,
+  viewportHeight: 0,
+  totalContentHeight: 0,
   progressByTask: new Map(),
   dirtyProgressTasks: new Set(),
   childrenByParent: new Map(),
@@ -90,7 +99,18 @@ export const useAppStore = create<AppState>((set, get) => ({
   
   setCommandPaletteInput: (input) => set({ commandPaletteInput: input }),
   
-  setScrollOffset: (offset) => set({ scrollOffset: offset }),
+  setScrollOffset: (offset, mode = 'auto') => {
+    const updates: Partial<AppState> = { scrollOffset: offset };
+    if (mode) {
+      updates.scrollMode = mode;
+      if (mode === 'manual') {
+        updates.lastManualScrollTime = Date.now();
+      }
+    }
+    set(updates);
+  },
+  
+  setViewportDimensions: (height, contentHeight) => set({ viewportHeight: height, totalContentHeight: contentHeight }),
   
   updateProgress: (taskId, progress) => {
     const { progressByTask } = get();

@@ -4,8 +4,8 @@ import type { Task, TaskDependency } from '@astrolabe/core';
 import { useDatabase } from '../context/DatabaseContext.js';
 import { useAppStore } from '../store/index.js';
 import { calculateAllTaskProgress, recalculateProgressForDirtyTasks } from '../store/calcProgress.js';
-import TaskTree from '../ui/components/TaskTree.js';
-import DetailPane from '../ui/components/DetailPane.js';
+import { TaskTree } from '../ui/components/TaskTree.js';
+import { DetailPane } from '../ui/components/DetailPane.js';
 import StatusBar from '../ui/components/StatusBar.js';
 import CommandPalette from '../ui/components/CommandPalette.js';
 
@@ -72,7 +72,6 @@ export default function TuiDashboard() {
     childrenByParent,
     progressByTask,
     dirtyProgressTasks,
-    scrollOffset,
     setTasks,
     setDependencies,
     selectTask,
@@ -80,7 +79,6 @@ export default function TuiDashboard() {
     setCurrentView,
     toggleCommandPalette,
     setCommandPaletteInput,
-    setScrollOffset,
     updateProgress,
     markProgressDirty,
     clearDirtyProgress,
@@ -290,14 +288,17 @@ export default function TuiDashboard() {
         }
       } else if (key.pageUp || (key.ctrl && input === 'u')) {
         // Manual scroll up
-        const newOffset = Math.max(0, scrollOffset - 5);
-        setScrollOffset(newOffset);
+        const { viewportHeight, scrollOffset, setScrollOffset } = useAppStore.getState();
+        const scrollStep = Math.max(1, Math.floor(viewportHeight / 3)); // Scroll by 1/3 of viewport
+        const newOffset = Math.max(0, scrollOffset - scrollStep);
+        setScrollOffset(newOffset, 'manual');
       } else if (key.pageDown || (key.ctrl && input === 'd')) {
         // Manual scroll down
-        const visibleTasks = getVisibleTasks();
-        const maxOffset = Math.max(0, visibleTasks.length - 10);
-        const newOffset = Math.min(maxOffset, scrollOffset + 5);
-        setScrollOffset(newOffset);
+        const { viewportHeight, scrollOffset, totalContentHeight, setScrollOffset } = useAppStore.getState();
+        const scrollStep = Math.max(1, Math.floor(viewportHeight / 3)); // Scroll by 1/3 of viewport
+        const maxOffset = Math.max(0, totalContentHeight - viewportHeight);
+        const newOffset = Math.min(maxOffset, scrollOffset + scrollStep);
+        setScrollOffset(newOffset, 'manual');
       }
     }
   });

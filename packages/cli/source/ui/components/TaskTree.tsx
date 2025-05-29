@@ -2,7 +2,13 @@ import { Box, Text } from 'ink';
 import type { Task } from '@astrolabe/core';
 import { useAppStore, useChildTasks, useTaskProgress } from '../../store/index.js';
 import { getTaskStatusIcon, formatProgress } from '../../store/calcProgress.js';
-import { useMemo } from 'react';
+import { useMemo, useEffect } from 'react';
+import { 
+  calculateViewportSlice, 
+  getVisibleTasksList, 
+  getTaskDepth, 
+  calculateViewportHeight 
+} from './scrollUtils.js';
 
 interface TaskTreeProps {
   parentId?: string | null;
@@ -17,22 +23,6 @@ interface TaskNodeProps {
   isSelected: boolean;
   isExpanded: boolean;
   progress: number;
-}
-
-// Helper function to get all visible tasks in a flattened list for viewport calculation
-function getVisibleTasksList(tasks: Task[], expandedTaskIds: Set<string>, parentId: string | null = null): Task[] {
-  const children = tasks.filter((t: Task) => t.parentId === parentId);
-  const result: Task[] = [];
-  
-  for (const child of children) {
-    result.push(child);
-    // If task is expanded, include its children
-    if (expandedTaskIds.has(child.id)) {
-      result.push(...getVisibleTasksList(tasks, expandedTaskIds, child.id));
-    }
-  }
-  
-  return result;
 }
 
 function TaskNode({ 
@@ -118,7 +108,14 @@ function TaskNode({
 
 export function TaskTree({ parentId = null, depth = 0, maxDepth = 10, maxHeight }: TaskTreeProps) {
   const childTasks = useChildTasks(parentId);
-  const { selectedTaskId, expandedTaskIds, tasks, scrollOffset, setScrollOffset } = useAppStore();
+  const {
+    selectedTaskId,
+    expandedTaskIds,
+    tasks,
+    scrollOffset,
+    setScrollOffset,
+    setViewportDimensions,
+  } = useAppStore();
   
   // Prevent infinite recursion
   if (depth > maxDepth) {
@@ -142,34 +139,39 @@ export function TaskTree({ parentId = null, depth = 0, maxDepth = 10, maxHeight 
       [tasks, expandedTaskIds]
     );
     
-    // Calculate viewport parameters
-    const viewportHeight = maxHeight ? Math.max(5, maxHeight - 4) : 15; // Reserve space for borders/padding
-    const selectedIndex = selectedTaskId ? allVisibleTasks.findIndex(t => t.id === selectedTaskId) : 0;
+    // Calculate effective viewport height
+    const effectiveViewportHeight = useMemo(() => 
+      calculateViewportHeight(maxHeight), 
+      [maxHeight]
+    );
     
-    // Auto-adjust scroll offset to keep selected task visible (less aggressive)
-    let newScrollOffset = scrollOffset;
-    if (selectedIndex >= 0) {
-      // Only scroll if selected task is completely outside viewport
-      if (selectedIndex < scrollOffset) {
-        newScrollOffset = Math.max(0, selectedIndex - 1); // Keep one item above visible
+    // Update viewport dimensions in store
+    useEffect(() => {
+      setViewportDimensions(effectiveViewportHeight, allVisibleTasks.length);
+    }, [effectiveViewportHeight, allVisibleTasks.length, setViewportDimensions]);
+    
+    // Calculate optimal scroll position
+    const selectedIndex = selectedTaskId ? allVisibleTasks.findIndex(t => t.id === selectedTaskId) : -1;
+    
+    const viewportCalc = useMemo(() =>
+      calculateViewportSlice(
+        selectedIndex,
+        scrollOffset,
+        effectiveViewportHeight,
+        allVisibleTasks.length
+      ),
+      [selectedIndex, scrollOffset, effectiveViewportHeight, allVisibleTasks.length]
+    );
+    
+    // Update scroll offset if needed
+    useEffect(() => {
+      if (viewportCalc.hasChanged) {
+        setScrollOffset(viewportCalc.newScrollOffset, 'auto');
       }
-      else if (selectedIndex >= scrollOffset + viewportHeight) {
-        newScrollOffset = selectedIndex - viewportHeight + 2; // Keep one item below visible
-      }
-    }
+    }, [viewportCalc.hasChanged, viewportCalc.newScrollOffset, setScrollOffset]);
     
-    // Ensure scroll offset is within bounds
-    const maxScrollOffset = Math.max(0, allVisibleTasks.length - viewportHeight);
-    newScrollOffset = Math.max(0, Math.min(newScrollOffset, maxScrollOffset));
-    
-    // Update scroll offset if it changed
-    if (newScrollOffset !== scrollOffset) {
-      setScrollOffset(newScrollOffset);
-    }
-    
-    // Calculate visible slice
-    const startIndex = newScrollOffset;
-    const endIndex = Math.min(allVisibleTasks.length, startIndex + viewportHeight);
+    // Use the calculated viewport slice
+    const { startIndex, endIndex } = viewportCalc;
     const visibleTasks = allVisibleTasks.slice(startIndex, endIndex);
     
     const containerProps = maxHeight ? { height: maxHeight, overflow: 'hidden' as const } : {};
@@ -225,21 +227,6 @@ export function TaskTree({ parentId = null, depth = 0, maxDepth = 10, maxHeight 
       })}
     </Box>
   );
-}
-
-// Helper function to calculate task depth in the hierarchy
-function getTaskDepth(task: Task, allTasks: Task[]): number {
-  let depth = 0;
-  let currentTask = task;
-  
-  while (currentTask.parentId) {
-    const parent = allTasks.find(t => t.id === currentTask.parentId);
-    if (!parent) break;
-    depth++;
-    currentTask = parent;
-  }
-  
-  return depth;
 }
 
 // Separate component to handle the progress hook safely
