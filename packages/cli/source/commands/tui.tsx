@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Box, useInput, useApp, Text } from 'ink';
+import { Box, useInput, useApp, Text, useStdout } from 'ink';
 import type { Task, TaskDependency } from '@astrolabe/core';
 import { useDatabase } from '../context/DatabaseContext.js';
 import { useAppStore } from '../store/index.js';
@@ -11,8 +11,57 @@ import CommandPalette from '../ui/components/CommandPalette.js';
 
 export const description = "Interactive TUI dashboard for task management";
 
+// Help view component
+function HelpView() {
+  return (
+    <Box flexDirection="column" padding={2}>
+      <Text bold color="cyan">Astrolabe TUI Help</Text>
+      <Text color="gray">─────────────────────</Text>
+      
+      <Box flexDirection="column" marginTop={1}>
+        <Text bold color="yellow">Navigation:</Text>
+        <Text>  ↑/k    Move cursor up</Text>
+        <Text>  ↓/j    Move cursor down</Text>
+        <Text>  ←/h    Collapse node</Text>
+        <Text>  →/l    Expand node</Text>
+        <Text>  ⏎      Toggle task status</Text>
+        <Text>  PgUp/Ctrl+u  Scroll up manually</Text>
+        <Text>  PgDn/Ctrl+d  Scroll down manually</Text>
+      </Box>
+      
+      <Box flexDirection="column" marginTop={1}>
+        <Text bold color="yellow">Task Management:</Text>
+        <Text>  a      Add sibling task</Text>
+        <Text>  A      Add child task</Text>
+        <Text>  D      Delete task</Text>
+        <Text>  :      Open command palette</Text>
+      </Box>
+      
+      <Box flexDirection="column" marginTop={1}>
+        <Text bold color="yellow">Views:</Text>
+        <Text>  v      Toggle dependency view</Text>
+        <Text>  ?      Show this help</Text>
+        <Text>  q      Quit application</Text>
+      </Box>
+      
+      <Box flexDirection="column" marginTop={1}>
+        <Text bold color="yellow">Command Palette Examples:</Text>
+        <Text color="gray">  add "Task title"</Text>
+        <Text color="gray">  add "Subtask" under task-123</Text>
+        <Text color="gray">  delete task-456</Text>
+        <Text color="gray">  status task-789 done</Text>
+      </Box>
+      
+      <Box marginTop={2}>
+        <Text color="gray">Press any key to return to task view</Text>
+      </Box>
+    </Box>
+  );
+}
+
 export default function TuiDashboard() {
   const { exit } = useApp();
+  const { stdout } = useStdout();
   const db = useDatabase();
   const {
     tasks,
@@ -23,6 +72,7 @@ export default function TuiDashboard() {
     childrenByParent,
     progressByTask,
     dirtyProgressTasks,
+    scrollOffset,
     setTasks,
     setDependencies,
     selectTask,
@@ -30,6 +80,7 @@ export default function TuiDashboard() {
     setCurrentView,
     toggleCommandPalette,
     setCommandPaletteInput,
+    setScrollOffset,
     updateProgress,
     markProgressDirty,
     clearDirtyProgress,
@@ -37,6 +88,29 @@ export default function TuiDashboard() {
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [terminalSize, setTerminalSize] = useState({ 
+    width: stdout?.columns || 80, 
+    height: stdout?.rows || 24 
+  });
+
+  // Track terminal size changes
+  useEffect(() => {
+    const updateSize = () => {
+      setTerminalSize({
+        width: stdout?.columns || 80,
+        height: stdout?.rows || 24
+      });
+    };
+
+    if (stdout) {
+      stdout.on('resize', updateSize);
+      return () => {
+        stdout.off('resize', updateSize);
+      };
+    }
+    
+    return undefined;
+  }, [stdout]);
 
   // Load initial data
   useEffect(() => {
@@ -122,6 +196,12 @@ export default function TuiDashboard() {
       return;
     }
 
+    // Help view - any key returns to tree view
+    if (currentView === 'help') {
+      setCurrentView('tree');
+      return;
+    }
+
     // Tree view navigation
     if (currentView === 'tree') {
       // Create a flattened list of visible tasks for navigation
@@ -150,17 +230,30 @@ export default function TuiDashboard() {
           if (prevTask) {
             selectTask(prevTask.id);
           }
+        } else if (visibleTasks.length > 0 && visibleTasks[0]) {
+          // If at the top, stay at the first task
+          selectTask(visibleTasks[0].id);
         }
       } else if (key.downArrow || input === 'j') {
-        if (currentIndex < visibleTasks.length - 1) {
+        if (currentIndex < visibleTasks.length - 1 && currentIndex >= 0) {
           const nextTask = visibleTasks[currentIndex + 1];
           if (nextTask) {
             selectTask(nextTask.id);
           }
+        } else if (visibleTasks.length > 0 && currentIndex === -1) {
+          // If no task selected, select the first one
+          const firstTask = visibleTasks[0];
+          if (firstTask) {
+            selectTask(firstTask.id);
+          }
         }
       } else if (key.rightArrow || input === 'l') {
         if (selectedTaskId) {
-          toggleTaskExpanded(selectedTaskId);
+          const selectedTask = tasks.find((t: Task) => t.id === selectedTaskId);
+          const hasChildren = selectedTask && tasks.some((t: Task) => t.parentId === selectedTask.id);
+          if (hasChildren) {
+            toggleTaskExpanded(selectedTaskId);
+          }
         }
       } else if (key.leftArrow || input === 'h') {
         if (selectedTaskId && expandedTaskIds.has(selectedTaskId)) {
@@ -195,6 +288,16 @@ export default function TuiDashboard() {
           toggleCommandPalette();
           setCommandPaletteInput(`delete ${selectedTaskId}`);
         }
+      } else if (key.pageUp || (key.ctrl && input === 'u')) {
+        // Manual scroll up
+        const newOffset = Math.max(0, scrollOffset - 5);
+        setScrollOffset(newOffset);
+      } else if (key.pageDown || (key.ctrl && input === 'd')) {
+        // Manual scroll down
+        const visibleTasks = getVisibleTasks();
+        const maxOffset = Math.max(0, visibleTasks.length - 10);
+        const newOffset = Math.min(maxOffset, scrollOffset + 5);
+        setScrollOffset(newOffset);
       }
     }
   });
@@ -318,39 +421,47 @@ export default function TuiDashboard() {
   }
 
   return (
-    <Box flexDirection="column" height="100%">
-      {/* Main content area */}
-      <Box flexGrow={1} flexDirection="row" height="100%">
-        {/* Left panel - Task Tree */}
-        <Box flexGrow={1} flexDirection="column" borderStyle="single" borderColor="gray" minWidth={0}>
-          <Box padding={1} flexGrow={1} overflow="hidden">
-            <TaskTree />
+    <Box flexDirection="column" width={terminalSize.width} height={terminalSize.height}>
+      {currentView === 'help' ? (
+        <HelpView />
+      ) : (
+        <>
+          {/* Main content area */}
+          <Box flexGrow={1} flexDirection="row" width="100%" height={terminalSize.height - 3}>
+            {/* Left panel - Task Tree */}
+            <Box 
+              flexGrow={1} 
+              flexDirection="column" 
+              borderStyle="single" 
+              borderColor="gray" 
+              width={terminalSize.width - 50}
+              height="100%"
+            >
+              <TaskTree maxHeight={terminalSize.height - 5} />
+            </Box>
+            
+            {/* Right panel - Detail Pane */}
+            <Box width={50} flexDirection="column" height="100%">
+              <DetailPane maxHeight={terminalSize.height - 5} />
+            </Box>
           </Box>
-        </Box>
-        
-        {/* Right panel - Detail Pane */}
-        <Box width={50} flexDirection="column" minWidth={50}>
-          <DetailPane />
-        </Box>
-      </Box>
-      
-      {/* Status bar */}
-      <Box height={3}>
-        <StatusBar />
-      </Box>
+          
+          {/* Status bar */}
+          <Box height={3} width="100%">
+            <StatusBar />
+          </Box>
+        </>
+      )}
       
       {/* Command palette overlay */}
       {showCommandPalette && (
         <Box 
-          position="absolute" 
-          top={0} 
-          left={0} 
-          right={0} 
-          bottom={0} 
           justifyContent="center" 
           alignItems="center"
+          width="100%"
+          height="100%"
         >
-          <Box width={80} maxWidth="80%">
+          <Box width={Math.min(80, terminalSize.width - 4)}>
             <CommandPalette 
               onExecute={handleCommandExecute}
               onCancel={handleCommandCancel}

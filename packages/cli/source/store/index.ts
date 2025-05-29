@@ -13,6 +13,9 @@ export interface AppState {
   showCommandPalette: boolean;
   commandPaletteInput: string;
   
+  // Scroll state
+  scrollOffset: number;
+  
   // Progress tracking
   progressByTask: Map<string, number>;
   dirtyProgressTasks: Set<string>;
@@ -29,6 +32,7 @@ export interface AppState {
   setCurrentView: (view: 'tree' | 'dependencies' | 'help') => void;
   toggleCommandPalette: () => void;
   setCommandPaletteInput: (input: string) => void;
+  setScrollOffset: (offset: number) => void;
   updateProgress: (taskId: string, progress: number) => void;
   markProgressDirty: (taskId: string) => void;
   clearDirtyProgress: () => void;
@@ -44,6 +48,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   currentView: 'tree',
   showCommandPalette: false,
   commandPaletteInput: '',
+  scrollOffset: 0,
   progressByTask: new Map(),
   dirtyProgressTasks: new Set(),
   childrenByParent: new Map(),
@@ -84,6 +89,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
   
   setCommandPaletteInput: (input) => set({ commandPaletteInput: input }),
+  
+  setScrollOffset: (offset) => set({ scrollOffset: offset }),
   
   updateProgress: (taskId, progress) => {
     const { progressByTask } = get();

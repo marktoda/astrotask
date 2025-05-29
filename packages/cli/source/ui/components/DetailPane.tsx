@@ -2,7 +2,7 @@ import { Box, Text } from 'ink';
 import { useAppStore, useTaskById, useTaskDependencies, useTaskProgress } from '../../store/index.js';
 import { getTaskStatusIcon, formatProgress } from '../../store/calcProgress.js';
 
-export function DetailPane() {
+export function DetailPane({ maxHeight }: { maxHeight?: number }) {
   const { selectedTaskId } = useAppStore();
   const selectedTask = useTaskById(selectedTaskId);
   const dependencies = useTaskDependencies(selectedTaskId || '');
@@ -21,8 +21,29 @@ export function DetailPane() {
   const statusColor = getStatusColor(selectedTask.status);
   const priorityColor = getPriorityColor(selectedTask.priority);
   
+  // Helper function to wrap text
+  const wrapText = (text: string, maxLength: number = 35): string[] => {
+    if (!text) return [];
+    const words = text.split(' ');
+    const lines: string[] = [];
+    let currentLine = '';
+    
+    for (const word of words) {
+      if ((currentLine + word).length <= maxLength) {
+        currentLine += (currentLine ? ' ' : '') + word;
+      } else {
+        if (currentLine) lines.push(currentLine);
+        currentLine = word;
+      }
+    }
+    if (currentLine) lines.push(currentLine);
+    return lines;
+  };
+  
+  const containerProps = maxHeight ? { height: maxHeight, overflow: 'hidden' as const } : { height: "100%" };
+  
   return (
-    <Box flexDirection="column" padding={1} borderStyle="round" borderColor="gray">
+    <Box flexDirection="column" padding={1} borderStyle="round" borderColor="gray" {...containerProps}>
       {/* Header */}
       <Box flexDirection="column" marginBottom={1}>
         <Text bold color="cyan">Task Details</Text>
@@ -30,21 +51,28 @@ export function DetailPane() {
       </Box>
       
       {/* Task Title */}
-      <Box marginBottom={1}>
-        <Text>{statusIcon} </Text>
-        <Text bold>{selectedTask.title}</Text>
+      <Box marginBottom={1} flexDirection="column">
+        <Box>
+          <Text>{statusIcon} </Text>
+          <Text bold>{selectedTask.title.substring(0, 40)}</Text>
+        </Box>
+        {selectedTask.title.length > 40 && (
+          <Text color="gray">{selectedTask.title.substring(40)}</Text>
+        )}
       </Box>
       
       {/* Task Description */}
       {selectedTask.description && (
-        <Box marginBottom={1}>
-          <Text color="gray">Description: </Text>
-          <Text>{selectedTask.description}</Text>
+        <Box marginBottom={1} flexDirection="column">
+          <Text color="gray">Description:</Text>
+          {wrapText(selectedTask.description).map((line, index) => (
+            <Text key={index}>{line}</Text>
+          ))}
         </Box>
       )}
       
       {/* Status and Priority */}
-      <Box flexDirection="row" gap={2} marginBottom={1}>
+      <Box flexDirection="column" marginBottom={1}>
         <Box>
           <Text color="gray">Status: </Text>
           <Text color={statusColor}>{selectedTask.status}</Text>
@@ -69,13 +97,20 @@ export function DetailPane() {
       {dependencies.length > 0 && (
         <Box flexDirection="column" marginBottom={1}>
           <Text color="gray">Blocked by:</Text>
-          {dependencies.map((dep) => (
-            <Box key={dep.id} paddingLeft={2}>
+          {dependencies.slice(0, 3).map((dep) => (
+            <Box key={dep.id} marginLeft={2}>
               <Text>{getTaskStatusIcon(dep)} </Text>
-              <Text color={getStatusColor(dep.status)}>{dep.title}</Text>
+              <Text color={getStatusColor(dep.status)}>
+                {dep.title.substring(0, 25)}{dep.title.length > 25 ? '...' : ''}
+              </Text>
               {dep.status !== 'done' && <Text color="red"> ⏳</Text>}
             </Box>
           ))}
+          {dependencies.length > 3 && (
+            <Box marginLeft={2}>
+              <Text color="gray">... and {dependencies.length - 3} more</Text>
+            </Box>
+          )}
         </Box>
       )}
       
@@ -83,8 +118,13 @@ export function DetailPane() {
       {selectedTask.prd && (
         <Box flexDirection="column" marginBottom={1}>
           <Text color="gray">PRD:</Text>
-          <Box paddingLeft={2}>
-            <Text>{selectedTask.prd.substring(0, 200)}{selectedTask.prd.length > 200 ? '...' : ''}</Text>
+          <Box marginLeft={2} flexDirection="column">
+            {wrapText(selectedTask.prd, 35).slice(0, 3).map((line, index) => (
+              <Text key={index}>{line}</Text>
+            ))}
+            {selectedTask.prd.length > 105 && (
+              <Text color="gray">...</Text>
+            )}
           </Box>
         </Box>
       )}
@@ -100,7 +140,7 @@ export function DetailPane() {
       )}
       
       {/* Timestamps */}
-      <Box flexDirection="column">
+      <Box flexDirection="column" marginTop={1}>
         <Text color="gray">Created: {formatDate(selectedTask.createdAt)}</Text>
         <Text color="gray">Updated: {formatDate(selectedTask.updatedAt)}</Text>
       </Box>
