@@ -271,7 +271,7 @@ export class DependencyHandlers {
    * Get hierarchical dependency graph for a task (includes inheritance)
    */
   async getHierarchicalTaskDependencies(args: GetTaskDependenciesInput): Promise<TaskDependencyGraph> {
-    return await this.context.dependencyService.getHierarchicalDependencyGraph(args.taskId);
+    return await this.context.dependencyService.getDependencyGraph(args.taskId);
   }
 
   /**

@@ -283,11 +283,39 @@ export class DependencyService {
 
   /**
    * Get tasks that are currently blocked by incomplete dependencies.
+   * Uses the original graph-based approach for direct dependencies only.
+   *
+   * @returns Promise resolving to array of tasks with dependency information
+   */
+  async getBlockedTasks(): Promise<TaskWithDependencies[]> {
+    const graph = await this.createDependencyGraph();
+    const blockedTaskIds = graph.getBlockedTasks();
+
+    const blockedTasks: TaskWithDependencies[] = [];
+    for (const taskId of blockedTaskIds) {
+      const task = await this.store.getTask(taskId);
+      if (task) {
+        const dependencyGraph = graph.getTaskDependencyGraph(taskId);
+        blockedTasks.push({
+          ...task,
+          dependencies: dependencyGraph.dependencies,
+          dependents: dependencyGraph.dependents,
+          isBlocked: dependencyGraph.isBlocked,
+          blockedBy: dependencyGraph.blockedBy,
+        });
+      }
+    }
+
+    return blockedTasks;
+  }
+
+  /**
+   * Get tasks that are currently blocked considering hierarchical dependency inheritance.
    * This method considers both direct dependencies and inherited dependencies from parent tasks.
    *
    * @returns Promise resolving to array of tasks with hierarchical dependency information
    */
-  async getBlockedTasks(): Promise<TaskWithDependencies[]> {
+  async getHierarchicallyBlockedTasks(): Promise<TaskWithDependencies[]> {
     const allTasks = await this.store.listTasks();
     const blockedTasks: TaskWithDependencies[] = [];
 
@@ -320,25 +348,13 @@ export class DependencyService {
   }
 
   /**
-   * Get comprehensive dependency graph information for a task.
-   * Uses the original graph-based approach for direct dependencies only.
+   * Get comprehensive dependency graph information for a task considering hierarchical inheritance.
+   * This includes both direct dependencies and inherited dependencies from parent tasks.
    *
    * @param taskId - ID of the task to get graph information for
    * @returns Promise resolving to dependency graph information
    */
   async getDependencyGraph(taskId: string): Promise<TaskDependencyGraph> {
-    const graph = await this.createDependencyGraph();
-    return graph.getTaskDependencyGraph(taskId);
-  }
-
-  /**
-   * Get comprehensive dependency graph information for a task considering hierarchical inheritance.
-   * This includes both direct dependencies and inherited dependencies from parent tasks.
-   *
-   * @param taskId - ID of the task to get hierarchical graph information for
-   * @returns Promise resolving to hierarchical dependency graph information
-   */
-  async getHierarchicalDependencyGraph(taskId: string): Promise<TaskDependencyGraph> {
     const effectiveDependencies = await this.getEffectiveDependencies(taskId);
     const dependents = await this.getDependents(taskId);
     const blockedBy: string[] = [];
