@@ -96,18 +96,54 @@ export class DependencyService {
   }
 
   /**
-   * Get all task IDs that a specific task depends on.
+   * Get all direct task IDs that a specific task depends on.
+   * This returns only first-level dependencies, not inherited ones.
    *
-   * @param taskId - ID of the task to get dependencies for
-   * @returns Promise resolving to array of dependency task IDs
+   * @param taskId - ID of the task to get direct dependencies for
+   * @returns Promise resolving to array of direct dependency task IDs
    */
-  async getDependencies(taskId: string): Promise<string[]> {
+  async getDirectDependencies(taskId: string): Promise<string[]> {
     const dependencies = await this.store.sql
       .select({ dependencyTaskId: taskDependencies.dependencyTaskId })
       .from(taskDependencies)
       .where(eq(taskDependencies.dependentTaskId, taskId));
 
     return dependencies.map((d: { dependencyTaskId: string }) => d.dependencyTaskId);
+  }
+
+  /**
+   * Get all effective task IDs that a specific task depends on.
+   * This includes both direct dependencies and inherited dependencies from parent tasks.
+   * Children inherit all dependencies from their parent tasks recursively.
+   *
+   * @param taskId - ID of the task to get effective dependencies for
+   * @returns Promise resolving to array of all effective dependency task IDs
+   */
+  async getDependencies(taskId: string): Promise<string[]> {
+    const visited = new Set<string>();
+    const dependencies = new Set<string>();
+
+    const collectDependencies = async (currentTaskId: string): Promise<void> => {
+      if (visited.has(currentTaskId)) {
+        return; // Avoid infinite loops
+      }
+      visited.add(currentTaskId);
+
+      // Get direct dependencies for current task
+      const directDeps = await this.getDirectDependencies(currentTaskId);
+      for (const dep of directDeps) {
+        dependencies.add(dep);
+      }
+
+      // Get parent task and inherit its dependencies
+      const task = await this.store.getTask(currentTaskId);
+      if (task?.parentId) {
+        await collectDependencies(task.parentId);
+      }
+    };
+
+    await collectDependencies(taskId);
+    return Array.from(dependencies);
   }
 
   /**
@@ -203,7 +239,7 @@ export class DependencyService {
 
     // Check for duplicate dependency
     if (dependentTask && dependencyTask) {
-      const existingDependencies = await this.getDependencies(dependentId);
+      const existingDependencies = await this.getDirectDependencies(dependentId);
       if (existingDependencies.includes(dependencyId)) {
         errors.push('Dependency already exists');
       }

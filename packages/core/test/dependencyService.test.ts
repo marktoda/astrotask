@@ -72,11 +72,11 @@ describe('DependencyService', () => {
       expect(dependency.createdAt).toBeInstanceOf(Date);
     });
 
-    it('should get dependencies for a task', async () => {
+    it('should get direct dependencies for a task', async () => {
       await dependencyService.addDependency(task2.id, task1.id);
       await dependencyService.addDependency(task2.id, task3.id);
 
-      const dependencies = await dependencyService.getDependencies(task2.id);
+      const dependencies = await dependencyService.getDirectDependencies(task2.id);
       
       expect(dependencies).toHaveLength(2);
       expect(dependencies).toContain(task1.id);
@@ -100,13 +100,51 @@ describe('DependencyService', () => {
       const removed = await dependencyService.removeDependency(task2.id, task1.id);
       expect(removed).toBe(true);
 
-      const dependencies = await dependencyService.getDependencies(task2.id);
+      const dependencies = await dependencyService.getDirectDependencies(task2.id);
       expect(dependencies).toHaveLength(0);
     });
 
     it('should return false when removing non-existent dependency', async () => {
       const removed = await dependencyService.removeDependency(task2.id, task1.id);
       expect(removed).toBe(false);
+    });
+
+    it('should get effective dependencies including hierarchical inheritance', async () => {
+      // Create a parent task
+      const parentTask = await store.addTask({
+        title: 'Parent Task',
+        description: 'Parent task',
+        status: 'pending',
+        priority: 'medium',
+      });
+
+      // Create a child task
+      const childTask = await store.addTask({
+        title: 'Child Task',
+        description: 'Child task',
+        status: 'pending',
+        priority: 'medium',
+        parentId: parentTask.id,
+      });
+
+      // Add dependencies to parent
+      await dependencyService.addDependency(parentTask.id, task1.id);
+      await dependencyService.addDependency(parentTask.id, task2.id);
+
+      // Add direct dependency to child
+      await dependencyService.addDependency(childTask.id, task3.id);
+
+      // Test direct dependencies
+      const childDirectDeps = await dependencyService.getDirectDependencies(childTask.id);
+      expect(childDirectDeps).toHaveLength(1);
+      expect(childDirectDeps).toContain(task3.id);
+
+      // Test effective dependencies (should include inherited from parent)
+      const childEffectiveDeps = await dependencyService.getDependencies(childTask.id);
+      expect(childEffectiveDeps).toHaveLength(3);
+      expect(childEffectiveDeps).toContain(task1.id); // inherited from parent
+      expect(childEffectiveDeps).toContain(task2.id); // inherited from parent
+      expect(childEffectiveDeps).toContain(task3.id); // direct dependency
     });
   });
 
