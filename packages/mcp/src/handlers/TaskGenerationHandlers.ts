@@ -83,8 +83,8 @@ export class TaskGenerationHandlers implements MCPHandler {
       const prdGenerator = createPRDTaskGenerator(this.logger, this.context.store);
 
       if (useHierarchical) {
-        // Generate hierarchical task tree
-        const trackingTree = await prdGenerator.generateTaskTree({
+        // Generate both task tree and dependency graph
+        const result = await prdGenerator.generate({
           content: params.content,
           context: {
             parentTaskId: params.context?.parentTaskId,
@@ -93,15 +93,12 @@ export class TaskGenerationHandlers implements MCPHandler {
         });
 
         if (params.persist) {
-          // Apply the reconciliation plan directly using taskService
-          const plan = trackingTree.createReconciliationPlan();
-          const updatedTree = await this.context.taskService.applyReconciliationPlan(plan);
+          // Apply both the task tree and dependency graph directly
+          const { updatedTree } = await result.tree.apply(this.context.taskService);
           
-          // Process dependencies if they were generated
-          if (prdGenerator.processPendingDependencies) {
-            // Extract child task IDs from the updated tree
-            const childTaskIds = updatedTree.getChildren().map(child => child.id);
-            await prdGenerator.processPendingDependencies(childTaskIds);
+          // Apply dependency graph if it has operations
+          if (result.graph.hasPendingChanges) {
+            await result.graph.apply(this.context.dependencyService);
           }
           
           // Return persisted tree with real IDs
@@ -125,19 +122,19 @@ export class TaskGenerationHandlers implements MCPHandler {
             generator: generatorType,
             persisted: false,
             hierarchical: true,
-            totalTasks: 1 + trackingTree.getChildren().length,
-            hasPendingOperations: trackingTree.hasPendingChanges,
+            totalTasks: 1 + result.tree.getChildren().length,
+            hasPendingOperations: result.tree.hasPendingChanges || result.graph.hasPendingChanges,
             requestId: this.context.requestId,
             timestamp: this.context.timestamp,
           };
 
           return {
-            tree: this.trackingTreeToNode(trackingTree),
+            tree: this.trackingTreeToNode(result.tree),
             metadata,
           };
         }
       } else {
-        // Generate reconciliation plan and apply it directly
+        // Generate both task tree and dependency graph
         // Load existing tasks for context if requested
         let existingTasks: Task[] = [];
         if (params.context?.existingTasks) {
@@ -148,8 +145,8 @@ export class TaskGenerationHandlers implements MCPHandler {
           existingTasks = tasks.filter((task): task is Task => task !== null);
         }
 
-        // Generate reconciliation plan
-        const plan = await prdGenerator.generate({
+        // Generate both tree and graph
+        const result = await prdGenerator.generate({
           content: params.content,
           context: {
             existingTasks,
@@ -158,8 +155,13 @@ export class TaskGenerationHandlers implements MCPHandler {
           metadata: params.metadata,
         });
 
-        // Apply the reconciliation plan directly using taskService
-        const updatedTree = await this.context.taskService.applyReconciliationPlan(plan);
+        // Apply the task tree reconciliation plan
+        const { updatedTree } = await result.tree.apply(this.context.taskService);
+
+        // Apply dependency graph if it has operations
+        if (result.graph.hasPendingChanges) {
+          await result.graph.apply(this.context.dependencyService);
+        }
 
         // Get all tasks from the updated tree (root + children)
         const allTasks = [updatedTree.task];
@@ -179,7 +181,7 @@ export class TaskGenerationHandlers implements MCPHandler {
           persisted: true,
           hierarchical: false,
           totalTasks: apiTasks.length,
-          operationsApplied: plan.operations.length,
+          operationsApplied: result.tree.pendingOperations.length + (result.graph.hasPendingChanges ? result.graph.pendingOperations.length : 0),
           requestId: this.context.requestId,
           timestamp: this.context.timestamp,
         };

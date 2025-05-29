@@ -120,12 +120,12 @@ export async function needsMigration(connection: DatabaseConnection): Promise<bo
       FROM information_schema.tables 
       WHERE table_schema = 'public' 
       AND table_type = 'BASE TABLE'
-      AND table_name IN ('tasks', 'context_slices')
+      AND table_name IN ('tasks', 'context_slices', 'task_dependencies')
       ORDER BY table_name
     `);
 
     const existingTables = result.rows.map((row) => (row as { table_name: string }).table_name);
-    const requiredTables = ['context_slices', 'tasks'];
+    const requiredTables = ['context_slices', 'task_dependencies', 'tasks'];
 
     // Check if all required tables exist
     const hasAllTables = requiredTables.every((table) => existingTables.includes(table));

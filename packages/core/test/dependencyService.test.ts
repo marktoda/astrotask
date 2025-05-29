@@ -20,7 +20,7 @@ describe('DependencyService', () => {
   beforeEach(async () => {
     // Initialize in-memory database for testing
     store = await createDatabase({ 
-      dbPath: ':memory:',
+      dbPath: 'memory://',
       encrypted: false,
       autoSync: false 
     });
@@ -51,7 +51,14 @@ describe('DependencyService', () => {
   });
 
   afterEach(async () => {
-    await store.close();
+    if (store) {
+      try {
+        await store.close();
+      } catch (error) {
+        // Ignore cleanup errors in tests
+        console.warn('Test cleanup error:', error);
+      }
+    }
   });
 
   describe('Basic CRUD Operations', () => {

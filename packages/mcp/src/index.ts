@@ -2,7 +2,7 @@
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { createDatabase, type DatabaseOptions, TaskService, createModuleLogger, logShutdown } from '@astrolabe/core';
+import { createDatabase, type DatabaseOptions, TaskService, DependencyService, createModuleLogger, logShutdown } from '@astrolabe/core';
 import {
   TaskHandlers,
   TaskGenerationHandlers,
@@ -47,10 +47,14 @@ async function main() {
   // Create TaskService with the store
   const taskService = new TaskService(store);
 
+  // Create DependencyService with the store
+  const dependencyService = new DependencyService(store);
+
   // Create handler context
   const handlerContext = {
     store,
     taskService,
+    dependencyService,
     requestId: 'main',
     timestamp: new Date().toISOString(),
   };

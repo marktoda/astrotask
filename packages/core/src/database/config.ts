@@ -55,6 +55,16 @@ function configureEncryption(_db: PGlite, verbose: boolean): void {
  * Ensure database directory exists
  */
 function ensureDatabaseDirectory(dbPath: string): void {
+  // Don't create directories for in-memory databases
+  if (dbPath === ':memory:' || dbPath.startsWith(':memory:') || dbPath.startsWith('memory://')) {
+    return;
+  }
+
+  // Don't create directories for other special protocols
+  if (dbPath.startsWith('idb://') || dbPath.startsWith('opfs-ahp://')) {
+    return;
+  }
+
   const lastSlash = dbPath.lastIndexOf('/');
   if (lastSlash === -1) {
     // Path is in current working directory; no directory to ensure

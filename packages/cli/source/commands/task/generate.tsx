@@ -2,6 +2,7 @@ import {
 	type GenerationError,
 	type Task,
 	TaskService,
+	DependencyService,
 	createModuleLogger,
 	createPRDTaskGenerator,
 } from "@astrolabe/core";
@@ -13,7 +14,10 @@ import { useDatabase } from "../../context/DatabaseContext.js";
 export const description = "Generate tasks from PRD content using AI";
 
 export const options = zod.object({
-	content: zod.string().describe("PRD content to generate tasks from"),
+	content: zod
+		.string()
+		.optional()
+		.describe("PRD content to generate tasks from"),
 	file: zod.string().optional().describe("Path to PRD file to read"),
 	parent: zod
 		.string()
@@ -165,8 +169,8 @@ export default function Generate({ options }: Props) {
 					}
 				}
 
-				// Generate reconciliation plan
-				const plan = await generator.generate({
+				// Generate both task tree and dependency graph
+				const result = await generator.generate({
 					content,
 					context: {
 						existingTasks,
@@ -181,7 +185,8 @@ export default function Generate({ options }: Props) {
 
 				// Preview mode - don't save to database
 				if (options.dry) {
-					// For dry run, just extract tasks from the plan without applying it
+					// For dry run, just extract tasks from the tracking tree without applying it
+					const plan = result.tree.createReconciliationPlan();
 					const previewTasks = plan.operations
 						.filter((op: any) => op.type === "child_add")
 						.map((op: any) => {
@@ -204,13 +209,15 @@ export default function Generate({ options }: Props) {
 					return;
 				}
 
-				// Apply the reconciliation plan (this persists to database)
+				// Apply both the task tree and dependency graph
 				const taskService = new TaskService(db);
-				const updatedTree = await taskService.applyReconciliationPlan(plan);
+				const { updatedTree } = await result.tree.apply(taskService);
 
-				// Process dependencies if they were generated
-				const childTaskIds = updatedTree.getChildren().map(child => child.id);
-				await (generator as any).processPendingDependencies(childTaskIds);
+				// Apply dependency graph if it has operations
+				if (result.graph.hasPendingChanges) {
+					const dependencyService = new DependencyService(db);
+					await result.graph.apply(dependencyService);
+				}
 
 				// Get all tasks from the updated tree (root + children)
 				const allTasks = [updatedTree.task];

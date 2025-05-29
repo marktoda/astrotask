@@ -8,14 +8,25 @@
  * @since 1.0.0
  */
 
-import type { ReconciliationPlan, TrackingTaskTree } from '../../utils/TrackingTaskTree.js';
+import type { TrackingDependencyGraph } from '../../utils/TrackingDependencyGraph.js';
+import type { TrackingTaskTree } from '../../utils/TrackingTaskTree.js';
 import type { GenerationInput, ValidationResult } from './schemas.js';
+
+/**
+ * Result of task generation containing both task tree and dependency graph
+ */
+export interface GenerationResult {
+  /** Tracking task tree with generated tasks */
+  tree: TrackingTaskTree;
+  /** Tracking dependency graph with generated dependencies */
+  graph: TrackingDependencyGraph;
+}
 
 /**
  * Base interface for all task generators
  *
  * Task generators are responsible for converting input content (PRDs, test descriptions, etc.)
- * into structured task hierarchies that can be stored in the database.
+ * into structured task hierarchies with dependency relationships that can be stored in the database.
  *
  * @interface TaskGenerator
  * @example
@@ -23,7 +34,7 @@ import type { GenerationInput, ValidationResult } from './schemas.js';
  * class PRDTaskGenerator implements TaskGenerator {
  *   readonly type = 'prd';
  *
- *   async generate(input: GenerationInput, parentId?: string | null): Promise<ReconciliationPlan> {
+ *   async generate(input: GenerationInput): Promise<GenerationResult> {
  *     // Implementation logic here
  *   }
  *
@@ -38,19 +49,18 @@ export interface TaskGenerator {
   readonly type: string;
 
   /**
-   * Generate a reconciliation plan representing the task hierarchy from the provided input
+   * Generate both task tree and dependency graph from the provided input
    *
    * This is the primary generation method that creates a complete task hierarchy
-   * and returns it as a ReconciliationPlan that can be applied to any compatible store.
-   * This enables the AI to generate proper hierarchical structures with multiple layers,
-   * subtasks, and complex relationships in a single operation.
+   * with dependency relationships and returns both as tracking structures that
+   * can be applied to any compatible store.
    *
    * @param input - The input content and context for generation
-   * @returns Promise resolving to a ReconciliationPlan representing the task hierarchy
+   * @returns Promise resolving to GenerationResult with both tree and graph
    *
    * @throws {Error} When generation fails due to invalid input or processing errors
    */
-  generate(input: GenerationInput): Promise<ReconciliationPlan>;
+  generate(input: GenerationInput): Promise<GenerationResult>;
 
   /**
    * Validate input before generation
@@ -59,17 +69,4 @@ export interface TaskGenerator {
    * @returns Promise resolving to validation results with errors/warnings/suggestions
    */
   validate(input: GenerationInput): Promise<ValidationResult>;
-
-  /**
-   * Generate a hierarchical task tree from the provided input
-   *
-   * This method creates a root task representing the entire generation context
-   * with generated subtasks as children, enabling atomic tree operations.
-   *
-   * @param input - The input content and context for generation
-   * @returns Promise resolving to a TrackingTaskTree with root task and generated children
-   *
-   * @throws {Error} When generation fails due to invalid input or processing errors
-   */
-  generateTaskTree?(input: GenerationInput): Promise<TrackingTaskTree>;
 }

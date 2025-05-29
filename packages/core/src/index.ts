@@ -15,6 +15,7 @@ export const APP_NAME = 'Astrolabe';
 export * from './database/index.js';
 export { TaskService } from './services/TaskService.js';
 export { DependencyService } from './services/DependencyService.js';
+export { DependencyGraph } from './utils/DependencyGraph.js';
 
 // Schema exports
 export {
@@ -72,6 +73,15 @@ export {
   deserializeTrackingState,
 } from './utils/TrackingTaskTree.js';
 
+// TrackingDependencyGraph utilities
+export {
+  TrackingDependencyGraph,
+  type DependencyPendingOperation,
+  type DependencyReconciliationPlan,
+  serializeDependencyTrackingState,
+  deserializeDependencyTrackingState,
+} from './utils/TrackingDependencyGraph.js';
+
 // TaskTree validation
 export {
   validateTaskTree,
@@ -93,7 +103,10 @@ export {
 } from './utils/TaskTreeCache.js';
 
 // Task generation exports
-export * from './services/generators/TaskGenerator.js';
+export type {
+  TaskGenerator,
+  GenerationResult,
+} from './services/generators/TaskGenerator.js';
 export * from './services/generators/PRDTaskGenerator.js';
 export * from './services/generators/schemas.js';
 

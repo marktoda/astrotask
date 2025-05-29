@@ -40,3 +40,4 @@ tasks.json
 tasks/
 dev.db
 *.db
+:memory:

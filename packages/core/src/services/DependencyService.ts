@@ -21,6 +21,11 @@ import type {
   TaskWithDependencies,
 } from '../schemas/dependency.js';
 import type { Task } from '../schemas/task.js';
+import { DependencyGraph } from '../utils/DependencyGraph.js';
+import type {
+  DependencyPendingOperation,
+  DependencyReconciliationPlan,
+} from '../utils/TrackingDependencyGraph.js';
 
 /**
  * Service for managing task dependency relationships.
@@ -121,7 +126,46 @@ export class DependencyService {
   }
 
   // ---------------------------------------------------------------------------
-  // Validation and Analysis
+  // Graph Operations (using DependencyGraph utility)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Create a DependencyGraph instance from current database state.
+   * This provides access to advanced graph analysis operations.
+   *
+   * @param taskIds - Optional array of task IDs to include (defaults to all tasks)
+   * @returns Promise resolving to DependencyGraph instance
+   */
+  async createDependencyGraph(taskIds?: string[]): Promise<DependencyGraph> {
+    // Get all dependencies
+    const allDependencies = taskIds
+      ? await this.store.sql
+          .select()
+          .from(taskDependencies)
+          .where(
+            and(
+              inArray(taskDependencies.dependentTaskId, taskIds),
+              inArray(taskDependencies.dependencyTaskId, taskIds)
+            )
+          )
+      : await this.store.sql.select().from(taskDependencies);
+
+    // Get task data for status checking
+    const tasks = taskIds
+      ? await Promise.all(taskIds.map((id) => this.store.getTask(id)))
+      : await this.store.listTasks();
+
+    const validTasks = tasks.filter((t): t is Task => t !== null);
+    const taskData = validTasks.map((task) => ({
+      id: task.id,
+      status: task.status,
+    }));
+
+    return DependencyGraph.fromDependencies(allDependencies, taskData);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Validation and Analysis (delegated to DependencyGraph)
   // ---------------------------------------------------------------------------
 
   /**
@@ -165,11 +209,14 @@ export class DependencyService {
       }
     }
 
-    // Check for cycles (only if basic validation passes)
+    // Check for cycles using DependencyGraph (only if basic validation passes)
     let cycles: string[][] = [];
     if (errors.length === 0) {
-      cycles = await this.findCyclesIfAdded(dependentId, dependencyId);
-      if (cycles.length > 0 && cycles[0]) {
+      const graph = await this.createDependencyGraph();
+      const cycleResult = graph.wouldCreateCycle(dependentId, dependencyId);
+      cycles = cycleResult.cycles;
+
+      if (cycleResult.hasCycles && cycles[0]) {
         errors.push(`Adding this dependency would create a cycle: ${cycles[0].join(' -> ')}`);
       }
     }
@@ -189,111 +236,9 @@ export class DependencyService {
    * @returns Promise resolving to array of cycles (each cycle is an array of task IDs)
    */
   async findCycles(taskIds?: string[]): Promise<string[][]> {
-    // Get all dependencies
-    const allDependencies = await this.store.sql.select().from(taskDependencies);
-
-    // Build adjacency list
-    const graph = new Map<string, string[]>();
-    for (const dep of allDependencies) {
-      if (!graph.has(dep.dependentTaskId)) {
-        graph.set(dep.dependentTaskId, []);
-      }
-      graph.get(dep.dependentTaskId)?.push(dep.dependencyTaskId);
-    }
-
-    // Use DFS to detect cycles
-    const visited = new Set<string>();
-    const recursionStack = new Set<string>();
-    const cycles: string[][] = [];
-
-    const dfs = (node: string, path: string[]): void => {
-      visited.add(node);
-      recursionStack.add(node);
-      path.push(node);
-
-      const neighbors = graph.get(node) || [];
-      for (const neighbor of neighbors) {
-        if (!visited.has(neighbor)) {
-          dfs(neighbor, [...path]);
-        } else if (recursionStack.has(neighbor)) {
-          // Found a cycle
-          const cycleStart = path.indexOf(neighbor);
-          if (cycleStart !== -1) {
-            cycles.push([...path.slice(cycleStart), neighbor]);
-          }
-        }
-      }
-
-      recursionStack.delete(node);
-    };
-
-    const nodesToCheck = taskIds || Array.from(graph.keys());
-    for (const node of nodesToCheck) {
-      if (!visited.has(node)) {
-        dfs(node, []);
-      }
-    }
-
-    return cycles;
-  }
-
-  /**
-   * Check if adding a dependency would create a cycle.
-   *
-   * @param dependentId - ID of the dependent task
-   * @param dependencyId - ID of the dependency task
-   * @returns Promise resolving to array of cycles that would be created
-   */
-  private async findCyclesIfAdded(dependentId: string, dependencyId: string): Promise<string[][]> {
-    // Temporarily add the dependency to check for cycles
-    const allDependencies = await this.store.sql.select().from(taskDependencies);
-
-    // Add the proposed dependency
-    const testDependencies = [
-      ...allDependencies,
-      { dependentTaskId: dependentId, dependencyTaskId: dependencyId },
-    ];
-
-    // Build adjacency list with the test dependency
-    const graph = new Map<string, string[]>();
-    for (const dep of testDependencies) {
-      if (!graph.has(dep.dependentTaskId)) {
-        graph.set(dep.dependentTaskId, []);
-      }
-      graph.get(dep.dependentTaskId)?.push(dep.dependencyTaskId);
-    }
-
-    // Check for cycles starting from the dependent task
-    const visited = new Set<string>();
-    const recursionStack = new Set<string>();
-    const cycles: string[][] = [];
-
-    const dfs = (node: string, path: string[]): void => {
-      visited.add(node);
-      recursionStack.add(node);
-      path.push(node);
-
-      const neighbors = graph.get(node) || [];
-      for (const neighbor of neighbors) {
-        if (!visited.has(neighbor)) {
-          dfs(neighbor, [...path]);
-        } else if (recursionStack.has(neighbor)) {
-          // Found a cycle
-          const cycleStart = path.indexOf(neighbor);
-          if (cycleStart !== -1) {
-            cycles.push([...path.slice(cycleStart), neighbor]);
-          }
-        }
-      }
-
-      recursionStack.delete(node);
-    };
-
-    if (!visited.has(dependentId)) {
-      dfs(dependentId, []);
-    }
-
-    return cycles;
+    const graph = await this.createDependencyGraph(taskIds);
+    const result = graph.findCycles();
+    return result.cycles;
   }
 
   /**
@@ -302,13 +247,14 @@ export class DependencyService {
    * @returns Promise resolving to array of tasks with dependency information
    */
   async getBlockedTasks(): Promise<TaskWithDependencies[]> {
-    // Get all tasks and their dependencies
-    const allTasks = await this.store.listTasks();
-    const blockedTasks: TaskWithDependencies[] = [];
+    const graph = await this.createDependencyGraph();
+    const blockedTaskIds = graph.getBlockedTasks();
 
-    for (const task of allTasks) {
-      const dependencyGraph = await this.getDependencyGraph(task.id);
-      if (dependencyGraph.isBlocked) {
+    const blockedTasks: TaskWithDependencies[] = [];
+    for (const taskId of blockedTaskIds) {
+      const task = await this.store.getTask(taskId);
+      if (task) {
+        const dependencyGraph = graph.getTaskDependencyGraph(taskId);
         blockedTasks.push({
           ...task,
           dependencies: dependencyGraph.dependencies,
@@ -322,10 +268,6 @@ export class DependencyService {
     return blockedTasks;
   }
 
-  // ---------------------------------------------------------------------------
-  // Graph Operations
-  // ---------------------------------------------------------------------------
-
   /**
    * Get comprehensive dependency graph information for a task.
    *
@@ -333,32 +275,8 @@ export class DependencyService {
    * @returns Promise resolving to dependency graph information
    */
   async getDependencyGraph(taskId: string): Promise<TaskDependencyGraph> {
-    const [dependencies, dependents] = await Promise.all([
-      this.getDependencies(taskId),
-      this.getDependents(taskId),
-    ]);
-
-    // Check if task is blocked by getting status of dependencies
-    const blockedBy: string[] = [];
-    if (dependencies.length > 0) {
-      const dependencyTasks = await Promise.all(dependencies.map((id) => this.store.getTask(id)));
-
-      for (let i = 0; i < dependencyTasks.length; i++) {
-        const depTask = dependencyTasks[i];
-        const dependencyId = dependencies[i];
-        if (depTask && depTask.status !== 'done' && dependencyId) {
-          blockedBy.push(dependencyId);
-        }
-      }
-    }
-
-    return {
-      taskId,
-      dependencies,
-      dependents,
-      isBlocked: blockedBy.length > 0,
-      blockedBy,
-    };
+    const graph = await this.createDependencyGraph();
+    return graph.getTaskDependencyGraph(taskId);
   }
 
   /**
@@ -367,17 +285,13 @@ export class DependencyService {
    * @returns Promise resolving to array of executable tasks
    */
   async getExecutableTasks(): Promise<Task[]> {
-    const allTasks = await this.store.listTasks();
+    const graph = await this.createDependencyGraph();
+    const executableTaskIds = graph.getExecutableTasks();
+
     const executableTasks: Task[] = [];
-
-    for (const task of allTasks) {
-      // Skip tasks that are already done or in progress
-      if (task.status === 'done' || task.status === 'in-progress') {
-        continue;
-      }
-
-      const dependencyGraph = await this.getDependencyGraph(task.id);
-      if (!dependencyGraph.isBlocked) {
+    for (const taskId of executableTaskIds) {
+      const task = await this.store.getTask(taskId);
+      if (task) {
         executableTasks.push(task);
       }
     }
@@ -392,79 +306,103 @@ export class DependencyService {
    * @returns Promise resolving to array of task IDs in topological order
    */
   async getTopologicalOrder(taskIds: string[]): Promise<string[]> {
-    // Get dependencies for the specified tasks
-    const dependencies = await this.store.sql
-      .select()
-      .from(taskDependencies)
-      .where(
-        and(
-          inArray(taskDependencies.dependentTaskId, taskIds),
-          inArray(taskDependencies.dependencyTaskId, taskIds)
-        )
+    const graph = await this.createDependencyGraph(taskIds);
+    return graph.getTopologicalOrderForTasks(taskIds);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Reconciliation Plan Operations
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Apply a dependency reconciliation plan to the database.
+   * This method processes all dependency operations in the plan and applies them atomically.
+   *
+   * @param plan - The reconciliation plan containing dependency operations
+   * @returns Promise resolving to updated DependencyGraph reflecting the changes
+   * @throws Error if any operation in the plan fails
+   */
+  async applyReconciliationPlan(plan: DependencyReconciliationPlan): Promise<DependencyGraph> {
+    // If no operations, just return current graph
+    if (plan.operations.length === 0) {
+      return this.createDependencyGraph();
+    }
+
+    // Process operations in order
+    for (const operation of plan.operations) {
+      await this.applyDependencyOperation(operation);
+    }
+
+    // Return updated dependency graph
+    return this.createDependencyGraph();
+  }
+
+  /**
+   * Apply a single dependency operation.
+   *
+   * @param operation - The dependency operation to apply
+   * @throws Error if the operation fails
+   */
+  private async applyDependencyOperation(operation: DependencyPendingOperation): Promise<void> {
+    switch (operation.type) {
+      case 'dependency_add':
+        await this.applyAddDependencyOperation(operation);
+        break;
+
+      case 'dependency_remove':
+        await this.applyRemoveDependencyOperation(operation);
+        break;
+
+      default:
+        // TypeScript should ensure this never happens, but just in case
+        throw new Error(
+          `Unknown dependency operation type: ${(operation as { type: string }).type}`
+        );
+    }
+  }
+
+  /**
+   * Apply an add dependency operation.
+   *
+   * @param operation - The add dependency operation
+   * @throws Error if the operation fails
+   */
+  private async applyAddDependencyOperation(
+    operation: DependencyPendingOperation & { type: 'dependency_add' }
+  ): Promise<void> {
+    try {
+      await this.addDependency(operation.dependentTaskId, operation.dependencyTaskId);
+    } catch (error) {
+      // If dependency already exists, that's okay - just log and continue
+      if (error instanceof Error && error.message.includes('already exists')) {
+        // Dependency already exists, skip
+        return;
+      }
+      throw new Error(
+        `Failed to add dependency ${operation.dependentTaskId} -> ${operation.dependencyTaskId}: ${
+          error instanceof Error ? error.message : String(error)
+        }`
       );
-
-    const { graph, inDegree } = this.buildTopologicalGraph(taskIds, dependencies);
-    return this.performTopologicalSort(graph, inDegree);
+    }
   }
 
   /**
-   * Build adjacency list and in-degree count for topological sorting.
+   * Apply a remove dependency operation.
+   *
+   * @param operation - The remove dependency operation
+   * @throws Error if the operation fails
    */
-  private buildTopologicalGraph(
-    taskIds: string[],
-    dependencies: Array<{ dependentTaskId: string; dependencyTaskId: string }>
-  ): { graph: Map<string, string[]>; inDegree: Map<string, number> } {
-    const graph = new Map<string, string[]>();
-    const inDegree = new Map<string, number>();
-
-    // Initialize all tasks
-    for (const taskId of taskIds) {
-      graph.set(taskId, []);
-      inDegree.set(taskId, 0);
+  private async applyRemoveDependencyOperation(
+    operation: DependencyPendingOperation & { type: 'dependency_remove' }
+  ): Promise<void> {
+    try {
+      await this.removeDependency(operation.dependentTaskId, operation.dependencyTaskId);
+    } catch (error) {
+      throw new Error(
+        `Failed to remove dependency ${operation.dependentTaskId} -> ${operation.dependencyTaskId}: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
     }
-
-    // Build graph
-    for (const dep of dependencies) {
-      graph.get(dep.dependencyTaskId)?.push(dep.dependentTaskId);
-      inDegree.set(dep.dependentTaskId, (inDegree.get(dep.dependentTaskId) || 0) + 1);
-    }
-
-    return { graph, inDegree };
-  }
-
-  /**
-   * Perform Kahn's algorithm for topological sorting.
-   */
-  private performTopologicalSort(
-    graph: Map<string, string[]>,
-    inDegree: Map<string, number>
-  ): string[] {
-    const queue: string[] = [];
-    const result: string[] = [];
-
-    // Start with tasks that have no dependencies
-    for (const [taskId, degree] of inDegree.entries()) {
-      if (degree === 0) {
-        queue.push(taskId);
-      }
-    }
-
-    while (queue.length > 0) {
-      const current = queue.shift();
-      if (!current) break; // This should never happen due to the while condition, but satisfies the linter
-      result.push(current);
-
-      // Process all dependents
-      for (const dependent of graph.get(current) || []) {
-        const newDegree = (inDegree.get(dependent) || 0) - 1;
-        inDegree.set(dependent, newDegree);
-
-        if (newDegree === 0) {
-          queue.push(dependent);
-        }
-      }
-    }
-
-    return result;
   }
 }

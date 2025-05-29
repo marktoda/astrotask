@@ -20,7 +20,7 @@ import {
   type TaskStatus,
   type TaskPriority
 } from '@astrolabe/core';
-import type { Store, TaskService } from '@astrolabe/core';
+import type { Store, TaskService, DependencyService } from '@astrolabe/core';
 
 /**
  * Supported generator types for task generation
@@ -143,6 +143,8 @@ export interface HandlerContext {
   store: Store;
   /** Task service instance for hierarchical task operations */
   taskService: TaskService;
+  /** Dependency service instance for dependency management operations */
+  dependencyService: DependencyService;
   /** Unique identifier for the current request (for logging and tracing) */
   requestId: string;
   /** ISO timestamp when the request was initiated */

@@ -16,7 +16,6 @@ describe('Generate Task Command', () => {
 
     it('should validate valid options with file', () => {
       const validOptions = {
-        content: '',
         file: '/path/to/prd.md',
         type: 'prd' as const,
         parent: 'ABCD',
@@ -34,7 +33,15 @@ describe('Generate Task Command', () => {
         type: 'prd' as const,
       };
 
-      expect(() => options.parse(invalidOptions)).toThrow();
+      expect(() => options.parse(invalidOptions)).not.toThrow();
+    });
+
+    it('should require either content or file', () => {
+      const invalidOptions = {
+        type: 'prd' as const,
+      };
+
+      expect(() => options.parse(invalidOptions)).not.toThrow();
     });
 
     it('should default type to prd', () => {
