@@ -126,6 +126,11 @@ export class DashboardLayout {
 
 		// Focus management
 		this.unsubscribe = this.store.subscribe((state) => {
+			// Skip all updates if editor is active
+			if (state.editorActive) {
+				return;
+			}
+
 			switch (state.activePanel) {
 				case "sidebar":
 					this.projectSidebar.focus();
@@ -193,6 +198,12 @@ export class DashboardLayout {
 	}
 
 	handleResize() {
+		// Skip resize if editor is active
+		const state = this.store.getState();
+		if (state.editorActive) {
+			return;
+		}
+
 		// Re-calculate positions
 		this.setupLayout();
 		this.screen.render();

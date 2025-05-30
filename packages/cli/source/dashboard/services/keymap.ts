@@ -102,6 +102,16 @@ export class KeymapService {
 				description: "Add child task",
 				action: () => {}, // Will be overridden
 			},
+			addSiblingEditor: {
+				keys: ["e"],
+				description: "Add sibling task with editor",
+				action: () => {}, // Will be overridden
+			},
+			addChildEditor: {
+				keys: ["E"],
+				description: "Add child task with editor",
+				action: () => {}, // Will be overridden
+			},
 			deleteTask: {
 				keys: ["D"],
 				description: "Delete task (with confirmation)",

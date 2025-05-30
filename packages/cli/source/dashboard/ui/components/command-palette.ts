@@ -109,6 +109,27 @@ export class CommandPalette {
 				},
 			},
 			{
+				name: "add task editor",
+				description: "Add a new task using editor",
+				pattern: /^add\s+editor(?:\s+under\s+(\S+))?$/,
+				execute: async (matches) => {
+					const parentId = matches[1] || null;
+					await state().addTaskWithEditor(parentId);
+					state().toggleCommandPalette();
+				},
+			},
+			{
+				name: "rename task",
+				description: "Rename a task by ID",
+				pattern: /^rename\s+(\S+)\s+"([^"]+)"$/,
+				execute: async (matches) => {
+					const taskId = matches[1] || "";
+					const newTitle = matches[2] || "";
+					await state().renameTask(taskId, newTitle);
+					state().toggleCommandPalette();
+				},
+			},
+			{
 				name: "delete task",
 				description: "Delete a task by ID",
 				pattern: /^delete\s+(\S+)$/,

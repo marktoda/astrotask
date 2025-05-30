@@ -29,10 +29,6 @@ async function main() {
 		// Initialize database
 		const db = await createDatabase();
 
-		// Create store
-		const useStore = createDashboardStore(db);
-		const store = useStore.getState();
-
 		// Create blessed screen with proper configuration for robust key handling
 		const screen = blessed.screen({
 			smartCSR: true,
@@ -52,6 +48,10 @@ async function main() {
 			// Allow these keys to bubble up and not be locked by child widgets
 			ignoreLocked: ["C-c", "tab", "S-tab", "btab", ":", "?", "q"],
 		} as any);
+
+		// Create store and pass the screen
+		const useStore = createDashboardStore(db, screen);
+		const store = useStore.getState();
 
 		// Turn on application-cursor & raw input explicitly for better key handling
 		// Check if methods exist before calling them

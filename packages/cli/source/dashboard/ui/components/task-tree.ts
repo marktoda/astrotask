@@ -75,7 +75,10 @@ export class TaskTreeComponent {
 
 		// Subscribe to store updates
 		this.unsubscribe = this.store.subscribe((state) => {
-			this.render(state);
+			// Skip rendering if editor is active
+			if (!state.editorActive) {
+				this.render(state);
+			}
 		});
 
 		// Initial render
@@ -213,6 +216,26 @@ export class TaskTreeComponent {
 			}
 		});
 
+		// Add sibling task with editor
+		this.list.key(["e"], async () => {
+			const selectedIndex = (this.list as any).selected;
+			const item = this.currentItems[selectedIndex];
+			if (item) {
+				const taskTree = state().getTaskTree(item.taskId);
+				const parentId = taskTree?.getParent()?.task.id || null;
+				await state().addTaskWithEditor(parentId);
+			}
+		});
+
+		// Add child task with editor
+		this.list.key(["E"], async () => {
+			const selectedIndex = (this.list as any).selected;
+			const item = this.currentItems[selectedIndex];
+			if (item) {
+				await state().addTaskWithEditor(item.taskId);
+			}
+		});
+
 		// Delete task
 		this.list.key(["D"], () => {
 			const selectedIndex = (this.list as any).selected;
@@ -220,6 +243,17 @@ export class TaskTreeComponent {
 			if (item) {
 				this.confirmDelete(item.task, () => {
 					state().deleteTask(item.taskId);
+				});
+			}
+		});
+
+		// Rename task
+		this.list.key(["r"], () => {
+			const selectedIndex = (this.list as any).selected;
+			const item = this.currentItems[selectedIndex];
+			if (item) {
+				this.promptForRename(item.task, (newTitle) => {
+					state().renameTask(item.taskId, newTitle);
 				});
 			}
 		});
@@ -362,7 +396,68 @@ export class TaskTreeComponent {
 		});
 	}
 
+	private promptForRename(task: Task, callback: (newTitle: string) => void) {
+		// Temporarily disable renders to prevent jittering
+		const originalRender = this.render.bind(this);
+		let renderingDisabled = true;
+
+		// Override render to prevent updates during prompt
+		this.render = (state: DashboardStore) => {
+			if (!renderingDisabled) {
+				originalRender(state);
+			}
+		};
+
+		const prompt = blessed.prompt({
+			parent: this.list.screen,
+			top: "center",
+			left: "center",
+			height: "shrink",
+			width: "50%",
+			border: {
+				type: "line",
+			},
+			style: {
+				border: {
+					fg: "yellow",
+				},
+			},
+			label: " New Task Title ",
+		});
+
+		const cleanup = () => {
+			// Re-enable rendering
+			renderingDisabled = false;
+			this.render = originalRender;
+
+			// Remove the prompt
+			if (prompt.parent) {
+				prompt.destroy();
+			}
+
+			// Force a render to update display
+			this.list.screen.render();
+		};
+
+		prompt.input("Enter new title:", task.title, (err, value) => {
+			cleanup();
+			if (!err && value && value.trim()) {
+				callback(value.trim());
+			}
+		});
+
+		// Handle escape/cancel
+		prompt.key(["escape", "C-c"], () => {
+			cleanup();
+		});
+	}
+
 	private render(state: DashboardStore) {
+		// Skip rendering if editor is active
+		if (state.editorActive) {
+			return;
+		}
+
 		this.isRendering = true;
 
 		try {

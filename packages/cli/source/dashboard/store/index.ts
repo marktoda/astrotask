@@ -7,6 +7,8 @@ import {
 	TrackingTaskTree,
 } from "@astrolabe/core";
 import { create } from "zustand";
+import { EditorService } from "../services/editor.js";
+import * as blessed from "blessed";
 
 export interface DashboardState {
 	// Core data structures - TrackingTaskTree and TrackingDependencyGraph as source of truth
@@ -26,6 +28,7 @@ export interface DashboardState {
 	confirmExit: boolean;
 	detailViewMode: "normal" | "dependencies"; // New view mode toggle
 	treeViewMode: "hierarchy" | "dependencies"; // Tree view mode toggle
+	editorActive: boolean; // Track if editor is active
 
 	// Project data (derived from trackingTree.getChildren())
 	projects: Project[];
@@ -58,8 +61,10 @@ export interface DashboardActions {
 
 	// Task CRUD - immediate tracking tree updates with mutable operations
 	addTask: (parentId: string | null, title: string) => void;
+	addTaskWithEditor: (parentId: string | null) => Promise<void>;
 	updateTaskStatus: (taskId: string, status: Task["status"]) => void;
 	updateTask: (taskId: string, updates: Partial<Task>) => void;
+	renameTask: (taskId: string, newTitle: string) => void;
 	deleteTask: (taskId: string) => void;
 
 	// Helper to trigger re-renders after mutations
@@ -114,9 +119,15 @@ export type DashboardStore = DashboardState & DashboardActions;
 
 type DatabaseStore = Awaited<ReturnType<typeof createDatabase>>;
 
-export function createDashboardStore(db: DatabaseStore) {
+export function createDashboardStore(db: DatabaseStore, screen?: blessed.Widgets.Screen) {
 	const taskService = new TaskService(db);
 	const dependencyService = new DependencyService(db);
+	const editorService = new EditorService();
+	
+	// Set screen if provided
+	if (screen) {
+		editorService.setScreen(screen);
+	}
 
 	let autoFlushInterval: NodeJS.Timeout | null = null;
 
@@ -134,6 +145,7 @@ export function createDashboardStore(db: DatabaseStore) {
 		confirmExit: false,
 		detailViewMode: "normal",
 		treeViewMode: "hierarchy",
+		editorActive: false,
 		projects: [],
 		selectedProjectId: null,
 		progressByTaskId: new Map(),
@@ -294,6 +306,90 @@ export function createDashboardStore(db: DatabaseStore) {
 			}
 		},
 
+		addTaskWithEditor: async (parentId: string | null) => {
+			const { trackingTree } = get();
+
+			if (!trackingTree) {
+				set({ statusMessage: "No task tree loaded" });
+				return;
+			}
+
+			try {
+				// Set editor active flag to prevent rendering
+				set({ editorActive: true, statusMessage: "Opening editor for task creation..." });
+
+				// Get parent task if parentId is provided
+				let parentTask: Task | undefined;
+				if (parentId) {
+					const parentNode = trackingTree.find((task) => task.id === parentId);
+					if (!parentNode) {
+						set({ statusMessage: `Parent task ${parentId} not found`, editorActive: false });
+						return;
+					}
+					parentTask = parentNode.task;
+				}
+
+				// Open editor with template
+				const result = await editorService.openEditorForTask(parentTask);
+
+				// Clear editor active flag
+				set({ editorActive: false });
+
+				if (!result.success) {
+					set({ statusMessage: `Editor error: ${result.error}` });
+					return;
+				}
+
+				if (!result.task) {
+					set({ statusMessage: "No task data received from editor" });
+					return;
+				}
+
+				const taskTemplate = result.task;
+
+				// Create new task with all the details from the template
+				const newTask: Task = {
+					id: `temp-${Date.now()}`, // Temporary ID - will be replaced on flush
+					parentId,
+					title: taskTemplate.title,
+					description: taskTemplate.description || null,
+					status: taskTemplate.status,
+					priority: taskTemplate.priority,
+					prd: taskTemplate.details || null, // Store detailed notes in PRD field
+					contextDigest: taskTemplate.notes || null, // Store additional notes in contextDigest
+					createdAt: new Date(),
+					updatedAt: new Date(),
+				};
+
+				if (parentId) {
+					// Find parent and add child - mutable operation
+					const parentNode = trackingTree.find((task) => task.id === parentId);
+					if (parentNode) {
+						const childTree = TrackingTaskTree.fromTask(newTask);
+						parentNode.addChild(childTree); // Mutation recorded automatically
+					} else {
+						set({ statusMessage: `Parent task ${parentId} not found` });
+						return;
+					}
+				} else {
+					// Add as root child - mutable operation
+					const childTree = TrackingTaskTree.fromTask(newTask);
+					trackingTree.addChild(childTree); // Mutation recorded automatically
+				}
+
+				// Trigger UI update
+				get().triggerTreeUpdate();
+				get().updateUnsavedChangesFlag();
+				get().recalculateAllProgress();
+
+				set({ statusMessage: `Created task: ${taskTemplate.title}` });
+			} catch (error) {
+				const errorMessage =
+					error instanceof Error ? error.message : String(error);
+				set({ statusMessage: `Error creating task: ${errorMessage}`, editorActive: false });
+			}
+		},
+
 		updateTaskStatus: (taskId, status) => {
 			get().updateTask(taskId, { status });
 		},
@@ -327,6 +423,38 @@ export function createDashboardStore(db: DatabaseStore) {
 				const errorMessage =
 					error instanceof Error ? error.message : String(error);
 				set({ statusMessage: `Error updating task: ${errorMessage}` });
+			}
+		},
+
+		renameTask: (taskId, newTitle) => {
+			const { trackingTree } = get();
+
+			if (!trackingTree) {
+				set({ statusMessage: "No task tree loaded" });
+				return;
+			}
+
+			try {
+				// Find the task anywhere in the tree
+				const taskNode = trackingTree.find((task) => task.id === taskId);
+				if (!taskNode) {
+					set({ statusMessage: `Task ${taskId} not found` });
+					return;
+				}
+
+				// Simple mutation - operation recorded automatically
+				taskNode.withTask({ title: newTitle });
+
+				// Trigger UI update
+				get().triggerTreeUpdate();
+				get().updateUnsavedChangesFlag();
+				get().recalculateAllProgress();
+
+				set({ statusMessage: `Renamed task ${taskId} to ${newTitle}` });
+			} catch (error) {
+				const errorMessage =
+					error instanceof Error ? error.message : String(error);
+				set({ statusMessage: `Error renaming task: ${errorMessage}` });
 			}
 		},
 
