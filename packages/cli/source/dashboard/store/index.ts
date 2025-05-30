@@ -219,8 +219,8 @@ export function createDashboardStore(
 				// Calculate progress
 				get().recalculateAllProgress();
 
-				// Enable auto-flush by default
-				get().enableAutoFlush();
+				// Don't enable auto-flush by default since we now flush immediately after changes
+				// get().enableAutoFlush();
 			} catch (error) {
 				const errorMessage =
 					error instanceof Error ? error.message : String(error);
@@ -259,7 +259,7 @@ export function createDashboardStore(
 			set({ expandedTaskIds: new Set() });
 		},
 
-		// Task CRUD - now using mutable operations
+		// Task CRUD - immediate tracking tree updates with mutable operations
 		addTask: (parentId, title) => {
 			const { trackingTree } = get();
 
@@ -268,48 +268,55 @@ export function createDashboardStore(
 				return;
 			}
 
-			try {
-				// Create new task
-				const newTask: Task = {
-					id: `temp-${Date.now()}`, // Temporary ID - will be replaced on flush
-					parentId,
-					title,
-					description: null,
-					status: "pending",
-					priority: "medium",
-					prd: null,
-					contextDigest: null,
-					createdAt: new Date(),
-					updatedAt: new Date(),
-				};
+			// Wrap the entire operation in an async function so we can await flush
+			(async () => {
+				try {
+					// Create new task
+					const newTask: Task = {
+						id: `temp-${Date.now()}`, // Temporary ID - will be replaced on flush
+						parentId,
+						title,
+						description: null,
+						status: "pending",
+						priority: "medium",
+						prd: null,
+						contextDigest: null,
+						createdAt: new Date(),
+						updatedAt: new Date(),
+					};
 
-				if (parentId) {
-					// Find parent and add child - mutable operation
-					const parentNode = trackingTree.find((task) => task.id === parentId);
-					if (parentNode) {
-						const childTree = TrackingTaskTree.fromTask(newTask);
-						parentNode.addChild(childTree); // Mutation recorded automatically
+					if (parentId) {
+						// Find parent and add child - mutable operation
+						const parentNode = trackingTree.find((task) => task.id === parentId);
+						if (parentNode) {
+							const childTree = TrackingTaskTree.fromTask(newTask);
+							parentNode.addChild(childTree); // Mutation recorded automatically
+						} else {
+							set({ statusMessage: `Parent task ${parentId} not found` });
+							return;
+						}
 					} else {
-						set({ statusMessage: `Parent task ${parentId} not found` });
-						return;
+						// Add as root child - mutable operation
+						const childTree = TrackingTaskTree.fromTask(newTask);
+						trackingTree.addChild(childTree); // Mutation recorded automatically
 					}
-				} else {
-					// Add as root child - mutable operation
-					const childTree = TrackingTaskTree.fromTask(newTask);
-					trackingTree.addChild(childTree); // Mutation recorded automatically
+
+					// Trigger UI update
+					get().triggerTreeUpdate();
+					get().updateUnsavedChangesFlag();
+					get().recalculateAllProgress();
+
+					set({ statusMessage: `Added task: ${title}` });
+
+					// Immediately flush to disk and reload to get real ID
+					await get().flushChangesImmediate();
+					await get().reloadFromDatabase();
+				} catch (error) {
+					const errorMessage =
+						error instanceof Error ? error.message : String(error);
+					set({ statusMessage: `Error adding task: ${errorMessage}` });
 				}
-
-				// Trigger UI update
-				get().triggerTreeUpdate();
-				get().updateUnsavedChangesFlag();
-				get().recalculateAllProgress();
-
-				set({ statusMessage: `Added task: ${title}` });
-			} catch (error) {
-				const errorMessage =
-					error instanceof Error ? error.message : String(error);
-				set({ statusMessage: `Error adding task: ${errorMessage}` });
-			}
+			})();
 		},
 
 		addTaskWithEditor: async (parentId: string | null) => {
@@ -369,28 +376,35 @@ export function createDashboardStore(
 				return;
 			}
 
-			try {
-				// Find the task anywhere in the tree
-				const taskNode = trackingTree.find((task) => task.id === taskId);
-				if (!taskNode) {
-					set({ statusMessage: `Task ${taskId} not found` });
-					return;
+			// Wrap in async to handle flush
+			(async () => {
+				try {
+					// Find the task anywhere in the tree
+					const taskNode = trackingTree.find((task) => task.id === taskId);
+					if (!taskNode) {
+						set({ statusMessage: `Task ${taskId} not found` });
+						return;
+					}
+
+					// Simple mutation - operation recorded automatically
+					taskNode.withTask(updates);
+
+					// Trigger UI update
+					get().triggerTreeUpdate();
+					get().updateUnsavedChangesFlag();
+					get().recalculateAllProgress();
+
+					set({ statusMessage: `Updated task ${taskId}` });
+
+					// Immediately flush to disk and reload
+					await get().flushChangesImmediate();
+					await get().reloadFromDatabase();
+				} catch (error) {
+					const errorMessage =
+						error instanceof Error ? error.message : String(error);
+					set({ statusMessage: `Error updating task: ${errorMessage}` });
 				}
-
-				// Simple mutation - operation recorded automatically
-				taskNode.withTask(updates);
-
-				// Trigger UI update
-				get().triggerTreeUpdate();
-				get().updateUnsavedChangesFlag();
-				get().recalculateAllProgress();
-
-				set({ statusMessage: `Updated task ${taskId}` });
-			} catch (error) {
-				const errorMessage =
-					error instanceof Error ? error.message : String(error);
-				set({ statusMessage: `Error updating task: ${errorMessage}` });
-			}
+			})();
 		},
 
 		renameTask: (taskId, newTitle) => {
@@ -401,28 +415,35 @@ export function createDashboardStore(
 				return;
 			}
 
-			try {
-				// Find the task anywhere in the tree
-				const taskNode = trackingTree.find((task) => task.id === taskId);
-				if (!taskNode) {
-					set({ statusMessage: `Task ${taskId} not found` });
-					return;
+			// Wrap in async to handle flush
+			(async () => {
+				try {
+					// Find the task anywhere in the tree
+					const taskNode = trackingTree.find((task) => task.id === taskId);
+					if (!taskNode) {
+						set({ statusMessage: `Task ${taskId} not found` });
+						return;
+					}
+
+					// Simple mutation - operation recorded automatically
+					taskNode.withTask({ title: newTitle });
+
+					// Trigger UI update
+					get().triggerTreeUpdate();
+					get().updateUnsavedChangesFlag();
+					get().recalculateAllProgress();
+
+					set({ statusMessage: `Renamed task ${taskId} to ${newTitle}` });
+
+					// Immediately flush to disk and reload
+					await get().flushChangesImmediate();
+					await get().reloadFromDatabase();
+				} catch (error) {
+					const errorMessage =
+						error instanceof Error ? error.message : String(error);
+					set({ statusMessage: `Error renaming task: ${errorMessage}` });
 				}
-
-				// Simple mutation - operation recorded automatically
-				taskNode.withTask({ title: newTitle });
-
-				// Trigger UI update
-				get().triggerTreeUpdate();
-				get().updateUnsavedChangesFlag();
-				get().recalculateAllProgress();
-
-				set({ statusMessage: `Renamed task ${taskId} to ${newTitle}` });
-			} catch (error) {
-				const errorMessage =
-					error instanceof Error ? error.message : String(error);
-				set({ statusMessage: `Error renaming task: ${errorMessage}` });
-			}
+			})();
 		},
 
 		deleteTask: (taskId) => {
@@ -433,35 +454,42 @@ export function createDashboardStore(
 				return;
 			}
 
-			try {
-				// Find the task anywhere in the tree
-				const taskNode = trackingTree.find((task) => task.id === taskId);
-				if (!taskNode) {
-					set({ statusMessage: `Task ${taskId} not found` });
-					return;
+			// Wrap in async to handle flush
+			(async () => {
+				try {
+					// Find the task anywhere in the tree
+					const taskNode = trackingTree.find((task) => task.id === taskId);
+					if (!taskNode) {
+						set({ statusMessage: `Task ${taskId} not found` });
+						return;
+					}
+
+					const parent = taskNode.getParent();
+
+					if (parent) {
+						parent.removeChild(taskId); // Mutation recorded automatically
+					} else if (trackingTree.id === taskId) {
+						// Deleting root - handle specially
+						set({ statusMessage: "Cannot delete root task" });
+						return;
+					}
+
+					// Trigger UI update
+					get().triggerTreeUpdate();
+					get().updateUnsavedChangesFlag();
+
+					set({ statusMessage: "Task deleted" });
+
+					// Immediately flush to disk and reload
+					await get().flushChangesImmediate();
+					await get().reloadFromDatabase();
+				} catch (error) {
+					console.error("Error in deleteTask:", error);
+					const errorMessage =
+						error instanceof Error ? error.message : String(error);
+					set({ statusMessage: `Error deleting task: ${errorMessage}` });
 				}
-
-				const parent = taskNode.getParent();
-
-				if (parent) {
-					parent.removeChild(taskId); // Mutation recorded automatically
-				} else if (trackingTree.id === taskId) {
-					// Deleting root - handle specially
-					set({ statusMessage: "Cannot delete root task" });
-					return;
-				}
-
-				// Trigger UI update
-				get().triggerTreeUpdate();
-				get().updateUnsavedChangesFlag();
-
-				set({ statusMessage: "Task deleted" });
-			} catch (error) {
-				console.error("Error in deleteTask:", error);
-				const errorMessage =
-					error instanceof Error ? error.message : String(error);
-				set({ statusMessage: `Error deleting task: ${errorMessage}` });
-			}
+			})();
 		},
 
 		// Persistence control - now works for ALL pending operations
@@ -636,24 +664,31 @@ export function createDashboardStore(
 				return;
 			}
 
-			try {
-				// TrackingDependencyGraph uses immutable operations, so we need to update the store
-				const updatedGraph = trackingDependencyGraph.withDependency(
-					taskId,
-					dependsOnId,
-				);
+			// Wrap in async to handle flush
+			(async () => {
+				try {
+					// TrackingDependencyGraph uses immutable operations, so we need to update the store
+					const updatedGraph = trackingDependencyGraph.withDependency(
+						taskId,
+						dependsOnId,
+					);
 
-				set({
-					trackingDependencyGraph: updatedGraph,
-					statusMessage: "Dependency added",
-				});
+					set({
+						trackingDependencyGraph: updatedGraph,
+						statusMessage: "Dependency added",
+					});
 
-				get().updateUnsavedChangesFlag();
-			} catch (error) {
-				const errorMessage =
-					error instanceof Error ? error.message : String(error);
-				set({ statusMessage: `Error adding dependency: ${errorMessage}` });
-			}
+					get().updateUnsavedChangesFlag();
+
+					// Immediately flush to disk and reload
+					await get().flushChangesImmediate();
+					await get().reloadFromDatabase();
+				} catch (error) {
+					const errorMessage =
+						error instanceof Error ? error.message : String(error);
+					set({ statusMessage: `Error adding dependency: ${errorMessage}` });
+				}
+			})();
 		},
 
 		removeDependency: (taskId, dependsOnId) => {
@@ -664,24 +699,31 @@ export function createDashboardStore(
 				return;
 			}
 
-			try {
-				// TrackingDependencyGraph uses immutable operations, so we need to update the store
-				const updatedGraph = trackingDependencyGraph.withoutDependency(
-					taskId,
-					dependsOnId,
-				);
+			// Wrap in async to handle flush
+			(async () => {
+				try {
+					// TrackingDependencyGraph uses immutable operations, so we need to update the store
+					const updatedGraph = trackingDependencyGraph.withoutDependency(
+						taskId,
+						dependsOnId,
+					);
 
-				set({
-					trackingDependencyGraph: updatedGraph,
-					statusMessage: "Dependency removed",
-				});
+					set({
+						trackingDependencyGraph: updatedGraph,
+						statusMessage: "Dependency removed",
+					});
 
-				get().updateUnsavedChangesFlag();
-			} catch (error) {
-				const errorMessage =
-					error instanceof Error ? error.message : String(error);
-				set({ statusMessage: `Error removing dependency: ${errorMessage}` });
-			}
+					get().updateUnsavedChangesFlag();
+
+					// Immediately flush to disk and reload
+					await get().flushChangesImmediate();
+					await get().reloadFromDatabase();
+				} catch (error) {
+					const errorMessage =
+						error instanceof Error ? error.message : String(error);
+					set({ statusMessage: `Error removing dependency: ${errorMessage}` });
+				}
+			})();
 		},
 
 		// UI actions
@@ -832,6 +874,11 @@ export function createDashboardStore(
 			try {
 				set({ statusMessage: "Reloading from database..." });
 
+				// Remember current selection and expanded state
+				const currentState = get();
+				const previousSelectedTaskId = currentState.selectedTaskId;
+				const previousExpandedTaskIds = new Set(currentState.expandedTaskIds);
+
 				// First flush any pending changes
 				if (get().hasUnsavedChanges) {
 					await get().flushChanges();
@@ -839,6 +886,32 @@ export function createDashboardStore(
 
 				// Then reload fresh data
 				await get().loadTasks();
+
+				// Restore UI state
+				const newState = get();
+				if (previousSelectedTaskId && newState.trackingTree) {
+					// Check if the previously selected task still exists
+					const taskStillExists = newState.trackingTree.find(
+						(task) => task.id === previousSelectedTaskId
+					);
+					if (taskStillExists) {
+						newState.selectTask(previousSelectedTaskId);
+					}
+				}
+
+				// Restore expanded state for tasks that still exist
+				const restoredExpandedTaskIds = new Set<string>();
+				if (newState.trackingTree) {
+					previousExpandedTaskIds.forEach((taskId) => {
+						const taskStillExists = newState.trackingTree!.find(
+							(task) => task.id === taskId
+						);
+						if (taskStillExists) {
+							restoredExpandedTaskIds.add(taskId);
+						}
+					});
+				}
+				set({ expandedTaskIds: restoredExpandedTaskIds });
 			} catch (error) {
 				const errorMessage =
 					error instanceof Error ? error.message : String(error);
@@ -908,17 +981,13 @@ export function createDashboardStore(
 					editorActive: false,
 				});
 
-				// Immediately flush to get real ID and avoid temporary ID issues
-				try {
-					await get().flushChanges();
-					set({
-						statusMessage: `Task "${taskTemplate.title}" saved successfully`,
-					});
-				} catch (flushError) {
-					console.error("Failed to flush task after creation:", flushError);
-					// Don't overwrite the success message with an error - the task was created,
-					// it just wasn't immediately persisted
-				}
+				// Immediately flush to disk and reload to get real ID
+				await get().flushChangesImmediate();
+				await get().reloadFromDatabase();
+				
+				set({
+					statusMessage: `Task "${taskTemplate.title}" saved successfully`,
+				});
 			} catch (error) {
 				const errorMessage =
 					error instanceof Error ? error.message : String(error);

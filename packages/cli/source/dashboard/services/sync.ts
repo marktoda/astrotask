@@ -7,7 +7,7 @@ export class SyncService {
 
 	constructor(
 		private store: StoreApi<DashboardStore>,
-		private syncIntervalMs = 30000, // 30 seconds
+		private syncIntervalMs = 300000, // 5 minutes instead of 30 seconds
 	) {}
 
 	start() {
@@ -31,12 +31,17 @@ export class SyncService {
 		try {
 			const state = this.store.getState();
 
-			// Use reloadFromDatabase which handles pending changes properly
-			// instead of loadTasks which rebuilds everything from scratch
-			await state.reloadFromDatabase();
+			// Only reload if there are no unsaved changes
+			// Otherwise, we might lose user's work
+			if (!state.hasUnsavedChanges) {
+				// Use reloadFromDatabase which handles pending changes properly
+				// instead of loadTasks which rebuilds everything from scratch
+				await state.reloadFromDatabase();
 
-			this.lastSync = new Date();
-			state.setStatusMessage(`Synced at ${this.lastSync.toLocaleTimeString()}`);
+				this.lastSync = new Date();
+				// Don't show sync message every time - it's distracting
+				// state.setStatusMessage(`Synced at ${this.lastSync.toLocaleTimeString()}`);
+			}
 		} catch (error) {
 			const state = this.store.getState();
 			state.setStatusMessage(`Sync failed: ${error}`);
