@@ -111,7 +111,7 @@ export class DetailPane {
 		lines.push(`Priority: ${priorityIcon} ${task.priority}`);
 
 		lines.push("");
-		lines.push("{gray-fg}Press 'g' for dependency graph view{/gray-fg}");
+		lines.push("{gray-fg}Press 'd' for dependency graph view{/gray-fg}");
 		lines.push("");
 
 		// Description
@@ -219,7 +219,7 @@ export class DetailPane {
 		lines.push("{bold}{cyan-fg}🕸️  Dependency Graph View{/bold}{/cyan-fg}");
 		lines.push(`{bold}Task: ${task.title}{/bold} (${task.id})`);
 		lines.push("");
-		lines.push("{gray-fg}Press 'g' for normal detail view{/gray-fg}");
+		lines.push("{gray-fg}Press 'd' for normal detail view{/gray-fg}");
 		lines.push("");
 
 		// Build dependency tree visualization

@@ -130,6 +130,16 @@ export class CommandPalette {
 				},
 			},
 			{
+				name: "edit task",
+				description: "Edit a task with editor by ID",
+				pattern: /^edit\s+(\S+)$/,
+				execute: async (matches) => {
+					const taskId = matches[1] || "";
+					await state().editTaskWithEditor(taskId);
+					state().toggleCommandPalette();
+				},
+			},
+			{
 				name: "delete task",
 				description: "Delete a task by ID",
 				pattern: /^delete\s+(\S+)$/,

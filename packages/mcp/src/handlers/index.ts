@@ -1,42 +1,23 @@
 /**
- * Handler modules for MCP Server operations
+ * Ultra-Minimal Handler modules for MCP Server operations
  *
- * Provides organized handler classes for different MCP operations:
- * - TaskHandlers: Core task CRUD operations
- * - TaskGenerationHandlers: Task generation from various input sources
- * - DependencyHandlers: Task dependency management operations
+ * Provides only the 4 essential MCP tools:
+ * - parsePRD: Bootstrap project from requirements
+ * - expandTask: Break down tasks into subtasks  
+ * - addDependency: Add dependency relationships
+ * - getNextTask: Get next available task to work on
  */
 
-export { TaskHandlers, type TaskContext } from './TaskHandlers.js';
-export { TaskGenerationHandlers } from './TaskGenerationHandlers.js';
+export { MinimalHandlers } from './MinimalHandlers.js';
 export { 
-  DependencyHandlers, 
-  type TaskContextWithDependencies,
-  type AddTaskDependencyInput,
-  type RemoveTaskDependencyInput,
-  type GetTaskDependenciesInput,
-  type ValidateTaskDependencyInput,
-  type GetAvailableTasksInput,
-  type UpdateTaskStatusInput,
-  type GetTasksWithDependenciesInput
-} from './DependencyHandlers.js';
-export * from './types.js';
-export { 
-  createTaskSchema, 
-  updateTaskSchema, 
-  deleteTaskSchema, 
-  completeTaskSchema, 
-  getTaskContextSchema, 
-  listTasksSchema,
-  generateTasksSchema,
-  listGeneratorsSchema,
-  validateGenerationInputSchema,
-  addTaskDependencySchema,
-  removeTaskDependencySchema,
-  getTaskDependenciesSchema,
-  validateTaskDependencySchema,
-  getAvailableTasksSchema,
-  updateTaskStatusSchema,
-  getTasksWithDependenciesSchema,
-  getTopologicalOrderSchema
+  parsePRDSchema,
+  expandTaskSchema,
+  addDependencySchema,
+  getNextTaskSchema,
+  type ParsePRDInput,
+  type ExpandTaskInput,
+  type AddDependencyInput,
+  type GetNextTaskInput,
+  type HandlerContext,
+  type MCPHandler
 } from './types.js';

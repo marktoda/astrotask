@@ -62,6 +62,7 @@ export interface DashboardActions {
 	// Task CRUD - immediate tracking tree updates with mutable operations
 	addTask: (parentId: string | null, title: string) => void;
 	addTaskWithEditor: (parentId: string | null) => Promise<void>;
+	editTaskWithEditor: (taskId: string) => Promise<void>;
 	updateTaskStatus: (taskId: string, status: Task["status"]) => void;
 	updateTask: (taskId: string, updates: Partial<Task>) => void;
 	renameTask: (taskId: string, newTitle: string) => void;
@@ -116,6 +117,12 @@ export interface DashboardActions {
 
 	// New method for processing pending task data from the editor
 	processPendingTask: (taskData: PendingTaskData) => Promise<void>;
+
+	// New method for processing pending task edit data from the editor
+	processPendingTaskEdit: (taskEditData: import("../services/editor.js").PendingTaskEditData) => Promise<void>;
+
+	// Get relationship of a task to the currently selected task for visual highlighting
+	getTaskRelationshipToSelected: (taskId: string) => string;
 }
 
 export type DashboardStore = DashboardState & DashboardActions;
@@ -359,6 +366,47 @@ export function createDashboardStore(
 					error instanceof Error ? error.message : String(error);
 				set({
 					statusMessage: `Error creating task: ${errorMessage}`,
+					editorActive: false,
+				});
+			}
+		},
+
+		editTaskWithEditor: async (taskId: string) => {
+			const { trackingTree } = get();
+
+			if (!trackingTree) {
+				set({ statusMessage: "No task tree loaded" });
+				return;
+			}
+
+			try {
+				// Set editor active flag to prevent rendering
+				set({
+					editorActive: true,
+					statusMessage: "Opening editor for task editing...",
+				});
+
+				// Get task if taskId is provided
+				const taskNode = trackingTree.find((task) => task.id === taskId);
+				if (!taskNode) {
+					set({
+						statusMessage: `Task ${taskId} not found`,
+						editorActive: false,
+					});
+					return;
+				}
+
+				// Open editor with task data for editing
+				await editorService.openEditorForTaskEdit(taskNode.task);
+
+				// Note: At this point, the screen has been recreated and this context is lost
+				// The task edit data is stored in the EditorService and will be processed
+				// when the dashboard reinitializes
+			} catch (error) {
+				const errorMessage =
+					error instanceof Error ? error.message : String(error);
+				set({
+					statusMessage: `Error editing task: ${errorMessage}`,
 					editorActive: false,
 				});
 			}
@@ -996,6 +1044,105 @@ export function createDashboardStore(
 					editorActive: false,
 				});
 			}
+		},
+
+		// New method for processing pending task edit data from the editor
+		processPendingTaskEdit: async (taskEditData: import("../services/editor.js").PendingTaskEditData) => {
+			const { trackingTree } = get();
+
+			if (!trackingTree) {
+				set({ statusMessage: "No task tree loaded" });
+				return;
+			}
+
+			try {
+				const { taskId, task: taskTemplate } = taskEditData;
+
+				// Find the task if taskId is provided
+				const taskNode = trackingTree.find((task) => task.id === taskId);
+				if (!taskNode) {
+					set({ statusMessage: `Task ${taskId} not found` });
+					return;
+				}
+
+				// Convert TaskTemplate to Task updates
+				const updates: Partial<Task> = {
+					title: taskTemplate.title,
+					description: taskTemplate.description || null,
+					status: taskTemplate.status,
+					priority: taskTemplate.priority,
+					prd: taskTemplate.details || null, // Store detailed notes in PRD field
+					contextDigest: taskTemplate.notes || null, // Store additional notes in contextDigest
+					updatedAt: new Date(),
+				};
+
+				// Apply the updates to the task
+				taskNode.withTask(updates);
+
+				// Trigger UI update
+				get().triggerTreeUpdate();
+				get().updateUnsavedChangesFlag();
+				get().recalculateAllProgress();
+
+				set({
+					statusMessage: `Updated task "${taskTemplate.title}"`,
+					editorActive: false,
+				});
+
+				// Immediately flush to disk and reload
+				await get().flushChangesImmediate();
+				await get().reloadFromDatabase();
+				
+				set({
+					statusMessage: `Task "${taskTemplate.title}" updated successfully`,
+				});
+			} catch (error) {
+				const errorMessage =
+					error instanceof Error ? error.message : String(error);
+				set({
+					statusMessage: `Error editing task: ${errorMessage}`,
+					editorActive: false,
+				});
+			}
+		},
+
+		// Get relationship of a task to the currently selected task for visual highlighting
+		getTaskRelationshipToSelected: (taskId: string) => {
+			const { selectedTaskId, trackingDependencyGraph } = get();
+			
+			if (!selectedTaskId || !trackingDependencyGraph || taskId === selectedTaskId) {
+				return 'none';
+			}
+
+			// Check if this task is blocking the selected task (selected depends on this task)
+			const selectedDependencies = trackingDependencyGraph.getDependencies(selectedTaskId);
+			if (selectedDependencies.includes(taskId)) {
+				// Further check if this blocking task is done or still pending
+				const { trackingTree } = get();
+				if (trackingTree) {
+					const taskNode = trackingTree.find((task) => task.id === taskId);
+					if (taskNode) {
+						return taskNode.task.status === 'done' ? 'blocking-completed' : 'blocking-pending';
+					}
+				}
+				return 'blocking-pending';
+			}
+
+			// Check if this task depends on the selected task (this task is blocked by selected)
+			const taskDependencies = trackingDependencyGraph.getDependencies(taskId);
+			if (taskDependencies.includes(selectedTaskId)) {
+				return 'dependent';
+			}
+
+			// Check for indirect relationships (tasks that share dependencies)
+			const selectedDeps = new Set(selectedDependencies);
+			const taskDeps = new Set(taskDependencies);
+			const hasSharedDependencies = [...selectedDeps].some(dep => taskDeps.has(dep));
+			if (hasSharedDependencies) {
+				return 'related';
+			}
+
+			return 'none';
 		},
 	}));
 

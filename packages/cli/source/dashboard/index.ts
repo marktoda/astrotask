@@ -107,6 +107,15 @@ async function main() {
 				}, 200);
 			}
 
+			// Check for pending task edit data from editor
+			const pendingTaskEditData = EditorService.getPendingTaskEditData();
+			if (pendingTaskEditData) {
+				// Process the pending task edit after a short delay to ensure UI is ready
+				setTimeout(async () => {
+					await store.processPendingTaskEdit(pendingTaskEditData);
+				}, 200);
+			}
+
 			// Cleanup function
 			async function cleanup(exitProcess = true) {
 				try {

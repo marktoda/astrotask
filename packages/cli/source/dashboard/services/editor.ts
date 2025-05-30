@@ -26,8 +26,16 @@ export interface PendingTaskData {
 	parentId: string | null;
 }
 
+export interface PendingTaskEditData {
+	task: TaskTemplate;
+	taskId: string;
+}
+
 // Global storage for pending task data that needs to survive screen recreation
 let pendingTaskData: PendingTaskData | null = null;
+
+// Global storage for pending task edit data that needs to survive screen recreation
+let pendingTaskEditData: PendingTaskEditData | null = null;
 
 export class EditorService {
 	private screen: blessed.Widgets.Screen | null = null;
@@ -40,6 +48,13 @@ export class EditorService {
 	static getPendingTaskData(): PendingTaskData | null {
 		const data = pendingTaskData;
 		pendingTaskData = null; // Clear after retrieval
+		return data;
+	}
+
+	// Static method to check and retrieve pending task edit data
+	static getPendingTaskEditData(): PendingTaskEditData | null {
+		const data = pendingTaskEditData;
+		pendingTaskEditData = null; // Clear after retrieval
 		return data;
 	}
 
@@ -79,6 +94,44 @@ status: pending
 
 # Tags (comma-separated, optional)
 tags: 
+
+# Additional Notes (optional)
+notes: |
+  Any additional context, links, or notes.
+`;
+
+		return template;
+	}
+
+	private generateTaskEditTemplate(existingTask: Task): string {
+		// Convert existing task data to match the template format
+		const tagsStr = Array.isArray(existingTask.contextDigest) 
+			? existingTask.contextDigest.join(", ") 
+			: "";
+		
+		const template = `# Task Template - Editing Existing Task
+# Lines starting with # are comments and will be ignored
+# Modify the sections below to update your task
+
+# Task Title (required)
+title: ${existingTask.title}
+
+# Task Description (optional)
+description: |
+${existingTask.description ? existingTask.description.split('\n').map(line => `  ${line}`).join('\n') : '  Brief overview of what this task accomplishes.\n  You can use multiple lines here.'}
+
+# Detailed Implementation Notes (optional)
+details: |
+${existingTask.prd ? existingTask.prd.split('\n').map(line => `  ${line}`).join('\n') : '  Detailed implementation instructions, acceptance criteria,\n  technical notes, or any other relevant information.\n  \n  Examples:\n  - What files need to be modified\n  - What functions to implement\n  - What tests to write\n  - Dependencies or prerequisites'}
+
+# Priority (low, medium, high)
+priority: ${existingTask.priority}
+
+# Status (pending, in-progress, done, cancelled, archived)
+status: ${existingTask.status}
+
+# Tags (comma-separated, optional)
+tags: ${tagsStr}
 
 # Additional Notes (optional)
 notes: |
@@ -304,6 +357,102 @@ notes: |
 			pendingTaskData = {
 				task,
 				parentId: parentId || null,
+			};
+
+			// Step 6: Re-create blessed screen
+			this.recreateScreen();
+
+			return {
+				success: true,
+				task,
+			};
+		} catch (error) {
+			// Make sure to recreate screen on any error
+			this.recreateScreen();
+
+			return {
+				success: false,
+				error: error instanceof Error ? error.message : String(error),
+			};
+		} finally {
+			// Clean up temp file
+			try {
+				await fs.unlink(tempFile);
+			} catch {
+				// Ignore cleanup errors
+			}
+		}
+	}
+
+	async openEditorForTaskEdit(existingTask: Task): Promise<EditorResult> {
+		if (!this.screen) {
+			return {
+				success: false,
+				error: "Screen not initialized",
+			};
+		}
+
+		const tempFile = join(tmpdir(), `astrolabe-edit-task-${Date.now()}.md`);
+
+		try {
+			// Write template with existing task data to temp file
+			const template = this.generateTaskEditTemplate(existingTask);
+			await fs.writeFile(tempFile, template, "utf8");
+
+			// Get editor command
+			const editor = this.getEditor();
+
+			// Parse editor command in case it has arguments
+			const [command, ...args] = editor.split(/\s+/);
+
+			if (!command) {
+				return {
+					success: false,
+					error: "No editor command found",
+				};
+			}
+
+			// Step 1: Detach blessed from the terminal completely
+			this.screen.destroy();
+
+			// Step 2: Reset terminal to normal state
+			process.stdout.write("\x1b[?1049l"); // Exit alternate screen
+			process.stdout.write("\x1b[2J\x1b[H"); // Clear and home
+			process.stdout.write("\x1b[?25h"); // Show cursor
+
+			// Step 3: Run editor synchronously - this blocks until editor exits
+			try {
+				execFileSync(command, [...args, tempFile], {
+					stdio: "inherit",
+					env: {
+						...process.env,
+						TERM: process.env["TERM"] || "xterm-256color",
+					},
+				});
+			} catch (error: any) {
+				// Editor exited with non-zero code or failed to launch
+				const errorMessage =
+					error.code === "ENOENT"
+						? `Editor '${command}' not found`
+						: error.message || "Editor failed";
+
+				// Re-create the screen before returning
+				this.recreateScreen();
+
+				return {
+					success: false,
+					error: errorMessage,
+				};
+			}
+
+			// Step 4: Read and parse the result
+			const content = await fs.readFile(tempFile, "utf8");
+			const task = this.parseTaskFromTemplate(content);
+
+			// Step 5: Store the pending task edit data
+			pendingTaskEditData = {
+				task,
+				taskId: existingTask.id,
 			};
 
 			// Step 6: Re-create blessed screen

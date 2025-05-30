@@ -71,7 +71,7 @@ export class Legend {
 				"→/l: Expand",
 				"Space: Cycle Status",
 				"a/A: Add Task",
-				"e/E: Add w/ Editor",
+				"e: Edit Task",
 				"D: Delete",
 				"d: Toggle View",
 			],

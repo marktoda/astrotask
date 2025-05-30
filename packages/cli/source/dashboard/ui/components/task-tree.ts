@@ -135,6 +135,19 @@ export class TaskTreeComponent {
 					state().toggleTaskExpanded(item.taskId);
 				}
 				state().selectTask(item.taskId);
+				
+				// Show helpful message about dependency highlighting
+				const currentState = state();
+				const dependencies = currentState.getTaskDependencies(item.taskId);
+				const dependents = currentState.getTaskDependents(item.taskId);
+				
+				if (dependencies.length > 0 || dependents.length > 0) {
+					state().setStatusMessage(
+						`Selected: ${item.task.title} | Dependency highlighting active - ⚠ blocking pending, ✓ blocking done, ← dependent, ~ related`
+					);
+				} else {
+					state().setStatusMessage(`Selected: ${item.task.title}`);
+				}
 			}
 		});
 
@@ -242,6 +255,15 @@ export class TaskTreeComponent {
 				this.promptForRename(item.task, (newTitle) => {
 					state().renameTask(item.taskId, newTitle);
 				});
+			}
+		});
+
+		// Edit task with editor
+		this.list.key(["e"], async () => {
+			const selectedIndex = (this.list as any).selected;
+			const item = this.currentItems[selectedIndex];
+			if (item) {
+				await state().editTaskWithEditor(item.taskId);
 			}
 		});
 
@@ -417,17 +439,30 @@ export class TaskTreeComponent {
 				(this.list as any)._clines = [];
 			}
 
-			// Set items with blessed color tags for blocked tasks
+			// Set items with blessed color tags based on dependency relationships
 			const formattedItems = items.map((item) => {
 				const plainLabel = this.stripAnsi(item.label);
-				const isBlocked = this.isTaskBlocked(item.task);
+				const relationship = state.getTaskRelationshipToSelected(item.taskId);
 
-				// Apply red text for blocked tasks
-				if (isBlocked) {
-					return `{red-fg}${plainLabel}{/red-fg}`;
+				// Apply colors based on relationship to selected task
+				switch (relationship) {
+					case 'blocking-pending':
+						// Task is blocking the selected task and is still pending (red/orange)
+						return `{red-fg}${plainLabel}{/red-fg}`;
+					case 'blocking-completed':
+						// Task is blocking the selected task but is done (green)
+						return `{green-fg}${plainLabel}{/green-fg}`;
+					case 'dependent':
+						// Task depends on the selected task (blue)
+						return `{blue-fg}${plainLabel}{/blue-fg}`;
+					case 'related':
+						// Task shares dependencies with the selected task (yellow)
+						return `{yellow-fg}${plainLabel}{/yellow-fg}`;
+					case 'none':
+					default:
+						// No special relationship or no task selected
+						return plainLabel;
 				}
-
-				return plainLabel;
 			});
 
 			this.list.setItems(formattedItems);
@@ -600,6 +635,7 @@ export class TaskTreeComponent {
 		const expandIcon = hasChildren ? (isExpanded ? "▼" : "▶") : " ";
 		const statusIcon = this.getStatusIcon(task.status);
 		const priorityIcon = this.getPriorityIcon(task.priority);
+		const dependencyIcon = this.getDependencyIndicator(task.id);
 
 		// Build the base label
 		let label = `${indent}${expandIcon} ${statusIcon} ${task.title}`;
@@ -609,7 +645,10 @@ export class TaskTreeComponent {
 			label += priorityIcon;
 		}
 
-		// Remove the blocked text indicator - we'll use row highlighting instead
+		// Add dependency indicator
+		if (dependencyIcon) {
+			label += dependencyIcon;
+		}
 
 		// Pad the label to ensure it fills the entire line width
 		// This helps overwrite any residual text when collapsing
@@ -650,9 +689,28 @@ export class TaskTreeComponent {
 		}
 	}
 
-	private isTaskBlocked(task: Task): boolean {
+	private getDependencyIndicator(taskId: string): string {
 		const state = this.store.getState();
-		return state.isTaskBlocked(task.id);
+		
+		// Only show indicators if we have a selected task
+		if (!state.selectedTaskId) {
+			return "";
+		}
+
+		const relationship = state.getTaskRelationshipToSelected(taskId);
+		
+		switch (relationship) {
+			case 'blocking-pending':
+				return " ⚠"; // Task is blocking the selected task (pending)
+			case 'blocking-completed':
+				return " ✓"; // Task is blocking the selected task (done)
+			case 'dependent':
+				return " ←"; // Task depends on the selected task
+			case 'related':
+				return " ~"; // Task shares dependencies
+			default:
+				return "";
+		}
 	}
 
 	private stripAnsi(str: string): string {

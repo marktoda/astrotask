@@ -86,7 +86,7 @@ The bottom legend shows:
 1. Show clear blocked status with actionable information
 2. Provide count of blocking tasks for quick assessment
 3. Use consistent icons across all views
-4. Include helpful hints (e.g., "Press 'g' for dependency graph")
+4. Include helpful hints (e.g., "Press 'd' for dependency graph")
 
 ### Accessibility
 1. Don't rely solely on color - use icons and text
