@@ -231,6 +231,11 @@ export class TaskTreeComponent {
 			state().collapseAll();
 		});
 
+		// Toggle dependency tree view
+		this.list.key(["d"], () => {
+			state().toggleTreeViewMode();
+		});
+
 		// Selection change handler
 		this.list.on("select item", () => {
 			if (this.isRendering) return;
@@ -400,6 +405,20 @@ export class TaskTreeComponent {
 	}
 
 	private buildTreeItems(state: DashboardStore): TaskTreeItem[] {
+		const { trackingTree, treeViewMode } = state;
+
+		if (!trackingTree) {
+			return [];
+		}
+
+		if (treeViewMode === "dependencies") {
+			return this.buildDependencyTreeItems(state);
+		} else {
+			return this.buildHierarchyTreeItems(state);
+		}
+	}
+
+	private buildHierarchyTreeItems(state: DashboardStore): TaskTreeItem[] {
 		const { trackingTree, expandedTaskIds } = state;
 
 		if (!trackingTree) {
@@ -437,6 +456,68 @@ export class TaskTreeComponent {
 		return items;
 	}
 
+	private buildDependencyTreeItems(state: DashboardStore): TaskTreeItem[] {
+		const { trackingTree, trackingDependencyGraph, expandedTaskIds } = state;
+
+		if (!trackingTree || !trackingDependencyGraph) {
+			return [];
+		}
+
+		const items: TaskTreeItem[] = [];
+		const visited = new Set<string>();
+
+		// Helper function to add a task and its dependents
+		const addDependencyNode = (taskId: string, depth: number) => {
+			if (visited.has(taskId) || depth > 10) { // Prevent infinite loops and excessive depth
+				return;
+			}
+
+			visited.add(taskId);
+			const taskNode = trackingTree.find(task => task.id === taskId);
+			if (!taskNode) {
+				return;
+			}
+
+			const dependents = trackingDependencyGraph.getDependents(taskId);
+			const hasChildren = dependents.length > 0;
+			const isExpanded = expandedTaskIds.has(taskId);
+
+			items.push({
+				taskId: taskId,
+				label: this.formatTaskLabel(taskNode.task, depth, hasChildren, isExpanded),
+				depth: depth,
+				isExpanded: isExpanded,
+				hasChildren: hasChildren,
+				task: taskNode.task,
+			});
+
+			// Add dependents if expanded
+			if (isExpanded && hasChildren) {
+				for (const dependentId of dependents) {
+					addDependencyNode(dependentId, depth + 1);
+				}
+			}
+		};
+
+		// Find root tasks (tasks with no dependencies) and start the tree from there
+		const allTaskIds = new Set<string>();
+		trackingTree.walkDepthFirst((node) => {
+			allTaskIds.add(node.task.id);
+		});
+
+		const rootTasks = Array.from(allTaskIds).filter(taskId => {
+			const dependencies = trackingDependencyGraph.getDependencies(taskId);
+			return dependencies.length === 0;
+		});
+
+		// Add each root task and its dependency tree
+		for (const rootTaskId of rootTasks) {
+			addDependencyNode(rootTaskId, 0);
+		}
+
+		return items;
+	}
+
 	private formatTaskLabel(
 		task: Task,
 		depth: number,
@@ -451,9 +532,10 @@ export class TaskTreeComponent {
 
 		let label = `${indent}${expandIcon} ${statusIcon} ${task.title}${priorityIcon}${blockIcon}`;
 
-		// Add dependency info if blocked
+		// Add dependency info if blocked - more concise format
 		if (this.isTaskBlocked(task) && this.getBlockingTasks(task).length > 0) {
-			label += ` (blocked by ${this.getBlockingTasks(task).length} task${this.getBlockingTasks(task).length > 1 ? "s" : ""})`;
+			const blockCount = this.getBlockingTasks(task).length;
+			label += ` 🚫[${blockCount}]`;
 		}
 
 		return label;

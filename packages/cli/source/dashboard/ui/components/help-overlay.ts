@@ -111,6 +111,7 @@ export class HelpOverlay {
 					{ keys: ["a"], description: "Add sibling task" },
 					{ keys: ["A"], description: "Add child task" },
 					{ keys: ["D"], description: "Delete task (with confirmation)" },
+					{ keys: ["d"], description: "Toggle dependency tree view" },
 					{ keys: ["b"], description: "Add dependency" },
 					{ keys: ["B"], description: "Remove dependency" },
 					{ keys: ["*"], description: "Expand all nodes" },

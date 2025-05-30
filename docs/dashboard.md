@@ -1,10 +1,10 @@
 # Astrolabe Terminal UI – Comprehensive Design Document
 
-**Version**: 0.1  |  **Date**: 2025‑05‑28  |  **Author**: ChatGPT (draft – awaiting team review)
+**Version**: 0.1  |  **Date**: 2025‑05‑28  |  **Author**: ChatGPT (draft – awaiting team review)
 
 ---
 
-## 1  Purpose & Scope
+## 1  Purpose & Scope
 
 Astrolabe is a _local‑first_ task‑management tool for AI‑augmented teams. This document specifies the architecture and user‑experience of the **terminal UI (TUI)** built with **TypeScript + blessed**. The TUI must enable engineers (and agents) to:
 
@@ -18,13 +18,13 @@ Non‑goals: full graphical Gantt charts, Kanban, or mobile UX; those may be add
 
 ---
 
-## 2  Tech Stack
+## 2  Tech  Stack
 
 | Layer            | Choice                                 | Rationale                                     |
 | ---------------- | -------------------------------------- | --------------------------------------------- |
-| Runtime          | Node ≥ 20                              | ES2022 features & prompt blessed support      |
+| Runtime          | Node ≥ 20                              | ES2022 features & prompt blessed support      |
 | Language         | TypeScript (strict)                    | Type‑safety across UI & domain logic          |
-| TUI lib          | **blessed** + @types/blessed           | Mature, composable widgets, good key handling |
+| TUI lib          | **blessed** + @types/blessed           | Mature, composable widgets, good key handling |
 | Rendering extras | blessed‑contrib (sparklines), chalk    | Lightweight visuals                           |
 | State            | **Zustand** or custom Redux‑lite store | Reactive updates without Magick               |
 | Persistence      | ElectricSQL client → PGlite / SQLite   | Local‑first, CRDT‑backed sync                 |
@@ -32,7 +32,7 @@ Non‑goals: full graphical Gantt charts, Kanban, or mobile UX; those may be add
 
 ---
 
-## 3  Domain Model ⇄ UI Mapping
+## 3  Domain Model ⇄ UI Mapping
 
 ```ts
 interface Task {
@@ -59,7 +59,7 @@ These support O(1) lookup for rendering.
 
 ---
 
-## 4  UI Layout
+## 4  UI  Layout
 
 ```
 ┌──────────────── Project Sidebar ───────────────┐┐
@@ -90,7 +90,7 @@ These support O(1) lookup for rendering.
 
 ---
 
-## 5  Keybindings (Default)
+## 5  Keybindings (Default)
 
 | Key   | Action                                 |
 | ----- | -------------------------------------- |
@@ -102,6 +102,7 @@ These support O(1) lookup for rendering.
 | a     | _Add_ sibling task below               |
 | A     | Add _child_ task                       |
 | D     | Delete selected task (confirm)         |
+| d     | Toggle dependency tree view            |
 | %     | Recalculate progress (auto on tick)    |
 | b     | Add dependency (prompts for target id) |
 | B     | Remove dependency                      |
@@ -113,7 +114,7 @@ All keys are configurable via a JSON config (\~/.config/astrolabe/keys.json).
 
 ---
 
-## 6  Command Palette Grammar
+## 6  Command Palette Grammar
 
 Example commands (autocompletion via fuzzy):
 
@@ -127,7 +128,7 @@ Internally parsed via `commander` + custom DSL.
 
 ---
 
-## 7  Progress Calculation & Streaming Updates
+## 7  Progress Calculation & Streaming Updates
 
 1. Store maintains dirty set of parents when a leaf status changes.
 2. Debounced worker recalculates subtree completion % using post‑order DFS.
@@ -136,7 +137,7 @@ Internally parsed via `commander` + custom DSL.
 
 ---
 
-## 8  Dependency Visualization
+## 8  Dependency Visualization
 
 Two modes:
 
@@ -150,7 +151,7 @@ Edge operations:
 
 ---
 
-## 9  Architecture & Modules
+## 9  Architecture & Modules
 
 ```
 src/
@@ -179,38 +180,38 @@ _Decoupling principle_: UI components **never** make DB calls – they dispatch 
 
 ---
 
-## 10  Performance Notes
+## 10  Performance Notes
 
-- Blessed diff‑renders but large trees (>10 k tasks) can choke. Virtualise by rendering only visible slice.
-- Use `nanobus` event emitter (200 B) for low‑overhead events.
+- Blessed diff‑renders but large trees (>10 k tasks) can choke. Virtualise by rendering only visible slice.
+- Use `nanobus` event emitter (200 B) for low‑overhead events.
 - Batch CRDT merges – throttle to 30 FPS for smooth UI.
 
 ---
 
-## 11  Error Handling UX
+## 11  Error Handling UX
 
 | Scenario             | UX Response                                           |
 | -------------------- | ----------------------------------------------------- |
 | DB write fails       | Status bar flashes red with reason; offer retry (_r_) |
 | Duplicate dependency | Modal warning; keep both sides intact                 |
 | Invalid command      | Palette highlights error & keeps input                |
-| Unsaved exits        | Prompt if pending local ops (> 0)                     |
+| Unsaved exits        | Prompt if pending local ops (> 0)                     |
 
-Errors bubble via `AppError` discriminated unions; renderer maps variant → message + severity.
+Errors bubble via `AppError` discriminated unions; renderer maps variant → message + severity.
 
 ---
 
-## 12  Testing Strategy
+## 12  Testing Strategy
 
 - **Unit** – store reducers, progress calc, command parser.
 - **Integration** – simulate key streams with `blessed.testing` harness; assert screen snapshots (ansi‑diff).
 - **E2E** – spawn child process, feed pseudo‑tty keystrokes, diff stdout against golden snapshots.
 
-CI runs on Node 20 & 22 to catch regressions.
+CI runs on Node 20 & 22 to catch regressions.
 
 ---
 
-## 13  Extensibility & Future Work
+## 13  Extensibility & Future Work
 
 | Idea                   | Notes                                         |
 | ---------------------- | --------------------------------------------- |
@@ -221,7 +222,7 @@ CI runs on Node 20 & 22 to catch regressions.
 
 ---
 
-## 14  Milestones & Timeline (Indicative)
+## 14  Milestones & Timeline (Indicative)
 
 | Week | Deliverable                                |
 | ---- | ------------------------------------------ |
@@ -234,7 +235,7 @@ CI runs on Node 20 & 22 to catch regressions.
 
 ---
 
-## 15  Open Questions
+## 15  Open Questions
 
 1. How should task ordering be stored? (manual index vs timestamp sort)
 2. Do we require encrypted local db? (agent privacy)
@@ -243,7 +244,7 @@ CI runs on Node 20 & 22 to catch regressions.
 
 ---
 
-## 16  Glossary
+## 16  Glossary
 
 - **Task Tree** – hierarchical representation of work items.
 - **Dependency Graph** – DAG indicating blocking relationships.
@@ -252,4 +253,4 @@ CI runs on Node 20 & 22 to catch regressions.
 
 ---
 
-> _“Simplicity is prerequisite for reliability.”_ ― Edsger Dijkstra
+> _“Simplicity is prerequisite for reliability.”_ ― Edsger Dijkstra

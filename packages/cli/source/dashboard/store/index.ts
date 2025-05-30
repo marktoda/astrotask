@@ -19,6 +19,7 @@ export interface DashboardState {
 	statusMessage: string;
 	confirmExit: boolean;
 	detailViewMode: "normal" | "dependencies"; // New view mode toggle
+	treeViewMode: "hierarchy" | "dependencies"; // Tree view mode toggle
 
 	// Project data (derived from trackingTree.getChildren())
 	projects: Project[];
@@ -76,6 +77,7 @@ export interface DashboardActions {
 	setStatusMessage: (message: string) => void;
 	setConfirmExit: (confirm: boolean) => void;
 	toggleDetailViewMode: () => void;
+	toggleTreeViewMode: () => void;
 
 	// Project actions
 	selectProject: (projectId: string | null) => void;
@@ -125,6 +127,7 @@ export function createDashboardStore(db: DatabaseStore) {
 		statusMessage: "Ready",
 		confirmExit: false,
 		detailViewMode: "normal",
+		treeViewMode: "hierarchy",
 		projects: [],
 		selectedProjectId: null,
 		progressByTaskId: new Map(),
@@ -543,6 +546,12 @@ export function createDashboardStore(db: DatabaseStore) {
 		toggleDetailViewMode: () => {
 			set((state) => ({
 				detailViewMode: state.detailViewMode === "normal" ? "dependencies" : "normal"
+			}));
+		},
+
+		toggleTreeViewMode: () => {
+			set((state) => ({
+				treeViewMode: state.treeViewMode === "hierarchy" ? "dependencies" : "hierarchy"
 			}));
 		},
 
