@@ -150,6 +150,7 @@ export class TaskTree implements ITaskTree {
    *
    * @algorithm Pre-order DFS: Node → Left subtrees → Right subtrees
    */
+  // biome-ignore lint/suspicious/noConfusingVoidType: void is intentional here for callbacks that don't need to return
   walkDepthFirst(visitor: (node: TaskTree) => void | false): void {
     const shouldContinue = visitor(this);
     if (shouldContinue === false) return;

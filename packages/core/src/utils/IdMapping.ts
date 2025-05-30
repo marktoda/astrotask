@@ -6,6 +6,7 @@
  * dependencies.
  */
 
+import type { TaskTreeData } from './TaskTree.js';
 import type { DependencyPendingOperation } from './TrackingDependencyGraph.js';
 import { IdMappingError } from './TrackingErrors.js';
 import type { PendingOperation } from './TrackingTaskTree.js';
@@ -66,7 +67,7 @@ export class IdMapper {
         return {
           ...operation,
           parentId: this.resolve(operation.parentId),
-          childData: this.applyToTaskTreeData(operation.childData as any), // Type assertion for now
+          childData: this.applyToTaskTreeData(operation.childData as TaskTreeData),
         };
 
       case 'child_remove':
@@ -92,7 +93,7 @@ export class IdMapper {
   /**
    * Apply ID mappings to task tree data recursively
    */
-  private applyToTaskTreeData(data: any): any {
+  private applyToTaskTreeData(data: TaskTreeData): TaskTreeData {
     if (!data || typeof data !== 'object') {
       return data;
     }
@@ -114,7 +115,9 @@ export class IdMapper {
 
     // Apply to children recursively
     if (Array.isArray(result.children)) {
-      result.children = result.children.map((child: any) => this.applyToTaskTreeData(child));
+      result.children = result.children.map((child: TaskTreeData) =>
+        this.applyToTaskTreeData(child)
+      );
     }
 
     return result;

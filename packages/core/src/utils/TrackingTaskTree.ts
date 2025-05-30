@@ -455,7 +455,8 @@ export class TrackingTaskTree implements ITaskTree {
       // Find the parent node to determine depth
       const parentNode = this.getRoot().find((task) => task.id === operation.parentId);
       return parentNode ? parentNode.getDepth() + 1 : 0;
-    } else if (operation.type === 'child_remove' || operation.type === 'task_update') {
+    }
+    if (operation.type === 'child_remove' || operation.type === 'task_update') {
       // Find the target node to determine depth
       const targetId = operation.type === 'child_remove' ? operation.childId : operation.taskId;
       const targetNode = this.getRoot().find((task) => task.id === targetId);
