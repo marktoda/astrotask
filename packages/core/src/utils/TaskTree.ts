@@ -20,6 +20,7 @@ export interface ITaskTree {
   getRoot(): ITaskTree;
 
   // Traversal methods
+  // biome-ignore lint/suspicious/noConfusingVoidType: void is intentional here for callbacks that don't need to return
   walkDepthFirst(visitor: (node: ITaskTree) => void | false): void;
   walkBreadthFirst(visitor: (node: ITaskTree) => void): void;
   find(predicate: (task: Task) => boolean): ITaskTree | null;

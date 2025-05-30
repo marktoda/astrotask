@@ -126,6 +126,7 @@ export class TrackingTaskTree implements ITaskTree {
   }
 
   // Traversal methods (compatible with TaskTree)
+  // biome-ignore lint/suspicious/noConfusingVoidType: void is intentional here for callbacks that don't need to return
   walkDepthFirst(visitor: (node: TrackingTaskTree) => void | false): void {
     const shouldContinue = visitor(this);
     if (shouldContinue === false) return;
