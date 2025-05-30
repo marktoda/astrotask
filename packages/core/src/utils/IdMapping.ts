@@ -1,14 +1,14 @@
 /**
  * @fileoverview Centralized ID mapping utilities
- * 
+ *
  * This module provides utilities for handling temporary ID to real ID mappings
  * during tracking operations, particularly useful for operations with hierarchical
  * dependencies.
  */
 
+import type { DependencyPendingOperation } from './TrackingDependencyGraph.js';
 import { IdMappingError } from './TrackingErrors.js';
 import type { PendingOperation } from './TrackingTaskTree.js';
-import type { DependencyPendingOperation } from './TrackingDependencyGraph.js';
 
 /**
  * Centralized ID mapper with validation and error handling
@@ -21,7 +21,11 @@ export class IdMapper {
    */
   addMapping(tempId: string, realId: string): void {
     if (!tempId || !realId) {
-      throw new IdMappingError('Invalid ID mapping: both tempId and realId must be non-empty', [], this.mappings);
+      throw new IdMappingError(
+        'Invalid ID mapping: both tempId and realId must be non-empty',
+        [],
+        this.mappings
+      );
     }
     this.mappings.set(tempId, realId);
   }
@@ -57,14 +61,14 @@ export class IdMapper {
           ...operation,
           taskId: this.resolve(operation.taskId),
         };
-      
+
       case 'child_add':
         return {
           ...operation,
           parentId: this.resolve(operation.parentId),
           childData: this.applyToTaskTreeData(operation.childData as any), // Type assertion for now
         };
-      
+
       case 'child_remove':
         return {
           ...operation,
@@ -94,14 +98,14 @@ export class IdMapper {
     }
 
     const result = { ...data };
-    
+
     // Apply to task ID if present
     if (result.task?.id) {
       result.task = {
         ...result.task,
         id: this.resolve(result.task.id),
       };
-      
+
       // Also update parentId if present
       if (result.task.parentId) {
         result.task.parentId = this.resolve(result.task.parentId);
@@ -120,8 +124,8 @@ export class IdMapper {
    * Validate that all required IDs have mappings
    */
   validateMappings(requiredIds: string[]): void {
-    const unmappedIds = requiredIds.filter(id => !this.hasMapping(id) && !this.isRealId(id));
-    
+    const unmappedIds = requiredIds.filter((id) => !this.hasMapping(id) && !this.isRealId(id));
+
     if (unmappedIds.length > 0) {
       throw new IdMappingError(
         `Missing ID mappings for: ${unmappedIds.join(', ')}`,
@@ -160,7 +164,7 @@ export function applyIdMappingsToTaskOperations(
   mappings: Map<string, string>
 ): PendingOperation[] {
   const mapper = createIdMapper(mappings);
-  return operations.map(op => mapper.applyToTaskOperation(op));
+  return operations.map((op) => mapper.applyToTaskOperation(op));
 }
 
 /**
@@ -171,5 +175,5 @@ export function applyIdMappingsToDependencyOperations(
   mappings: Map<string, string>
 ): DependencyPendingOperation[] {
   const mapper = createIdMapper(mappings);
-  return operations.map(op => mapper.applyToDependencyOperation(op));
-} 
+  return operations.map((op) => mapper.applyToDependencyOperation(op));
+}

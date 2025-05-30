@@ -12,19 +12,19 @@ export interface ITaskTree {
   readonly id: string;
   readonly title: string;
   readonly status: TaskStatus;
-  
+
   // Navigation methods
   getParent(): ITaskTree | null;
   getChildren(): readonly ITaskTree[];
   getSiblings(): ITaskTree[];
   getRoot(): ITaskTree;
-  
+
   // Traversal methods
   walkDepthFirst(visitor: (node: ITaskTree) => void | false): void;
   walkBreadthFirst(visitor: (node: ITaskTree) => void): void;
   find(predicate: (task: Task) => boolean): ITaskTree | null;
   filter(predicate: (task: Task) => boolean): ITaskTree[];
-  
+
   // Query methods
   getPath(): ITaskTree[];
   getDepth(): number;
@@ -33,12 +33,12 @@ export interface ITaskTree {
   isAncestorOf(other: ITaskTree): boolean;
   isDescendantOf(other: ITaskTree): boolean;
   isSiblingOf(other: ITaskTree): boolean;
-  
+
   // Transformation methods
   withTask(updates: Partial<Task>): ITaskTree;
   addChild(child: ITaskTree): ITaskTree;
   removeChild(childId: string): ITaskTree;
-  
+
   // Serialization methods
   toPlainObject(): TaskTreeData;
   toTaskTree?(): TaskTree; // Optional - for TrackingTaskTree to convert to immutable
@@ -153,7 +153,7 @@ export class TaskTree implements ITaskTree {
   walkDepthFirst(visitor: (node: TaskTree) => void | false): void {
     const shouldContinue = visitor(this);
     if (shouldContinue === false) return;
-    
+
     for (const child of this._children) {
       child.walkDepthFirst(visitor);
     }

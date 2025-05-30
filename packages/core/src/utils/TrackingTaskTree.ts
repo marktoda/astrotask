@@ -1,8 +1,8 @@
 import { z } from 'zod';
 import type { Task } from '../schemas/task.js';
-import { TaskTree, type TaskTreeData, type ITaskTree } from './TaskTree.js';
-import type { ITaskReconciliationService, TaskFlushResult } from './TrackingTypes.js';
+import { type ITaskTree, TaskTree, type TaskTreeData } from './TaskTree.js';
 import { ReconciliationError } from './TrackingErrors.js';
+import type { ITaskReconciliationService, TaskFlushResult } from './TrackingTypes.js';
 
 /**
  * Pending operations that can be applied to a TaskTree
@@ -51,20 +51,20 @@ export interface FlushResult {
 
 /**
  * Mutable TrackingTaskTree that records operations in place for later reconciliation.
- * 
+ *
  * Key features:
  * - Mutable operations that update the tree in place
  * - Automatic operation recording for all mutations
  * - Tree-wide operation collection and flushing
  * - Optimistic updates with conflict resolution
  * - Compatible interface with TaskTree via ITaskTree
- * 
+ *
  * NOTE: This class uses a mutable approach while TrackingDependencyGraph uses
  * an immutable approach. Consider aligning these patterns for consistency.
  */
 export class TrackingTaskTree implements ITaskTree {
   private _pendingOperations: PendingOperation[] = [];
-  private _baseVersion: number = 0;
+  private _baseVersion = 0;
   private _children: TrackingTaskTree[] = [];
   private readonly _parent: TrackingTaskTree | null = null;
   private _task: Task;
@@ -79,10 +79,10 @@ export class TrackingTaskTree implements ITaskTree {
     this._parent = parent;
     this._baseVersion = options.baseVersion ?? 0;
     this._task = { ...data.task }; // Make a copy for mutation
-    
+
     // Convert children to TrackingTaskTree instances
-    this._children = data.children.map((childData) => 
-      new TrackingTaskTree(childData, this, options)
+    this._children = data.children.map(
+      (childData) => new TrackingTaskTree(childData, this, options)
     );
   }
 
@@ -129,7 +129,7 @@ export class TrackingTaskTree implements ITaskTree {
   walkDepthFirst(visitor: (node: TrackingTaskTree) => void | false): void {
     const shouldContinue = visitor(this);
     if (shouldContinue === false) return;
-    
+
     for (const child of this._children) {
       child.walkDepthFirst(visitor);
     }
@@ -226,13 +226,13 @@ export class TrackingTaskTree implements ITaskTree {
       updates: updates as Record<string, unknown>,
       timestamp: new Date(),
     };
-    
+
     // Add operation to this node
     this._pendingOperations.push(operation);
-    
+
     // Update task data in place
     Object.assign(this._task, updates);
-    
+
     return this;
   }
 
@@ -240,22 +240,21 @@ export class TrackingTaskTree implements ITaskTree {
    * Add child in place and record the operation
    */
   addChild(child: TaskTree | TrackingTaskTree): this {
-    const trackingChild = child instanceof TrackingTaskTree 
-      ? child 
-      : TrackingTaskTree.fromTaskTree(child);
-      
+    const trackingChild =
+      child instanceof TrackingTaskTree ? child : TrackingTaskTree.fromTaskTree(child);
+
     const operation: PendingOperation = {
       type: 'child_add',
       parentId: this.id,
       childData: trackingChild.toPlainObject(),
       timestamp: new Date(),
     };
-    
+
     this._pendingOperations.push(operation);
-    
+
     // Add child to actual tree structure
     this._children.push(trackingChild);
-    
+
     return this;
   }
 
@@ -269,12 +268,12 @@ export class TrackingTaskTree implements ITaskTree {
       childId,
       timestamp: new Date(),
     };
-    
+
     this._pendingOperations.push(operation);
-    
+
     // Remove from actual tree structure
-    this._children = this._children.filter(child => child.id !== childId);
-    
+    this._children = this._children.filter((child) => child.id !== childId);
+
     return this;
   }
 
@@ -283,9 +282,9 @@ export class TrackingTaskTree implements ITaskTree {
    */
   get hasPendingChanges(): boolean {
     let hasChanges = this._pendingOperations.length > 0;
-    
+
     if (!hasChanges) {
-      this.walkDepthFirst(node => {
+      this.walkDepthFirst((node) => {
         if (node._pendingOperations?.length > 0) {
           hasChanges = true;
           return false; // Stop traversal
@@ -294,7 +293,7 @@ export class TrackingTaskTree implements ITaskTree {
         return undefined;
       });
     }
-    
+
     return hasChanges;
   }
 
@@ -304,36 +303,38 @@ export class TrackingTaskTree implements ITaskTree {
   async flush(taskService: ITaskReconciliationService): Promise<TaskFlushResult> {
     // Collect operations from all nodes
     const allOperations = this.collectAllOperations();
-    
+
     if (allOperations.length === 0) {
       return {
-        updatedTree: await taskService.executeReconciliationOperations({
-          treeId: this.id,
-          baseVersion: this._baseVersion,
-          operations: [],
-        }).then(result => result.tree),
+        updatedTree: await taskService
+          .executeReconciliationOperations({
+            treeId: this.id,
+            baseVersion: this._baseVersion,
+            operations: [],
+          })
+          .then((result) => result.tree),
         clearedTrackingTree: this,
         idMappings: new Map<string, string>(),
       };
     }
-    
+
     // Create reconciliation plan from all operations
     const reconciliationPlan: ReconciliationPlan = {
       treeId: this.id,
       baseVersion: this._baseVersion,
       operations: this.consolidateOperations(allOperations),
     };
-    
+
     try {
       // Use the method that returns ID mappings
       const result = await taskService.executeReconciliationOperations(reconciliationPlan);
-      
+
       // Clear all operations from all nodes
       this.clearAllOperations();
-      
+
       // Update base version
       this._baseVersion += allOperations.length;
-      
+
       return {
         updatedTree: result.tree,
         clearedTrackingTree: this,
@@ -355,13 +356,13 @@ export class TrackingTaskTree implements ITaskTree {
    */
   private collectAllOperations(): PendingOperation[] {
     const operations: PendingOperation[] = [];
-    
-    this.walkDepthFirst(node => {
+
+    this.walkDepthFirst((node) => {
       if (node._pendingOperations) {
         operations.push(...node._pendingOperations);
       }
     });
-    
+
     // Sort by timestamp to maintain operation order
     return operations.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
   }
@@ -370,7 +371,7 @@ export class TrackingTaskTree implements ITaskTree {
    * Clear operations from all nodes in the tree
    */
   private clearAllOperations(): void {
-    this.walkDepthFirst(node => {
+    this.walkDepthFirst((node) => {
       if (node._pendingOperations) {
         node._pendingOperations.length = 0; // Clear in place
       }
@@ -385,7 +386,7 @@ export class TrackingTaskTree implements ITaskTree {
     const taskUpdates = new Map<string, PendingOperation>();
     const childAddOperations: PendingOperation[] = [];
     const childRemoveOperations: PendingOperation[] = [];
-    
+
     for (const op of operations) {
       if (op.type === 'task_update') {
         // Keep only the latest update for each task
@@ -395,7 +396,7 @@ export class TrackingTaskTree implements ITaskTree {
           if (existing && existing.type === 'task_update') {
             const mergedOp: PendingOperation = {
               ...op,
-              updates: { ...existing.updates, ...op.updates }
+              updates: { ...existing.updates, ...op.updates },
             };
             taskUpdates.set(op.taskId, mergedOp);
           } else {
@@ -408,22 +409,24 @@ export class TrackingTaskTree implements ITaskTree {
         childRemoveOperations.push(op);
       }
     }
-    
+
     // Sort child_add operations by depth to ensure parents are created before children
     const sortedChildAdds = this.sortChildAddOperationsByDepth(childAddOperations);
-    
+
     // Sort child_remove operations by reverse depth to ensure children are removed before parents
     const sortedChildRemoves = childRemoveOperations.sort((a, b) => {
       const depthA = this.getOperationDepth(a);
       const depthB = this.getOperationDepth(b);
       return depthB - depthA; // Reverse order: deeper children first
     });
-    
+
     // Final order: task updates first, then child additions (parents before children), then child removals (children before parents)
     return [
-      ...Array.from(taskUpdates.values()).sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime()),
+      ...Array.from(taskUpdates.values()).sort(
+        (a, b) => a.timestamp.getTime() - b.timestamp.getTime()
+      ),
       ...sortedChildAdds,
-      ...sortedChildRemoves
+      ...sortedChildRemoves,
     ];
   }
 
@@ -434,11 +437,11 @@ export class TrackingTaskTree implements ITaskTree {
     return operations.sort((a, b) => {
       const depthA = this.getOperationDepth(a);
       const depthB = this.getOperationDepth(b);
-      
+
       if (depthA !== depthB) {
         return depthA - depthB; // Shallower (parents) first
       }
-      
+
       // Same depth, sort by timestamp
       return a.timestamp.getTime() - b.timestamp.getTime();
     });
@@ -450,12 +453,12 @@ export class TrackingTaskTree implements ITaskTree {
   private getOperationDepth(operation: PendingOperation): number {
     if (operation.type === 'child_add') {
       // Find the parent node to determine depth
-      const parentNode = this.getRoot().find(task => task.id === operation.parentId);
+      const parentNode = this.getRoot().find((task) => task.id === operation.parentId);
       return parentNode ? parentNode.getDepth() + 1 : 0;
     } else if (operation.type === 'child_remove' || operation.type === 'task_update') {
       // Find the target node to determine depth
       const targetId = operation.type === 'child_remove' ? operation.childId : operation.taskId;
-      const targetNode = this.getRoot().find(task => task.id === targetId);
+      const targetNode = this.getRoot().find((task) => task.id === targetId);
       return targetNode ? targetNode.getDepth() : 0;
     }
     return 0;

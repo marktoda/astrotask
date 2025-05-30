@@ -375,7 +375,7 @@ export class TaskService implements ITaskReconciliationService {
     const updatedTaskIds = new Set<string>();
     const createdTaskIds: string[] = [];
     const rollbackActions: (() => Promise<void>)[] = [];
-    
+
     // ID mapping for temporary IDs to real database IDs
     const idMappings = new Map<string, string>();
 
@@ -422,7 +422,9 @@ export class TaskService implements ITaskReconciliationService {
         }
       }
 
-      throw new Error(`Failed to apply reconciliation plan: ${error instanceof Error ? error.message : String(error)}`);
+      throw new Error(
+        `Failed to apply reconciliation plan: ${error instanceof Error ? error.message : String(error)}`
+      );
     } finally {
       // Clear cache again to ensure no stale data persists after the operation
       this.clearCache();
@@ -484,10 +486,10 @@ export class TaskService implements ITaskReconciliationService {
     }
 
     const childData = operation.childData as TaskTreeData;
-    
+
     // Resolve parent ID - check if it's a temporary ID that needs mapping
     const resolvedParentId = idMapping.get(operation.parentId) || operation.parentId;
-    
+
     const createTask: CreateTask = {
       parentId: resolvedParentId,
       title: childData.task.title,
@@ -500,7 +502,7 @@ export class TaskService implements ITaskReconciliationService {
 
     const createdTask = await this.store.addTask(createTask);
     createdTaskIds.push(createdTask.id);
-    
+
     // Map the temporary ID to the real database ID
     if (childData.task.id && childData.task.id !== createdTask.id) {
       idMapping.set(childData.task.id, createdTask.id);
@@ -513,7 +515,12 @@ export class TaskService implements ITaskReconciliationService {
 
     // Recursively create children if they exist
     if (childData.children && childData.children.length > 0) {
-      await this.createChildrenRecursively(childData.children, createdTask.id, rollbackActions, idMapping);
+      await this.createChildrenRecursively(
+        childData.children,
+        createdTask.id,
+        rollbackActions,
+        idMapping
+      );
     }
   }
 
@@ -560,7 +567,7 @@ export class TaskService implements ITaskReconciliationService {
       };
 
       const createdChild = await this.store.addTask(createTask);
-      
+
       // Map the temporary ID to the real database ID if idMapping is provided
       if (idMapping && childData.task.id && childData.task.id !== createdChild.id) {
         idMapping.set(childData.task.id, createdChild.id);
@@ -575,7 +582,12 @@ export class TaskService implements ITaskReconciliationService {
 
       // Recursively create grandchildren
       if (childData.children && childData.children.length > 0) {
-        await this.createChildrenRecursively(childData.children, createdChild.id, rollbackActions, idMapping);
+        await this.createChildrenRecursively(
+          childData.children,
+          createdChild.id,
+          rollbackActions,
+          idMapping
+        );
       }
     }
   }

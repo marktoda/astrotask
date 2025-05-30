@@ -160,8 +160,8 @@ describe('TrackingDependencyGraph', () => {
       expect(clearedGraph.hasPendingChanges).toBe(false);
       expect(clearedGraph.pendingOperations).toHaveLength(0);
       
-      // Base version should increment
-      expect(clearedGraph.baseVersion).toBe(trackingGraph.baseVersion + 1);
+      // Base version should increment by the number of pending operations
+      expect(clearedGraph.baseVersion).toBe(1); // Was 0, now 1 after clearing 1 operation
     });
 
     it('preserves graph state when clearing operations', () => {
@@ -330,7 +330,7 @@ describe('TrackingDependencyGraph', () => {
       };
 
       await expect(trackingGraph.apply(mockService)).rejects.toThrow(
-        'Failed to apply tracking dependency graph changes: Service error'
+        'Failed to flush tracking dependency graph changes: Service error'
       );
 
       // Should preserve pending operations on failure

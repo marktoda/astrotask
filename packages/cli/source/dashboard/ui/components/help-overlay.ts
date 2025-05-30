@@ -126,6 +126,14 @@ export class HelpOverlay {
 				],
 			},
 			{
+				title: "Task Details",
+				bindings: [
+					{ keys: ["g"], description: "Toggle dependency graph view" },
+					{ keys: ["↑", "k"], description: "Scroll up" },
+					{ keys: ["↓", "j"], description: "Scroll down" },
+				],
+			},
+			{
 				title: "Command Palette",
 				bindings: [
 					{ keys: ['add "title"'], description: "Add new task" },

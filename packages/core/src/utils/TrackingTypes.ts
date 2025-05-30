@@ -1,14 +1,17 @@
 /**
  * @fileoverview Type definitions for tracking-related service interfaces
- * 
+ *
  * This module defines the service interfaces required by TrackingTaskTree
  * and TrackingDependencyGraph for flushing operations to the store.
  */
 
+import type { IDependencyGraph } from './DependencyGraph.js';
 import type { TaskTree } from './TaskTree.js';
-import type { DependencyGraph } from './DependencyGraph.js';
+import type {
+  DependencyReconciliationPlan,
+  TrackingDependencyGraph,
+} from './TrackingDependencyGraph.js';
 import type { ReconciliationPlan, TrackingTaskTree } from './TrackingTaskTree.js';
-import type { DependencyReconciliationPlan, TrackingDependencyGraph } from './TrackingDependencyGraph.js';
 
 /**
  * Task service interface required for TrackingTaskTree flush operations
@@ -16,7 +19,7 @@ import type { DependencyReconciliationPlan, TrackingDependencyGraph } from './Tr
 export interface ITaskReconciliationService {
   /**
    * Execute reconciliation operations and return the updated tree with ID mappings
-   * 
+   *
    * @param plan - The reconciliation plan containing operations to apply
    * @returns Promise resolving to updated tree and ID mappings
    * @throws {Error} If any operation fails
@@ -33,12 +36,12 @@ export interface ITaskReconciliationService {
 export interface IDependencyReconciliationService {
   /**
    * Apply a reconciliation plan to the dependency store
-   * 
+   *
    * @param plan - The reconciliation plan containing dependency operations
    * @returns Promise resolving to updated dependency graph
    * @throws {Error} If any operation fails
    */
-  applyReconciliationPlan(plan: DependencyReconciliationPlan): Promise<DependencyGraph>;
+  applyReconciliationPlan(plan: DependencyReconciliationPlan): Promise<IDependencyGraph>;
 }
 
 /**
@@ -54,7 +57,7 @@ export interface TaskFlushResult {
  * Result of flushing a TrackingDependencyGraph
  */
 export interface DependencyFlushResult {
-  updatedGraph: DependencyGraph;
+  updatedGraph: IDependencyGraph;
   clearedTrackingGraph: TrackingDependencyGraph;
 }
 
@@ -71,4 +74,4 @@ export interface FlushMetadata {
 
 // Re-export for convenience
 export type { TrackingTaskTree } from './TrackingTaskTree.js';
-export type { TrackingDependencyGraph } from './TrackingDependencyGraph.js'; 
+export type { TrackingDependencyGraph } from './TrackingDependencyGraph.js';

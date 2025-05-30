@@ -1,12 +1,12 @@
 /**
  * @fileoverview Error types for tracking operations
- * 
+ *
  * This module defines specific error types for better error handling
  * in TrackingTaskTree and TrackingDependencyGraph operations.
  */
 
-import type { PendingOperation } from './TrackingTaskTree.js';
 import type { DependencyPendingOperation } from './TrackingDependencyGraph.js';
+import type { PendingOperation } from './TrackingTaskTree.js';
 
 /**
  * Base error class for all tracking-related errors
@@ -19,7 +19,7 @@ export class TrackingError extends Error {
   ) {
     super(message);
     this.name = 'TrackingError';
-    
+
     // Maintain proper stack trace (for V8)
     if (Error.captureStackTrace) {
       Error.captureStackTrace(this, TrackingError);
@@ -83,4 +83,4 @@ export class StructureValidationError extends TrackingError {
     super(message, undefined, cause);
     this.name = 'StructureValidationError';
   }
-} 
+}

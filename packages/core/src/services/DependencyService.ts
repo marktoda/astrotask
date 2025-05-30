@@ -21,16 +21,16 @@ import type {
   TaskWithDependencies,
 } from '../schemas/dependency.js';
 import type { Task } from '../schemas/task.js';
-import { DependencyGraph } from '../utils/DependencyGraph.js';
-import type { IDependencyReconciliationService } from '../utils/TrackingTypes.js';
+import { DependencyGraph, type IDependencyGraph } from '../utils/DependencyGraph.js';
 import type {
   DependencyPendingOperation,
   DependencyReconciliationPlan,
 } from '../utils/TrackingDependencyGraph.js';
+import type { IDependencyReconciliationService } from '../utils/TrackingTypes.js';
 
 /**
  * Service for managing task dependencies and dependency graphs
- * 
+ *
  * Provides CRUD operations, validation, and batch reconciliation capabilities
  * for task dependency relationships.
  */
@@ -325,7 +325,7 @@ export class DependencyService implements IDependencyReconciliationService {
    * @returns Promise resolving to updated DependencyGraph reflecting the changes
    * @throws Error if any operation in the plan fails
    */
-  async applyReconciliationPlan(plan: DependencyReconciliationPlan): Promise<DependencyGraph> {
+  async applyReconciliationPlan(plan: DependencyReconciliationPlan): Promise<IDependencyGraph> {
     // If no operations, just return current graph
     if (plan.operations.length === 0) {
       return this.createDependencyGraph();

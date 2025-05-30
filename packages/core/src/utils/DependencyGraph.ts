@@ -14,6 +14,47 @@ import { z } from 'zod';
 import type { TaskDependency, TaskDependencyGraph } from '../schemas/dependency.js';
 
 /**
+ * Common interface for all DependencyGraph implementations
+ * This ensures both immutable (DependencyGraph) and mutable (TrackingDependencyGraph) versions
+ * maintain the same public API
+ */
+export interface IDependencyGraph {
+  // Basic Graph Queries
+  getDependencies(taskId: string): string[];
+  getDependents(taskId: string): string[];
+  getTaskDependencyGraph(taskId: string): TaskDependencyGraph;
+  getAllTaskDependencyGraphs(): Map<string, TaskDependencyGraph>;
+  getAllTaskIds(): string[];
+  hasTask(taskId: string): boolean;
+  getBlockedTasks(): string[];
+  getExecutableTasks(): string[];
+
+  // Cycle Detection
+  findCycles(): CycleDetectionResult;
+  wouldCreateCycle(dependentId: string, dependencyId: string): CycleDetectionResult;
+
+  // Topological Sorting
+  getTopologicalOrder(): string[];
+  getTopologicalOrderForTasks(taskIds: string[]): string[];
+
+  // Graph Traversal
+  walkDepthFirst(startTaskId: string, visitor: (taskId: string, depth: number) => void): void;
+  walkBreadthFirst(startTaskId: string, visitor: (taskId: string, depth: number) => void): void;
+  findShortestPath(fromTaskId: string, toTaskId: string): string[] | null;
+
+  // Graph Metrics and Analysis
+  getMetrics(): DependencyGraphMetrics;
+  calculateTaskDepth(taskId: string): number;
+
+  // Transformation Methods
+  withDependency(dependentId: string, dependencyId: string): IDependencyGraph;
+  withoutDependency(dependentId: string, dependencyId: string): IDependencyGraph;
+
+  // Serialization
+  toPlainObject(): DependencyGraphData;
+}
+
+/**
  * Schema for dependency graph data structure
  */
 export const dependencyGraphDataSchema = z.object({
@@ -104,7 +145,7 @@ export interface DependencyGraphMetrics {
  * - Performance: Efficient graph algorithms and caching
  * - Separation of concerns: Pure graph logic separate from database operations
  */
-export class DependencyGraph {
+export class DependencyGraph implements IDependencyGraph {
   private readonly _dependencies: Map<string, string[]>; // dependentId -> [dependencyIds]
   private readonly _dependents: Map<string, string[]>; // dependencyId -> [dependentIds]
   private readonly _tasks: Map<string, TaskData>;
@@ -643,7 +684,7 @@ export class DependencyGraph {
   /**
    * Create a new DependencyGraph with an additional dependency
    */
-  withDependency(dependentId: string, dependencyId: string): DependencyGraph {
+  withDependency(dependentId: string, dependencyId: string): IDependencyGraph {
     const dependencies = this._getAllDependencyPairs();
     dependencies.push({ dependentTaskId: dependentId, dependencyTaskId: dependencyId });
 
@@ -656,7 +697,7 @@ export class DependencyGraph {
   /**
    * Create a new DependencyGraph without a specific dependency
    */
-  withoutDependency(dependentId: string, dependencyId: string): DependencyGraph {
+  withoutDependency(dependentId: string, dependencyId: string): IDependencyGraph {
     const dependencies = this._getAllDependencyPairs().filter(
       (dep) => !(dep.dependentTaskId === dependentId && dep.dependencyTaskId === dependencyId)
     );

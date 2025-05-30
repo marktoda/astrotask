@@ -18,6 +18,7 @@ export interface DashboardState {
 	helpOverlayOpen: boolean;
 	statusMessage: string;
 	confirmExit: boolean;
+	detailViewMode: "normal" | "dependencies"; // New view mode toggle
 
 	// Project data (derived from trackingTree.getChildren())
 	projects: Project[];
@@ -74,6 +75,7 @@ export interface DashboardActions {
 	toggleHelpOverlay: () => void;
 	setStatusMessage: (message: string) => void;
 	setConfirmExit: (confirm: boolean) => void;
+	toggleDetailViewMode: () => void;
 
 	// Project actions
 	selectProject: (projectId: string | null) => void;
@@ -122,6 +124,7 @@ export function createDashboardStore(db: DatabaseStore) {
 		helpOverlayOpen: false,
 		statusMessage: "Ready",
 		confirmExit: false,
+		detailViewMode: "normal",
 		projects: [],
 		selectedProjectId: null,
 		progressByTaskId: new Map(),
@@ -535,6 +538,12 @@ export function createDashboardStore(db: DatabaseStore) {
 
 		setConfirmExit: (confirm) => {
 			set({ confirmExit: confirm });
+		},
+
+		toggleDetailViewMode: () => {
+			set((state) => ({
+				detailViewMode: state.detailViewMode === "normal" ? "dependencies" : "normal"
+			}));
 		},
 
 		// Project actions

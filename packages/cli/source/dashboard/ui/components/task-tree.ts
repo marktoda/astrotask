@@ -243,6 +243,17 @@ export class TaskTreeComponent {
 	}
 
 	private promptForTaskTitle(callback: (title: string) => void) {
+		// Temporarily disable renders to prevent jittering
+		const originalRender = this.render.bind(this);
+		let renderingDisabled = true;
+		
+		// Override render to prevent updates during prompt
+		this.render = (state: DashboardStore) => {
+			if (!renderingDisabled) {
+				originalRender(state);
+			}
+		};
+
 		const prompt = blessed.prompt({
 			parent: this.list.screen,
 			top: "center",
@@ -260,14 +271,45 @@ export class TaskTreeComponent {
 			label: " New Task ",
 		});
 
-		prompt.input("Enter task title:", "", (err, value) => {
-			if (!err && value) {
-				callback(value);
+		const cleanup = () => {
+			// Re-enable rendering
+			renderingDisabled = false;
+			this.render = originalRender;
+			
+			// Remove the prompt
+			if (prompt.parent) {
+				prompt.destroy();
 			}
+			
+			// Force a render to update display
+			this.list.screen.render();
+		};
+
+		prompt.input("Enter task title:", "", (err, value) => {
+			cleanup();
+			if (!err && value && value.trim()) {
+				callback(value.trim());
+			}
+		});
+
+		// Handle escape/cancel
+		prompt.key(['escape', 'C-c'], () => {
+			cleanup();
 		});
 	}
 
 	private confirmDelete(task: Task, callback: () => void) {
+		// Temporarily disable renders to prevent jittering
+		const originalRender = this.render.bind(this);
+		let renderingDisabled = true;
+		
+		// Override render to prevent updates during confirmation
+		this.render = (state: DashboardStore) => {
+			if (!renderingDisabled) {
+				originalRender(state);
+			}
+		};
+
 		const question = blessed.question({
 			parent: this.list.screen,
 			top: "center",
@@ -285,10 +327,30 @@ export class TaskTreeComponent {
 			label: " Confirm Delete ",
 		});
 
+		const cleanup = () => {
+			// Re-enable rendering
+			renderingDisabled = false;
+			this.render = originalRender;
+			
+			// Remove the question
+			if (question.parent) {
+				question.destroy();
+			}
+			
+			// Force a render to update display
+			this.list.screen.render();
+		};
+
 		question.ask(`Delete task "${task.title}"? (y/n)`, (err, value) => {
+			cleanup();
 			if (!err && value && value.toLowerCase() === "y") {
 				callback();
 			}
+		});
+
+		// Handle escape/cancel
+		question.key(['escape', 'C-c', 'n'], () => {
+			cleanup();
 		});
 	}
 

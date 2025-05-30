@@ -18,9 +18,9 @@ import type { Store } from '../../database/store.js';
 import type { CreateTask, Task } from '../../schemas/task.js';
 import { TaskService } from '../../services/TaskService.js';
 import type { TaskTree } from '../../utils/TaskTree.js';
+import { TASK_IDENTIFIERS } from '../../utils/TaskTreeConstants.js';
 import { TrackingDependencyGraph } from '../../utils/TrackingDependencyGraph.js';
 import { TrackingTaskTree } from '../../utils/TrackingTaskTree.js';
-import { TASK_IDENTIFIERS } from '../../utils/TaskTreeConstants.js';
 import { createLLM } from '../../utils/llm.js';
 import { PRD_SYSTEM_PROMPT, generatePRDPrompt } from '../../utils/prompts.js';
 import type { GenerationResult, TaskGenerator } from './TaskGenerator.js';
@@ -145,7 +145,7 @@ export class PRDTaskGenerator implements TaskGenerator {
             }
           }
         }
-        
+
         // Clear pending dependencies since they're now in the tracking graph
         this.pendingDependencies = null;
       }
@@ -445,7 +445,7 @@ export class PRDTaskGenerator implements TaskGenerator {
     // Update the PRD epic to have the correct parent ID (PROJECT_ROOT)
     const prdEpicWithCorrectParent = {
       ...prdEpic,
-      parentId: TASK_IDENTIFIERS.PROJECT_ROOT
+      parentId: TASK_IDENTIFIERS.PROJECT_ROOT,
     };
 
     // Create PRD epic tree and add it to the project root
@@ -453,12 +453,12 @@ export class PRDTaskGenerator implements TaskGenerator {
     trackingTree = trackingTree.addChild(prdEpicTree);
 
     // Add child tasks to the PRD epic tree
-    // The child tasks will reference the temporary PRD epic ID, 
+    // The child tasks will reference the temporary PRD epic ID,
     // but this will be resolved during flush via ID mapping
     for (const childTask of childTasks) {
       const childTree = TrackingTaskTree.fromTask(childTask);
       // Find the PRD epic in the tracking tree and add children to it
-      const prdEpicInTree = trackingTree.find(task => task.id === prdEpic.id);
+      const prdEpicInTree = trackingTree.find((task) => task.id === prdEpic.id);
       if (prdEpicInTree) {
         prdEpicInTree.addChild(childTree);
       }

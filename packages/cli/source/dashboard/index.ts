@@ -96,7 +96,14 @@ async function main() {
 		await layout.initialize();
 
 		// Cleanup function
-		function cleanup() {
+		async function cleanup() {
+			try {
+				// Save changes before exit
+				await store.flushOnExit();
+			} catch (error) {
+				console.error("Failed to save before exit:", error);
+			}
+			
 			try {
 				syncService.stop();
 				screen.destroy();
@@ -110,7 +117,7 @@ async function main() {
 		}
 
 		// Set up robust exit handling with multiple key combinations
-		screen.key(["q", "C-c", "escape"], () => {
+		screen.key(["q", "C-c", "escape"], async () => {
 			// Check if any overlays are open first
 			const currentState = store;
 			if (currentState.commandPaletteOpen || currentState.helpOverlayOpen) {
@@ -122,7 +129,7 @@ async function main() {
 
 			// Double-tap safety for exit
 			if (currentState.confirmExit) {
-				cleanup();
+				await cleanup();
 			} else {
 				currentState.setConfirmExit(true);
 				currentState.setStatusMessage("Press q/Ctrl+C again to exit");
@@ -131,8 +138,8 @@ async function main() {
 		});
 
 		// Force exit with Ctrl+C (bypass double-tap)
-		screen.key(["C-c"], () => {
-			cleanup();
+		screen.key(["C-c"], async () => {
+			await cleanup();
 		});
 
 		// Handle terminal resize
