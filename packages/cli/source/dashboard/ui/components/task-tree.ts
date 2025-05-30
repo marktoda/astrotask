@@ -57,6 +57,7 @@ export class TaskTreeComponent {
 			scrollable: true,
 			interactive: true,
 			focusable: true,
+			tags: true,
 			scrollbar: {
 				ch: " ",
 				track: {
@@ -66,6 +67,8 @@ export class TaskTreeComponent {
 					inverse: true,
 				},
 			},
+			alwaysScroll: true,
+			invertSelected: false,
 		});
 
 		this.setupEventHandlers();
@@ -370,9 +373,35 @@ export class TaskTreeComponent {
 			const currentSelection = (this.list as any).selected || 0;
 			const currentSelectedTaskId = this.currentItems[currentSelection]?.taskId;
 
-			// Set items without ANSI codes to avoid blessed parsing issues
-			const plainItems = items.map((item) => this.stripAnsi(item.label));
-			this.list.setItems(plainItems);
+			// Force complete redraw by temporarily hiding and showing the list
+			this.list.hide();
+			
+			// Clear the list completely before setting new items
+			this.list.clearItems();
+			this.list.setContent("");
+			
+			// Clear the internal render cache if it exists
+			if ((this.list as any)._clines) {
+				(this.list as any)._clines = [];
+			}
+			
+			// Set items with blessed color tags for blocked tasks
+			const formattedItems = items.map((item) => {
+				const plainLabel = this.stripAnsi(item.label);
+				const isBlocked = this.isTaskBlocked(item.task);
+				
+				// Apply red background for blocked tasks
+				if (isBlocked) {
+					return `{red-bg}{white-fg}${plainLabel}{/white-fg}{/red-bg}`;
+				}
+				
+				return plainLabel;
+			});
+			
+			this.list.setItems(formattedItems);
+			
+			// Show the list again
+			this.list.show();
 
 			// Restore selection - prioritize selectedTaskId from state, fallback to current selection
 			let targetIndex = 0;
@@ -395,6 +424,11 @@ export class TaskTreeComponent {
 			// Ensure the target index is within bounds
 			if (targetIndex >= 0 && targetIndex < items.length) {
 				this.list.select(targetIndex);
+			}
+			
+			// Force the parent box to redraw as well
+			if (this.list.parent) {
+				(this.list.parent as any).render();
 			}
 		} finally {
 			this.isRendering = false;
@@ -534,14 +568,22 @@ export class TaskTreeComponent {
 		const expandIcon = hasChildren ? (isExpanded ? "▼" : "▶") : " ";
 		const statusIcon = this.getStatusIcon(task.status);
 		const priorityIcon = this.getPriorityIcon(task.priority);
-		const blockIcon = this.getBlockIcon(task);
 
-		let label = `${indent}${expandIcon} ${statusIcon} ${task.title}${priorityIcon}${blockIcon}`;
+		// Build the base label
+		let label = `${indent}${expandIcon} ${statusIcon} ${task.title}`;
+		
+		// Add priority indicator if not medium
+		if (task.priority !== "medium") {
+			label += priorityIcon;
+		}
 
-		// Add dependency info if blocked - more concise format
-		if (this.isTaskBlocked(task) && this.getBlockingTasks(task).length > 0) {
-			const blockCount = this.getBlockingTasks(task).length;
-			label += ` 🚫[${blockCount}]`;
+		// Remove the blocked text indicator - we'll use row highlighting instead
+
+		// Pad the label to ensure it fills the entire line width
+		// This helps overwrite any residual text when collapsing
+		const maxWidth = (this.list.width as number) - 4; // Account for borders and padding
+		if (label.length < maxWidth) {
+			label = label.padEnd(maxWidth, ' ');
 		}
 
 		return label;
@@ -552,13 +594,13 @@ export class TaskTreeComponent {
 			case "done":
 				return "✓";
 			case "in-progress":
-				return "●";
+				return "◉";  // Changed to filled circle for better visibility
 			case "pending":
 				return "○";
 			case "cancelled":
 				return "✗";
 			case "archived":
-				return "□";
+				return "⧈";  // Changed to a better archive icon
 			default:
 				return "?";
 		}
@@ -567,7 +609,7 @@ export class TaskTreeComponent {
 	private getPriorityIcon(priority: Task["priority"]): string {
 		switch (priority) {
 			case "high":
-				return " !";
+				return " !";  // Changed back to exclamation mark to avoid emoji rendering issues
 			case "low":
 				return " ↓";
 			case "medium":
@@ -576,18 +618,9 @@ export class TaskTreeComponent {
 		}
 	}
 
-	private getBlockIcon(task: Task): string {
-		return this.isTaskBlocked(task) ? " ⎋" : "";
-	}
-
 	private isTaskBlocked(task: Task): boolean {
 		const state = this.store.getState();
 		return state.isTaskBlocked(task.id);
-	}
-
-	private getBlockingTasks(task: Task): string[] {
-		const state = this.store.getState();
-		return state.getBlockingTasks(task.id);
 	}
 
 	private stripAnsi(str: string): string {

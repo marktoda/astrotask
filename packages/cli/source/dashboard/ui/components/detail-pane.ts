@@ -95,29 +95,38 @@ export class DetailPane {
 		const { trackingTree } = state;
 		const lines: string[] = [];
 
-		// Header
-		lines.push(`Task: ${task.title}`);
-		lines.push(`ID: ${task.id}`);
-		lines.push(`Status: ${task.status}`);
-		lines.push(`Priority: ${task.priority}`);
+		// Header with improved styling
+		lines.push(`{bold}Task: ${task.title}{/bold}`);
+		lines.push(`{gray-fg}ID: ${task.id}{/gray-fg}`);
+		
+		// Status with icon
+		const statusIcon = this.getStatusIcon(task.status);
+		const statusColor = this.getDependencyStatusColor(task.status);
+		lines.push(`Status: ${statusIcon} {${statusColor}-fg}${task.status}{/${statusColor}-fg}`);
+		
+		// Priority with icon
+		const priorityIcon = this.getPriorityIcon(task.priority);
+		lines.push(`Priority: ${priorityIcon} ${task.priority}`);
+		
 		lines.push("");
 		lines.push("{gray-fg}Press 'g' for dependency graph view{/gray-fg}");
 		lines.push("");
 
 		// Description
 		if (task.description) {
-			lines.push("Description:");
+			lines.push("{bold}Description:{/bold}");
 			lines.push(task.description);
 			lines.push("");
 		}
 
-		// Children
+		// Children/Subtasks
 		const children = taskNode.getChildren();
 		if (children.length > 0) {
-			lines.push("Subtasks:");
+			lines.push("{bold}Subtasks:{/bold}");
 			children.forEach((child: any) => {
 				const statusIcon = this.getStatusIcon(child.task.status);
-				lines.push(`  ${statusIcon} ${child.task.title}`);
+				const statusColor = this.getDependencyStatusColor(child.task.status);
+				lines.push(`  ${statusIcon} {${statusColor}-fg}${child.task.title}{/${statusColor}-fg}`);
 			});
 			lines.push("");
 		}
@@ -125,7 +134,7 @@ export class DetailPane {
 		// Dependencies - use new store methods with prettier display
 		const deps = state.getTaskDependencies(task.id);
 		if (deps.length > 0) {
-			lines.push("{cyan-fg}🔗 Dependencies (required first):{/cyan-fg}");
+			lines.push("{bold}{cyan-fg}Dependencies (required first):{/cyan-fg}{/bold}");
 			deps.forEach((depId: string) => {
 				const depTaskNode = trackingTree?.find(
 					(task: Task) => task.id === depId,
@@ -134,9 +143,9 @@ export class DetailPane {
 					const status = depTaskNode.task.status;
 					const statusIcon = this.getDependencyStatusIcon(status);
 					const statusColor = this.getDependencyStatusColor(status);
-					const priorityIcon = this.getPriorityEmoji(depTaskNode.task.priority);
+					const priorityIcon = this.getPriorityIcon(depTaskNode.task.priority);
 					lines.push(
-						`  ${statusIcon} {${statusColor}-fg}${depTaskNode.task.title}{/${statusColor}-fg} ${priorityIcon}`,
+						`  ${statusIcon} {${statusColor}-fg}${depTaskNode.task.title}{/${statusColor}-fg}${priorityIcon}`,
 					);
 				}
 			});
@@ -146,7 +155,7 @@ export class DetailPane {
 		// Dependents - use new store methods with prettier display
 		const dependents = state.getTaskDependents(task.id);
 		if (dependents.length > 0) {
-			lines.push("{magenta-fg}⛓️  Blocks these tasks:{/magenta-fg}");
+			lines.push("{bold}{magenta-fg}Blocks these tasks:{/magenta-fg}{/bold}");
 			dependents.forEach((dependentId: string) => {
 				const dependentTaskNode = trackingTree?.find(
 					(task: Task) => task.id === dependentId,
@@ -155,11 +164,11 @@ export class DetailPane {
 					const status = dependentTaskNode.task.status;
 					const statusIcon = this.getDependencyStatusIcon(status);
 					const statusColor = this.getDependencyStatusColor(status);
-					const priorityIcon = this.getPriorityEmoji(
+					const priorityIcon = this.getPriorityIcon(
 						dependentTaskNode.task.priority,
 					);
 					lines.push(
-						`  ${statusIcon} {${statusColor}-fg}${dependentTaskNode.task.title}{/${statusColor}-fg} ${priorityIcon}`,
+						`  ${statusIcon} {${statusColor}-fg}${dependentTaskNode.task.title}{/${statusColor}-fg}${priorityIcon}`,
 					);
 				}
 			});
@@ -170,24 +179,23 @@ export class DetailPane {
 		const isBlocked = state.isTaskBlocked(task.id);
 		if (isBlocked) {
 			const blockingTasks = state.getBlockingTasks(task.id);
-			lines.push("{red-fg}🚫 BLOCKED BY:{/red-fg}");
+			lines.push("{bold}{red-fg}⏸ Task is Blocked{/red-fg}{/bold}");
+			lines.push("{yellow-fg}Complete these tasks first:{/yellow-fg}");
 			blockingTasks.forEach((blockingId: string) => {
 				const blockingTaskNode = trackingTree?.find(
 					(task: Task) => task.id === blockingId,
 				);
 				if (blockingTaskNode) {
-					const priorityIcon = this.getPriorityEmoji(
+					const priorityIcon = this.getPriorityIcon(
 						blockingTaskNode.task.priority,
 					);
+					const status = blockingTaskNode.task.status;
+					const statusIcon = this.getStatusIcon(status);
 					lines.push(
-						`  ⏸️  {yellow-fg}${blockingTaskNode.task.title}{/yellow-fg} ${priorityIcon}`,
+						`  ${statusIcon} {yellow-fg}${blockingTaskNode.task.title}{/yellow-fg}${priorityIcon}`,
 					);
 				}
 			});
-			lines.push("");
-			lines.push(
-				"{yellow-fg}💡 Complete dependencies above to unblock this task{/yellow-fg}",
-			);
 			lines.push("");
 		}
 
@@ -225,7 +233,7 @@ export class DetailPane {
 		// Show current task status
 		const statusIcon = this.getDependencyStatusIcon(task.status);
 		const statusColor = this.getDependencyStatusColor(task.status);
-		const priorityIcon = this.getPriorityEmoji(task.priority);
+		const priorityIcon = this.getPriorityIcon(task.priority);
 		const blockIcon = isBlocked ? " 🚫" : "";
 		lines.push(`{bold}📍 CURRENT TASK:{/bold}`);
 		lines.push(
@@ -289,7 +297,7 @@ export class DetailPane {
 				const status = taskNode.task.status;
 				const statusIcon = this.getDependencyStatusIcon(status);
 				const statusColor = this.getDependencyStatusColor(status);
-				const priorityIcon = this.getPriorityEmoji(taskNode.task.priority);
+				const priorityIcon = this.getPriorityIcon(taskNode.task.priority);
 
 				lines.push(
 					`${indent}${connector}${statusIcon} {${statusColor}-fg}${taskNode.task.title}{/${statusColor}-fg} ${priorityIcon}`,
@@ -338,13 +346,13 @@ export class DetailPane {
 			case "done":
 				return "✓";
 			case "in-progress":
-				return "●";
+				return "◉";
 			case "pending":
 				return "○";
 			case "cancelled":
 				return "✗";
 			case "archived":
-				return "📁";
+				return "⧈";
 			default:
 				return "○";
 		}
@@ -355,13 +363,13 @@ export class DetailPane {
 			case "done":
 				return "✓";
 			case "in-progress":
-				return "●";
+				return "◉";
 			case "pending":
 				return "○";
 			case "cancelled":
 				return "✗";
 			case "archived":
-				return "📁";
+				return "⧈";
 			default:
 				return "○";
 		}
@@ -384,14 +392,14 @@ export class DetailPane {
 		}
 	}
 
-	private getPriorityEmoji(priority: Task["priority"]): string {
+	private getPriorityIcon(priority: Task["priority"]): string {
 		switch (priority) {
 			case "high":
-				return "🔥";
+				return " !";
 			case "medium":
-				return "🔸";
+				return "";
 			case "low":
-				return "🔹";
+				return " ↓";
 			default:
 				return "";
 		}

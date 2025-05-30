@@ -40,9 +40,18 @@ export class Legend {
 	}
 
 	private render(state: DashboardStore) {
-		const { activePanel } = state;
+		const { activePanel, treeViewMode } = state;
 
 		let content = "";
+
+		// Icon legend - always show
+		const iconLegend = [
+			"○ Pending",
+			"◉ In Progress",
+			"✓ Done",
+			"! High Priority",
+			"Red = Blocked",
+		];
 
 		// Common bindings
 		const commonBindings = [
@@ -60,23 +69,33 @@ export class Legend {
 				"↓/j: Down",
 				"←/h: Collapse",
 				"→/l: Expand",
-				"Space: Toggle",
+				"Space: Cycle Status",
 				"a/A: Add Task",
 				"D: Delete",
+				"d: Toggle View",
 			],
-			details: ["↑/k: Scroll Up", "↓/j: Scroll Down"],
+			details: ["↑/k: Scroll Up", "↓/j: Scroll Down", "g: Graph View"],
 		};
 
 		// Build content
 		const activePanelBindings = panelBindings[activePanel] || [];
-		const allBindings = [...activePanelBindings, ...commonBindings];
+		
+		// First row: icon legend
+		const row1 = `Icons: ${iconLegend.join(" │ ")}`;
+		
+		// Second row: key bindings
+		const keyBindings = [...activePanelBindings, ...commonBindings];
+		const row2 = keyBindings.join(" │ ");
 
-		// Split into two rows for better layout
-		const half = Math.ceil(allBindings.length / 2);
-		const row1 = allBindings.slice(0, half).join(" │ ");
-		const row2 = allBindings.slice(half).join(" │ ");
+		// Add view mode indicator for tree panel
+		let viewModeIndicator = "";
+		if (activePanel === "tree") {
+			viewModeIndicator = treeViewMode === "dependencies" 
+				? " {yellow-fg}[Dependency View]{/}" 
+				: " {green-fg}[Hierarchy View]{/}";
+		}
 
-		content = `${row1}\n${row2}`;
+		content = `${row1}${viewModeIndicator}\n${row2}`;
 
 		this.box.setContent(content);
 		this.box.screen.render();
