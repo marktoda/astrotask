@@ -1,4 +1,4 @@
-import { spawn } from "child_process";
+import { execFileSync } from "child_process";
 import { promises as fs } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
@@ -216,14 +216,52 @@ notes: |
 			// Get editor command
 			const editor = this.getEditor();
 			
-			// Use screen.exec which is more reliable than spawn
-			const result = await this.execEditor(editor, tempFile);
-
-			if (!result.success) {
-				return result;
+			// Parse editor command in case it has arguments
+			const [command, ...args] = editor.split(/\s+/);
+			
+			if (!command) {
+				return {
+					success: false,
+					error: "No editor command found",
+				};
 			}
 
-			// Read and parse the result
+			// Step 1: Detach blessed from the terminal completely
+			this.screen.destroy();
+
+			// Step 2: Reset terminal to normal state
+			process.stdout.write('\x1b[?1049l'); // Exit alternate screen
+			process.stdout.write('\x1b[2J\x1b[H'); // Clear and home
+			process.stdout.write('\x1b[?25h'); // Show cursor
+			
+			// Step 3: Run editor synchronously - this blocks until editor exits
+			try {
+				execFileSync(command, [...args, tempFile], {
+					stdio: 'inherit',
+					env: {
+						...process.env,
+						TERM: process.env['TERM'] || 'xterm-256color',
+					}
+				});
+			} catch (error: any) {
+				// Editor exited with non-zero code or failed to launch
+				const errorMessage = error.code === 'ENOENT' 
+					? `Editor '${command}' not found`
+					: error.message || 'Editor failed';
+					
+				// Re-create the screen before returning
+				this.recreateScreen();
+				
+				return {
+					success: false,
+					error: errorMessage,
+				};
+			}
+
+			// Step 4: Re-create blessed screen
+			this.recreateScreen();
+
+			// Step 5: Read and parse the result
 			const content = await fs.readFile(tempFile, 'utf8');
 			const task = this.parseTaskFromTemplate(content);
 
@@ -246,148 +284,12 @@ notes: |
 		}
 	}
 
-	private execEditor(editor: string, filename: string): Promise<EditorResult> {
-		return new Promise((resolve) => {
-			const screen = this.screen!;
-			
-			// Disable screen rendering during editor session
-			const originalRender = screen.render.bind(screen);
-			screen.render = () => {};
-			
-			// Get the program instance
-			const program = screen.program as any;
-			
-			// Completely reset terminal state for the editor
-			try {
-				// Save current state
-				program.saveCursor();
-				program.savedCursor = true;
-				
-				// Exit alternate buffer and show cursor
-				program.normalBuffer();
-				program.showCursor();
-				program.csr(0, program.rows - 1);
-				program.disableMouse();
-				
-				// Reset all terminal modes
-				if (program.term) {
-					program.term.out('\x1b[?1049l'); // Exit alternate screen
-					program.term.out('\x1b[?25h');   // Show cursor
-					program.term.out('\x1b[?1000l'); // Disable mouse
-					program.term.out('\x1b[?1002l'); // Disable mouse tracking
-					program.term.out('\x1b[?1003l'); // Disable any mouse mode
-					program.term.out('\x1b[?1006l'); // Disable SGR mouse mode
-					program.term.out('\x1b[?47l');   // Use normal screen buffer
-					program.term.out('\x1b[2J');     // Clear screen
-					program.term.out('\x1b[H');      // Move to home
-				}
-				
-				// Flush any pending output
-				if (program.output && typeof program.output.flush === 'function') {
-					program.output.flush();
-				}
-			} catch (err) {
-				// Continue even if some reset operations fail
-			}
-			
-			// Parse editor command in case it has arguments
-			const [command, ...args] = editor.split(/\s+/);
-			
-			if (!command) {
-				// Restore render function
-				screen.render = originalRender;
-				resolve({ 
-					success: false, 
-					error: "No editor command found" 
-				});
-				return;
-			}
-
-			// Give terminal time to settle before spawning editor
-			setTimeout(() => {
-				// Spawn the editor with a completely clean environment
-				const child = spawn(command, [...args, filename], {
-					stdio: 'inherit',
-					shell: true,
-					env: {
-						...process.env,
-						// Ensure terminal type is set correctly for neovim
-						TERM: process.env['TERM'] || 'xterm-256color',
-						// Clear any blessed-specific environment variables
-						BLESSED: undefined,
-						BLESSED_SCREEN: undefined,
-					}
-				});
-
-				const cleanup = () => {
-					// Re-enter blessed mode
-					try {
-						// Clear screen first
-						if (program.term) {
-							program.term.out('\x1b[2J');     // Clear screen
-							program.term.out('\x1b[H');      // Move to home
-						}
-						
-						// Re-enter alternate buffer
-						program.alternateBuffer();
-						program.csr(0, program.rows - 1);
-						program.hideCursor();
-						program.enableMouse();
-						
-						// Restore saved cursor if it was saved
-						if (program.savedCursor) {
-							program.restoreCursor();
-							program.savedCursor = false;
-						}
-						
-						// Re-enable mouse modes for blessed
-						if (program.term) {
-							program.term.out('\x1b[?1049h'); // Enter alternate screen
-							program.term.out('\x1b[?25l');   // Hide cursor
-							program.term.out('\x1b[?1000h'); // Enable mouse
-							program.term.out('\x1b[?1002h'); // Enable mouse tracking
-							program.term.out('\x1b[?1003h'); // Enable any mouse mode
-							program.term.out('\x1b[?1006h'); // Enable SGR mouse mode
-						}
-						
-						// Flush output
-						if (program.output && typeof program.output.flush === 'function') {
-							program.output.flush();
-						}
-					} catch (err) {
-						// Continue even if restoration fails
-					}
-					
-					// Restore render function
-					screen.render = originalRender;
-					
-					// Force a full screen redraw
-					screen.alloc();
-					screen.render();
-				};
-
-				child.on('exit', (code: number | null) => {
-					cleanup();
-					
-					if (code === 0) {
-						resolve({ success: true });
-					} else {
-						resolve({ 
-							success: false, 
-							error: `Editor exited with code ${code}` 
-						});
-					}
-				});
-
-				child.on('error', (error: Error) => {
-					cleanup();
-					
-					resolve({ 
-						success: false, 
-						error: `Failed to start editor: ${error.message}` 
-					});
-				});
-			}, 50); // Small delay to ensure terminal has settled
-		});
+	private recreateScreen() {
+		// Re-enter alternate screen
+		process.stdout.write('\x1b[?1049h');
+		
+		// The dashboard needs to recreate its screen
+		// This is handled by emitting a custom event
+		process.emit('blessed-screen-restart' as any);
 	}
 } 

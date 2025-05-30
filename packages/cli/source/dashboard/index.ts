@@ -29,141 +29,164 @@ async function main() {
 		// Initialize database
 		const db = await createDatabase();
 
-		// Create blessed screen with proper configuration for robust key handling
-		const screen = blessed.screen({
-			smartCSR: true,
-			title: "Astrolabe Dashboard",
-			fullUnicode: true,
-			dockBorders: true,
-			cursor: {
-				artificial: true,
-				shape: "block",
-				blink: true,
-				color: "white",
-			},
-			sendFocus: true, // Ensure focus events are sent
-			warnings: false, // Disable warnings to suppress terminfo messages
-			terminal: process.env["TERM"], // Use the terminal we set above
-			forceUnicode: true, // Force unicode support
-			// Allow these keys to bubble up and not be locked by child widgets
-			ignoreLocked: ["C-c", "tab", "S-tab", "btab", ":", "?", "q"],
-		} as any);
+		// Function to create and initialize the dashboard
+		async function createDashboard() {
+			// Create blessed screen with proper configuration for robust key handling
+			const screen = blessed.screen({
+				smartCSR: true,
+				title: "Astrolabe Dashboard",
+				fullUnicode: true,
+				dockBorders: true,
+				cursor: {
+					artificial: true,
+					shape: "block",
+					blink: true,
+					color: "white",
+				},
+				sendFocus: true, // Ensure focus events are sent
+				warnings: false, // Disable warnings to suppress terminfo messages
+				terminal: process.env["TERM"], // Use the terminal we set above
+				forceUnicode: true, // Force unicode support
+				// Allow these keys to bubble up and not be locked by child widgets
+				ignoreLocked: ["C-c", "tab", "S-tab", "btab", ":", "?", "q"],
+			} as any);
 
-		// Create store and pass the screen
-		const useStore = createDashboardStore(db, screen);
-		const store = useStore.getState();
+			// Create store and pass the screen
+			const useStore = createDashboardStore(db, screen);
+			const store = useStore.getState();
 
-		// Turn on application-cursor & raw input explicitly for better key handling
-		// Check if methods exist before calling them
-		try {
-			if (
-				screen.program &&
-				typeof (screen.program as any).keypad === "function"
-			) {
-				(screen.program as any).keypad(true);
-			}
-			if (typeof (screen as any).grabInput === "function") {
-				(screen as any).grabInput({ mouse: true });
-			}
-		} catch (programError: any) {
-			// Ignore program setup errors - not critical for basic functionality
-			console.warn(
-				"Warning: Could not enable enhanced input mode:",
-				programError.message,
-			);
-		}
-
-		// Debug key handling (enable with DEBUG_KEYS=1)
-		if (process.env["DEBUG_KEYS"]) {
-			screen.on("keypress", (_ch, key) => {
-				console.error(
-					`DEBUG: Key pressed - full: "${key.full}", sequence: ${JSON.stringify(key.sequence)}, name: "${key.name}"`,
-				);
-			});
-		}
-
-		// Initialize services
-		const keymapService = new KeymapService();
-		const syncService = new SyncService(useStore);
-
-		// Create main layout
-		const layout = new DashboardLayout(screen, useStore, keymapService);
-
-		// Start sync service
-		syncService.start();
-
-		// Initialize layout
-		await layout.initialize();
-
-		// Cleanup function
-		async function cleanup() {
+			// Turn on application-cursor & raw input explicitly for better key handling
+			// Check if methods exist before calling them
 			try {
-				// Save changes before exit
-				await store.flushOnExit();
-			} catch (error) {
-				console.error("Failed to save before exit:", error);
-			}
-
-			try {
-				syncService.stop();
-				screen.destroy();
-				if (process.stdout.isTTY) {
-					process.stdout.write("\x1b[?25h"); // Show cursor
+				if (
+					screen.program &&
+					typeof (screen.program as any).keypad === "function"
+				) {
+					(screen.program as any).keypad(true);
 				}
-			} catch (error) {
-				// Ignore cleanup errors
+				if (typeof (screen as any).grabInput === "function") {
+					(screen as any).grabInput({ mouse: true });
+				}
+			} catch (programError: any) {
+				// Ignore program setup errors - not critical for basic functionality
+				console.warn(
+					"Warning: Could not enable enhanced input mode:",
+					programError.message,
+				);
 			}
-			process.exit(0);
+
+			// Debug key handling (enable with DEBUG_KEYS=1)
+			if (process.env["DEBUG_KEYS"]) {
+				screen.on("keypress", (_ch, key) => {
+					console.error(
+						`DEBUG: Key pressed - full: "${key.full}", sequence: ${JSON.stringify(key.sequence)}, name: "${key.name}"`,
+					);
+				});
+			}
+
+			// Initialize services
+			const keymapService = new KeymapService();
+			const syncService = new SyncService(useStore);
+
+			// Create main layout
+			const layout = new DashboardLayout(screen, useStore, keymapService);
+
+			// Start sync service
+			syncService.start();
+
+			// Initialize layout
+			await layout.initialize();
+
+			// Cleanup function
+			async function cleanup(exitProcess = true) {
+				try {
+					// Save changes before exit
+					await store.flushOnExit();
+				} catch (error) {
+					console.error("Failed to save before exit:", error);
+				}
+
+				try {
+					syncService.stop();
+					screen.destroy();
+					if (process.stdout.isTTY) {
+						process.stdout.write("\x1b[?25h"); // Show cursor
+					}
+				} catch (error) {
+					// Ignore cleanup errors
+				}
+				
+				if (exitProcess) {
+					process.exit(0);
+				}
+			}
+
+			// Set up robust exit handling with multiple key combinations
+			screen.key(["q", "C-c", "escape"], async () => {
+				// Check if any overlays are open first
+				const currentState = store;
+				if (currentState.commandPaletteOpen || currentState.helpOverlayOpen) {
+					// Close overlays instead of exiting
+					currentState.toggleCommandPalette();
+					currentState.toggleHelpOverlay();
+					return;
+				}
+
+				// Double-tap safety for exit
+				if (currentState.confirmExit) {
+					await cleanup();
+				} else {
+					currentState.setConfirmExit(true);
+					currentState.setStatusMessage("Press q/Ctrl+C again to exit");
+					setTimeout(() => currentState.setConfirmExit(false), 2000);
+				}
+			});
+
+			// Force exit with Ctrl+C (bypass double-tap)
+			screen.key(["C-c"], async () => {
+				await cleanup();
+			});
+
+			// Handle terminal resize
+			screen.on("resize", () => {
+				layout.handleResize();
+			});
+
+			// Render initial state
+			screen.render();
+
+			return { screen, cleanup };
 		}
 
-		// Set up robust exit handling with multiple key combinations
-		screen.key(["q", "C-c", "escape"], async () => {
-			// Check if any overlays are open first
-			const currentState = store;
-			if (currentState.commandPaletteOpen || currentState.helpOverlayOpen) {
-				// Close overlays instead of exiting
-				currentState.toggleCommandPalette();
-				currentState.toggleHelpOverlay();
-				return;
-			}
+		// Create initial dashboard
+		let currentDashboard = await createDashboard();
 
-			// Double-tap safety for exit
-			if (currentState.confirmExit) {
-				await cleanup();
-			} else {
-				currentState.setConfirmExit(true);
-				currentState.setStatusMessage("Press q/Ctrl+C again to exit");
-				setTimeout(() => currentState.setConfirmExit(false), 2000);
-			}
+		// Handle screen restart after editor closes
+		process.on('blessed-screen-restart' as any, async () => {
+			// Clean up current screen without exiting
+			await currentDashboard.cleanup(false);
+			
+			// Small delay to ensure terminal is ready
+			setTimeout(async () => {
+				// Recreate the dashboard
+				currentDashboard = await createDashboard();
+			}, 100);
 		});
-
-		// Force exit with Ctrl+C (bypass double-tap)
-		screen.key(["C-c"], async () => {
-			await cleanup();
-		});
-
-		// Handle terminal resize
-		screen.on("resize", () => {
-			layout.handleResize();
-		});
-
-		// Render initial state
-		screen.render();
 
 		// Set up process signal handlers
-		process.on("SIGINT", cleanup);
-		process.on("SIGTERM", cleanup);
-		process.on("beforeExit", cleanup);
+		process.on("SIGINT", () => currentDashboard.cleanup());
+		process.on("SIGTERM", () => currentDashboard.cleanup());
+		process.on("beforeExit", () => currentDashboard.cleanup());
 
 		// Handle uncaught exceptions gracefully
 		process.on("uncaughtException", (error) => {
 			console.error("Uncaught exception:", error);
-			cleanup();
+			currentDashboard.cleanup();
 		});
 
 		process.on("unhandledRejection", (reason) => {
 			console.error("Unhandled rejection:", reason);
-			cleanup();
+			currentDashboard.cleanup();
 		});
 	} catch (error) {
 		console.error("Failed to initialize dashboard:", error);
@@ -171,5 +194,4 @@ async function main() {
 	}
 }
 
-// Start the dashboard
 main();
