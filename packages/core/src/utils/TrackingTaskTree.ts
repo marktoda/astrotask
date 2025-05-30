@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import type { Task } from '../schemas/task.js';
 import { TaskTree, type TaskTreeData, type ITaskTree } from './TaskTree.js';
+import type { ITaskReconciliationService, TaskFlushResult } from './TrackingTypes.js';
+import { ReconciliationError } from './TrackingErrors.js';
 
 /**
  * Pending operations that can be applied to a TaskTree
@@ -15,7 +17,7 @@ export const pendingOperationSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('child_add'),
     parentId: z.string(),
-    childData: z.any(), // Use any for TaskTreeData to avoid recursive type issues
+    childData: z.unknown(), // Use unknown instead of any for better type safety
     timestamp: z.date(),
   }),
   z.object({
@@ -39,6 +41,7 @@ export interface ReconciliationPlan {
 
 /**
  * Result of flushing operations to the task service
+ * @deprecated Use TaskFlushResult from TrackingTypes instead
  */
 export interface FlushResult {
   updatedTree: TaskTree;
@@ -55,6 +58,9 @@ export interface FlushResult {
  * - Tree-wide operation collection and flushing
  * - Optimistic updates with conflict resolution
  * - Compatible interface with TaskTree via ITaskTree
+ * 
+ * NOTE: This class uses a mutable approach while TrackingDependencyGraph uses
+ * an immutable approach. Consider aligning these patterns for consistency.
  */
 export class TrackingTaskTree implements ITaskTree {
   private _pendingOperations: PendingOperation[] = [];
@@ -295,16 +301,7 @@ export class TrackingTaskTree implements ITaskTree {
   /**
    * Flush all operations from the entire tree and return both the updated tree and ID mappings
    */
-  async flush(taskService: {
-    executeReconciliationOperations(plan: ReconciliationPlan): Promise<{
-      tree: TaskTree;
-      idMappings: Map<string, string>;
-    }>;
-  }): Promise<{
-    updatedTree: TaskTree;
-    clearedTrackingTree: TrackingTaskTree;
-    idMappings: Map<string, string>;
-  }> {
+  async flush(taskService: ITaskReconciliationService): Promise<TaskFlushResult> {
     // Collect operations from all nodes
     const allOperations = this.collectAllOperations();
     
@@ -344,7 +341,12 @@ export class TrackingTaskTree implements ITaskTree {
       };
     } catch (error) {
       // Don't clear operations on failure - preserve for retry
-      throw new Error(`Failed to flush operations: ${error instanceof Error ? error.message : String(error)}`);
+      throw new ReconciliationError(
+        `Failed to flush operations: ${error instanceof Error ? error.message : String(error)}`,
+        allOperations,
+        [], // No successful operations since we failed
+        error instanceof Error ? error : undefined
+      );
     }
   }
 

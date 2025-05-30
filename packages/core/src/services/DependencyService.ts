@@ -22,16 +22,19 @@ import type {
 } from '../schemas/dependency.js';
 import type { Task } from '../schemas/task.js';
 import { DependencyGraph } from '../utils/DependencyGraph.js';
+import type { IDependencyReconciliationService } from '../utils/TrackingTypes.js';
 import type {
   DependencyPendingOperation,
   DependencyReconciliationPlan,
 } from '../utils/TrackingDependencyGraph.js';
 
 /**
- * Service for managing task dependency relationships.
- * Provides CRUD operations, validation, and graph analysis for task dependencies.
+ * Service for managing task dependencies and dependency graphs
+ * 
+ * Provides CRUD operations, validation, and batch reconciliation capabilities
+ * for task dependency relationships.
  */
-export class DependencyService {
+export class DependencyService implements IDependencyReconciliationService {
   constructor(private store: Store) {}
 
   // ---------------------------------------------------------------------------

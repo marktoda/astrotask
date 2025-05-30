@@ -82,6 +82,32 @@ export {
   deserializeDependencyTrackingState,
 } from './utils/TrackingDependencyGraph.js';
 
+// Tracking service interfaces and types
+export type {
+  ITaskReconciliationService,
+  IDependencyReconciliationService,
+  TaskFlushResult,
+  DependencyFlushResult,
+  FlushMetadata,
+} from './utils/TrackingTypes.js';
+
+// Tracking error types
+export {
+  TrackingError,
+  ReconciliationError,
+  OperationConsolidationError,
+  IdMappingError,
+  StructureValidationError,
+} from './utils/TrackingErrors.js';
+
+// ID mapping utilities
+export {
+  IdMapper,
+  createIdMapper,
+  applyIdMappingsToTaskOperations,
+  applyIdMappingsToDependencyOperations,
+} from './utils/IdMapping.js';
+
 // TaskTree validation
 export {
   validateTaskTree,

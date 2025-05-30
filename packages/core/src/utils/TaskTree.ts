@@ -44,7 +44,7 @@ export interface ITaskTree {
   toTaskTree?(): TaskTree; // Optional - for TrackingTaskTree to convert to immutable
 }
 
-/**
+/*
  * TaskTree Schema - Recursive task structure with children
  */
 export const taskTreeSchema: z.ZodType<TaskTreeData> = z.lazy(() =>

@@ -10,6 +10,7 @@ import {
   validateTaskTree,
 } from '../utils/TaskTreeValidation.js';
 import type { ReconciliationPlan } from '../utils/TrackingTaskTree.js';
+import type { ITaskReconciliationService } from '../utils/TrackingTypes.js';
 import {
   type StatusTransitionResult,
   validateStatusTransition,
@@ -22,7 +23,7 @@ import { DependencyService } from './DependencyService.js';
  * Now includes dependency-aware operations for task status management
  */
 
-export class TaskService {
+export class TaskService implements ITaskReconciliationService {
   private cache: TaskTreeCache;
   private cachedOps: CachedTaskTreeOperations;
   private dependencyService: DependencyService;

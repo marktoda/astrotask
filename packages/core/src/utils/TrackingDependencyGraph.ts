@@ -11,6 +11,8 @@
 
 import { z } from 'zod';
 import { DependencyGraph, type DependencyGraphData } from './DependencyGraph.js';
+import type { IDependencyReconciliationService, DependencyFlushResult } from './TrackingTypes.js';
+import { ReconciliationError } from './TrackingErrors.js';
 
 /**
  * Pending operations that can be applied to a DependencyGraph
@@ -46,6 +48,7 @@ export interface DependencyReconciliationPlan {
  *
  * Key features:
  * - Same interface as DependencyGraph (transparent drop-in replacement)
+ * - Immutable operations that return new instances (for consistency and predictability)
  * - Captures all mutations as pending operations
  * - Supports optimistic updates with rollback capability
  * - Enables batch reconciliation to store
@@ -178,18 +181,13 @@ export class TrackingDependencyGraph extends DependencyGraph {
   }
 
   /**
-   * Apply all pending operations to a DependencyService and clear them on success
-   * This is the recommended way to persist changes from a TrackingDependencyGraph
+   * Flush all pending operations to a DependencyService and clear them on success
+   * This is the primary way to persist changes from a TrackingDependencyGraph
    *
    * @param dependencyService - The service to apply changes to
    * @returns Promise of the updated DependencyGraph from the store and the cleared TrackingDependencyGraph
    */
-  async apply(dependencyService: {
-    applyReconciliationPlan(plan: DependencyReconciliationPlan): Promise<DependencyGraph>;
-  }): Promise<{
-    updatedGraph: DependencyGraph;
-    clearedTrackingGraph: TrackingDependencyGraph;
-  }> {
+  async flush(dependencyService: IDependencyReconciliationService): Promise<DependencyFlushResult> {
     if (!this.hasPendingChanges) {
       // No changes to apply, just return current state
       const currentGraph = await dependencyService.applyReconciliationPlan({
@@ -220,22 +218,21 @@ export class TrackingDependencyGraph extends DependencyGraph {
       };
     } catch (error) {
       // Don't clear pending operations on failure - preserve them for retry
-      throw new Error(
-        `Failed to apply tracking dependency graph changes: ${error instanceof Error ? error.message : String(error)}`
+      throw new ReconciliationError(
+        `Failed to flush tracking dependency graph changes: ${error instanceof Error ? error.message : String(error)}`,
+        this._pendingOperations,
+        [], // No successful operations since we failed
+        error instanceof Error ? error : undefined
       );
     }
   }
 
   /**
-   * Alias for apply() method for consistency with TrackingTaskTree
+   * Apply all pending operations to a DependencyService and clear them on success
+   * @deprecated Use flush() instead for consistency with TrackingTaskTree
    */
-  async flush(dependencyService: {
-    applyReconciliationPlan(plan: DependencyReconciliationPlan): Promise<DependencyGraph>;
-  }): Promise<{
-    updatedGraph: DependencyGraph;
-    clearedTrackingGraph: TrackingDependencyGraph;
-  }> {
-    return this.apply(dependencyService);
+  async apply(dependencyService: IDependencyReconciliationService): Promise<DependencyFlushResult> {
+    return this.flush(dependencyService);
   }
 
   /**
