@@ -926,7 +926,11 @@ export function createDashboardStore(
 		// Sync operations
 		reloadFromDatabase: async () => {
 			try {
-				set({ statusMessage: "Reloading from database..." });
+				// Don't show loading message if we're just syncing in background
+				const isSilentReload = get().statusMessage?.includes('Finalizing');
+				if (!isSilentReload) {
+					set({ statusMessage: "Reloading from database..." });
+				}
 
 				// Remember current selection and expanded state
 				const currentState = get();
@@ -944,12 +948,34 @@ export function createDashboardStore(
 				// Restore UI state
 				const newState = get();
 				if (previousSelectedTaskId && newState.trackingTree) {
-					// Check if the previously selected task still exists
+					// For temporary IDs, try to find the task by title
+					let taskToSelect: string | null = previousSelectedTaskId;
+					
+					if (previousSelectedTaskId.startsWith('temp-')) {
+						// Find the newly created task by matching other properties
+						const oldTask = currentState.trackingTree?.find(
+							(task) => task.id === previousSelectedTaskId
+						);
+						if (oldTask) {
+							// Find by title and parent
+							const newTask = newState.trackingTree.find(
+								(task) => 
+									task.title === oldTask.task.title && 
+									task.parentId === oldTask.task.parentId &&
+									!task.id.startsWith('temp-')
+							);
+							if (newTask) {
+								taskToSelect = newTask.task.id;
+							}
+						}
+					}
+
+					// Check if the task still exists
 					const taskStillExists = newState.trackingTree.find(
-						(task) => task.id === previousSelectedTaskId
+						(task) => task.id === taskToSelect
 					);
 					if (taskStillExists) {
-						newState.selectTask(previousSelectedTaskId);
+						newState.selectTask(taskToSelect);
 					}
 				}
 
@@ -957,6 +983,12 @@ export function createDashboardStore(
 				const restoredExpandedTaskIds = new Set<string>();
 				if (newState.trackingTree) {
 					previousExpandedTaskIds.forEach((taskId) => {
+						// Handle temporary IDs
+						if (taskId.startsWith('temp-')) {
+							// Skip temp IDs in expansion restoration
+							return;
+						}
+						
 						const taskStillExists = newState.trackingTree!.find(
 							(task) => task.id === taskId
 						);
@@ -966,6 +998,11 @@ export function createDashboardStore(
 					});
 				}
 				set({ expandedTaskIds: restoredExpandedTaskIds });
+
+				// Don't override status message if it was set to something specific
+				if (!isSilentReload) {
+					set({ statusMessage: "Ready" });
+				}
 			} catch (error) {
 				const errorMessage =
 					error instanceof Error ? error.message : String(error);
@@ -995,6 +1032,12 @@ export function createDashboardStore(
 			try {
 				const { task: taskTemplate, parentId } = taskData;
 
+				// Show immediate feedback
+				set({
+					statusMessage: `Creating task: ${taskTemplate.title}...`,
+					editorActive: false,
+				});
+
 				// Create new task with all the details from the template
 				const newTask: Task = {
 					id: `temp-${Date.now()}`, // Temporary ID - will be replaced on flush
@@ -1016,7 +1059,9 @@ export function createDashboardStore(
 						const childTree = TrackingTaskTree.fromTask(newTask);
 						parentNode.addChild(childTree); // Mutation recorded automatically
 					} else {
-						set({ statusMessage: `Parent task ${parentId} not found` });
+						set({ 
+							statusMessage: `Parent task ${parentId} not found`,
+						});
 						return;
 					}
 				} else {
@@ -1025,22 +1070,40 @@ export function createDashboardStore(
 					trackingTree.addChild(childTree); // Mutation recorded automatically
 				}
 
-				// Trigger UI update
+				// Trigger UI update immediately to show the task
 				get().triggerTreeUpdate();
 				get().updateUnsavedChangesFlag();
 				get().recalculateAllProgress();
 
-				set({
-					statusMessage: `Created task: ${taskTemplate.title}`,
-					editorActive: false,
+				// Show task immediately with temp ID
+				set({ 
+					selectedTaskId: newTask.id,
+					statusMessage: `Saving task: ${taskTemplate.title}...`,
 				});
-
-				// Immediately flush to disk and reload to get real ID
-				await get().flushChangesImmediate();
-				await get().reloadFromDatabase();
+				
+				// Flush immediately to persist the task
+				try {
+					await get().flushChangesImmediate();
+				} catch (flushError) {
+					set({
+						statusMessage: `Error saving task: ${flushError instanceof Error ? flushError.message : String(flushError)}`,
+					});
+					return;
+				}
+				
+				// Reload to get the real IDs and ensure UI is in sync
+				set({ statusMessage: `Finalizing task...` });
+				try {
+					await get().reloadFromDatabase();
+				} catch (reloadError) {
+					set({
+						statusMessage: `Error finalizing task: ${reloadError instanceof Error ? reloadError.message : String(reloadError)}`,
+					});
+					return;
+				}
 				
 				set({
-					statusMessage: `Task "${taskTemplate.title}" saved successfully`,
+					statusMessage: `Task "${taskTemplate.title}" created successfully`,
 				});
 			} catch (error) {
 				const errorMessage =
@@ -1064,10 +1127,20 @@ export function createDashboardStore(
 			try {
 				const { taskId, task: taskTemplate } = taskEditData;
 
+				// Show immediate feedback
+				set({
+					statusMessage: `Updating task: ${taskTemplate.title}...`,
+					editorActive: false,
+					isFlushingChanges: true, // Prevent other operations during edit
+				});
+
 				// Find the task if taskId is provided
 				const taskNode = trackingTree.find((task) => task.id === taskId);
 				if (!taskNode) {
-					set({ statusMessage: `Task ${taskId} not found` });
+					set({ 
+						statusMessage: `Task ${taskId} not found`,
+						isFlushingChanges: false,
+					});
 					return;
 				}
 
@@ -1085,22 +1158,31 @@ export function createDashboardStore(
 				// Apply the updates to the task
 				taskNode.withTask(updates);
 
-				// Trigger UI update
+				// Trigger UI update immediately
 				get().triggerTreeUpdate();
 				get().updateUnsavedChangesFlag();
 				get().recalculateAllProgress();
 
-				set({
-					statusMessage: `Updated task "${taskTemplate.title}"`,
-					editorActive: false,
+				// Keep the task selected
+				set({ 
+					selectedTaskId: taskId,
+					statusMessage: `Saving changes...`,
 				});
 
-				// Immediately flush to disk and reload
-				await get().flushChangesImmediate();
-				await get().reloadFromDatabase();
+				// Force render to show the updates
+				if (get().treeVersion) {
+					set({ treeVersion: get().treeVersion + 1 });
+				}
+
+				// Small delay to ensure UI updates are visible
+				await new Promise(resolve => setTimeout(resolve, 50));
+
+				// Flush changes - for edits, we don't need to reload since IDs don't change
+				await get().flushChanges();
 				
 				set({
 					statusMessage: `Task "${taskTemplate.title}" updated successfully`,
+					isFlushingChanges: false,
 				});
 			} catch (error) {
 				const errorMessage =
@@ -1108,6 +1190,7 @@ export function createDashboardStore(
 				set({
 					statusMessage: `Error editing task: ${errorMessage}`,
 					editorActive: false,
+					isFlushingChanges: false,
 				});
 			}
 		},
