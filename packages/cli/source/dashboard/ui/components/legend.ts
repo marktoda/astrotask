@@ -50,7 +50,7 @@ export class Legend {
 			"◉ In Progress",
 			"✓ Done",
 			"! High Priority",
-			"Red = Blocked",
+			"Red Text = Blocked",
 		];
 
 		// Common bindings

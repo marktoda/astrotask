@@ -19,20 +19,19 @@ The Astrolabe dashboard uses a clean, consistent design system to display task i
 
 ### Special Indicators
 - `▶` / `▼` **Expand/Collapse** - Shows if a task has subtasks and their visibility state
-- `⏸` **Blocked** - Task is blocked by dependencies
-  - Format: `⏸ blocked by N` where N is the number of blocking tasks
+- **Red Text** - Task is blocked by dependencies (entire row appears in red)
 
 ## Task Tree Display
 
 ### Format
 ```
-[expand] [status] Task Title [priority] [blocked indicator]
+[expand] [status] Task Title [priority]
 ```
 
 ### Examples
 - `▶ ○ Implement authentication !` - High priority pending task with subtasks
 - `▼ ◉ Create dashboard` - In-progress task with expanded subtasks
-- `  ○ Add task filtering ⏸ blocked by 2` - Blocked subtask
+- `  ○ Add task filtering` (in red text) - Blocked subtask
 - `  ✓ Setup project structure` - Completed task
 
 ## Task Details Panel

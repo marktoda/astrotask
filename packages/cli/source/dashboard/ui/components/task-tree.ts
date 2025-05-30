@@ -390,9 +390,9 @@ export class TaskTreeComponent {
 				const plainLabel = this.stripAnsi(item.label);
 				const isBlocked = this.isTaskBlocked(item.task);
 				
-				// Apply red background for blocked tasks
+				// Apply red text for blocked tasks
 				if (isBlocked) {
-					return `{red-bg}{white-fg}${plainLabel}{/white-fg}{/red-bg}`;
+					return `{red-fg}${plainLabel}{/red-fg}`;
 				}
 				
 				return plainLabel;
