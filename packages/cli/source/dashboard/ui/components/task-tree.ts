@@ -135,15 +135,15 @@ export class TaskTreeComponent {
 					state().toggleTaskExpanded(item.taskId);
 				}
 				state().selectTask(item.taskId);
-				
+
 				// Show helpful message about dependency highlighting
 				const currentState = state();
 				const dependencies = currentState.getTaskDependencies(item.taskId);
 				const dependents = currentState.getTaskDependents(item.taskId);
-				
+
 				if (dependencies.length > 0 || dependents.length > 0) {
 					state().setStatusMessage(
-						`Selected: ${item.task.title} | Dependency highlighting active - ⚠ blocking pending, ✓ blocking done, ← dependent, ~ related`
+						`Selected: ${item.task.title} | Dependency highlighting active - ⚠ blocking pending, ✓ blocking done, ← dependent, ~ related`,
 					);
 				} else {
 					state().setStatusMessage(`Selected: ${item.task.title}`);
@@ -265,6 +265,33 @@ export class TaskTreeComponent {
 		// Toggle dependency tree view
 		this.list.key(["d"], () => {
 			state().toggleTreeViewMode();
+		});
+
+		// Set task as tree root (focus on this task's subtree)
+		this.list.key(["f"], () => {
+			const selectedIndex = (this.list as any).selected;
+			const item = this.currentItems[selectedIndex];
+			if (item) {
+				// Set this task as the selected project to root the tree at this task
+				state().selectProject(item.taskId);
+				state().setStatusMessage(`Focused on task: ${item.task.title}`);
+			}
+		});
+
+		// Reset tree root to show all projects (escape from focused view)
+		this.list.key(["escape", "u"], () => {
+			state().selectProject(null);
+			state().setStatusMessage("Showing all projects");
+		});
+
+		// Mouse click handling - double click to set as root
+		this.list.on("click", () => {
+			const selectedIndex = (this.list as any).selected;
+			const item = this.currentItems[selectedIndex];
+			if (item) {
+				// On single click, just select the task
+				state().selectTask(item.taskId);
+			}
 		});
 
 		// Selection change handler
@@ -431,19 +458,19 @@ export class TaskTreeComponent {
 
 				// Apply colors based on relationship to selected task
 				switch (relationship) {
-					case 'blocking-pending':
+					case "blocking-pending":
 						// Task is blocking the selected task and is still pending (red/orange)
 						return `{red-fg}${plainLabel}{/red-fg}`;
-					case 'blocking-completed':
+					case "blocking-completed":
 						// Task is blocking the selected task but is done (green)
 						return `{green-fg}${plainLabel}{/green-fg}`;
-					case 'dependent':
+					case "dependent":
 						// Task depends on the selected task (blue)
 						return `{blue-fg}${plainLabel}{/blue-fg}`;
-					case 'related':
+					case "related":
 						// Task shares dependencies with the selected task (yellow)
 						return `{yellow-fg}${plainLabel}{/yellow-fg}`;
-					case 'none':
+					case "none":
 					default:
 						// No special relationship or no task selected
 						return plainLabel;
@@ -505,7 +532,7 @@ export class TaskTreeComponent {
 	}
 
 	private buildHierarchyTreeItems(state: DashboardStore): TaskTreeItem[] {
-		const { trackingTree, expandedTaskIds } = state;
+		const { trackingTree, expandedTaskIds, selectedProjectId } = state;
 
 		if (!trackingTree) {
 			return [];
@@ -534,9 +561,20 @@ export class TaskTreeComponent {
 			}
 		};
 
-		// Add all root-level tasks (children of the project root)
-		for (const rootTask of trackingTree.getChildren()) {
-			addTreeNode(rootTask, 0);
+		// If a specific project is selected, show only that project's task tree
+		if (selectedProjectId) {
+			const selectedProjectNode = trackingTree.find(
+				(task) => task.id === selectedProjectId,
+			);
+			if (selectedProjectNode) {
+				// Show the selected project as root (depth 0) with its children
+				addTreeNode(selectedProjectNode, 0);
+			}
+		} else {
+			// Show all root-level tasks (children of the project root) when no specific project is selected
+			for (const rootTask of trackingTree.getChildren()) {
+				addTreeNode(rootTask, 0);
+			}
 		}
 
 		return items;
@@ -676,22 +714,22 @@ export class TaskTreeComponent {
 
 	private getDependencyIndicator(taskId: string): string {
 		const state = this.store.getState();
-		
+
 		// Only show indicators if we have a selected task
 		if (!state.selectedTaskId) {
 			return "";
 		}
 
 		const relationship = state.getTaskRelationshipToSelected(taskId);
-		
+
 		switch (relationship) {
-			case 'blocking-pending':
+			case "blocking-pending":
 				return " ⚠"; // Task is blocking the selected task (pending)
-			case 'blocking-completed':
+			case "blocking-completed":
 				return " ✓"; // Task is blocking the selected task (done)
-			case 'dependent':
+			case "dependent":
 				return " ←"; // Task depends on the selected task
-			case 'related':
+			case "related":
 				return " ~"; // Task shares dependencies
 			default:
 				return "";

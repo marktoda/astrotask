@@ -119,7 +119,9 @@ export interface DashboardActions {
 	processPendingTask: (taskData: PendingTaskData) => Promise<void>;
 
 	// New method for processing pending task edit data from the editor
-	processPendingTaskEdit: (taskEditData: import("../services/editor.js").PendingTaskEditData) => Promise<void>;
+	processPendingTaskEdit: (
+		taskEditData: import("../services/editor.js").PendingTaskEditData,
+	) => Promise<void>;
 
 	// Get relationship of a task to the currently selected task for visual highlighting
 	getTaskRelationshipToSelected: (taskId: string) => string;
@@ -927,7 +929,7 @@ export function createDashboardStore(
 		reloadFromDatabase: async () => {
 			try {
 				// Don't show loading message if we're just syncing in background
-				const isSilentReload = get().statusMessage?.includes('Finalizing');
+				const isSilentReload = get().statusMessage?.includes("Finalizing");
 				if (!isSilentReload) {
 					set({ statusMessage: "Reloading from database..." });
 				}
@@ -950,19 +952,19 @@ export function createDashboardStore(
 				if (previousSelectedTaskId && newState.trackingTree) {
 					// For temporary IDs, try to find the task by title
 					let taskToSelect: string | null = previousSelectedTaskId;
-					
-					if (previousSelectedTaskId.startsWith('temp-')) {
+
+					if (previousSelectedTaskId.startsWith("temp-")) {
 						// Find the newly created task by matching other properties
 						const oldTask = currentState.trackingTree?.find(
-							(task) => task.id === previousSelectedTaskId
+							(task) => task.id === previousSelectedTaskId,
 						);
 						if (oldTask) {
 							// Find by title and parent
 							const newTask = newState.trackingTree.find(
-								(task) => 
-									task.title === oldTask.task.title && 
+								(task) =>
+									task.title === oldTask.task.title &&
 									task.parentId === oldTask.task.parentId &&
-									!task.id.startsWith('temp-')
+									!task.id.startsWith("temp-"),
 							);
 							if (newTask) {
 								taskToSelect = newTask.task.id;
@@ -972,7 +974,7 @@ export function createDashboardStore(
 
 					// Check if the task still exists
 					const taskStillExists = newState.trackingTree.find(
-						(task) => task.id === taskToSelect
+						(task) => task.id === taskToSelect,
 					);
 					if (taskStillExists) {
 						newState.selectTask(taskToSelect);
@@ -984,13 +986,13 @@ export function createDashboardStore(
 				if (newState.trackingTree) {
 					previousExpandedTaskIds.forEach((taskId) => {
 						// Handle temporary IDs
-						if (taskId.startsWith('temp-')) {
+						if (taskId.startsWith("temp-")) {
 							// Skip temp IDs in expansion restoration
 							return;
 						}
-						
+
 						const taskStillExists = newState.trackingTree!.find(
-							(task) => task.id === taskId
+							(task) => task.id === taskId,
 						);
 						if (taskStillExists) {
 							restoredExpandedTaskIds.add(taskId);
@@ -1059,7 +1061,7 @@ export function createDashboardStore(
 						const childTree = TrackingTaskTree.fromTask(newTask);
 						parentNode.addChild(childTree); // Mutation recorded automatically
 					} else {
-						set({ 
+						set({
 							statusMessage: `Parent task ${parentId} not found`,
 						});
 						return;
@@ -1076,11 +1078,11 @@ export function createDashboardStore(
 				get().recalculateAllProgress();
 
 				// Show task immediately with temp ID
-				set({ 
+				set({
 					selectedTaskId: newTask.id,
 					statusMessage: `Saving task: ${taskTemplate.title}...`,
 				});
-				
+
 				// Flush immediately to persist the task
 				try {
 					await get().flushChangesImmediate();
@@ -1090,7 +1092,7 @@ export function createDashboardStore(
 					});
 					return;
 				}
-				
+
 				// Reload to get the real IDs and ensure UI is in sync
 				set({ statusMessage: `Finalizing task...` });
 				try {
@@ -1101,7 +1103,7 @@ export function createDashboardStore(
 					});
 					return;
 				}
-				
+
 				set({
 					statusMessage: `Task "${taskTemplate.title}" created successfully`,
 				});
@@ -1116,7 +1118,9 @@ export function createDashboardStore(
 		},
 
 		// New method for processing pending task edit data from the editor
-		processPendingTaskEdit: async (taskEditData: import("../services/editor.js").PendingTaskEditData) => {
+		processPendingTaskEdit: async (
+			taskEditData: import("../services/editor.js").PendingTaskEditData,
+		) => {
 			const { trackingTree } = get();
 
 			if (!trackingTree) {
@@ -1137,7 +1141,7 @@ export function createDashboardStore(
 				// Find the task if taskId is provided
 				const taskNode = trackingTree.find((task) => task.id === taskId);
 				if (!taskNode) {
-					set({ 
+					set({
 						statusMessage: `Task ${taskId} not found`,
 						isFlushingChanges: false,
 					});
@@ -1164,7 +1168,7 @@ export function createDashboardStore(
 				get().recalculateAllProgress();
 
 				// Keep the task selected
-				set({ 
+				set({
 					selectedTaskId: taskId,
 					statusMessage: `Saving changes...`,
 				});
@@ -1175,11 +1179,11 @@ export function createDashboardStore(
 				}
 
 				// Small delay to ensure UI updates are visible
-				await new Promise(resolve => setTimeout(resolve, 50));
+				await new Promise((resolve) => setTimeout(resolve, 50));
 
 				// Flush changes - for edits, we don't need to reload since IDs don't change
 				await get().flushChanges();
-				
+
 				set({
 					statusMessage: `Task "${taskTemplate.title}" updated successfully`,
 					isFlushingChanges: false,
@@ -1198,40 +1202,49 @@ export function createDashboardStore(
 		// Get relationship of a task to the currently selected task for visual highlighting
 		getTaskRelationshipToSelected: (taskId: string) => {
 			const { selectedTaskId, trackingDependencyGraph } = get();
-			
-			if (!selectedTaskId || !trackingDependencyGraph || taskId === selectedTaskId) {
-				return 'none';
+
+			if (
+				!selectedTaskId ||
+				!trackingDependencyGraph ||
+				taskId === selectedTaskId
+			) {
+				return "none";
 			}
 
 			// Check if this task is blocking the selected task (selected depends on this task)
-			const selectedDependencies = trackingDependencyGraph.getDependencies(selectedTaskId);
+			const selectedDependencies =
+				trackingDependencyGraph.getDependencies(selectedTaskId);
 			if (selectedDependencies.includes(taskId)) {
 				// Further check if this blocking task is done or still pending
 				const { trackingTree } = get();
 				if (trackingTree) {
 					const taskNode = trackingTree.find((task) => task.id === taskId);
 					if (taskNode) {
-						return taskNode.task.status === 'done' ? 'blocking-completed' : 'blocking-pending';
+						return taskNode.task.status === "done"
+							? "blocking-completed"
+							: "blocking-pending";
 					}
 				}
-				return 'blocking-pending';
+				return "blocking-pending";
 			}
 
 			// Check if this task depends on the selected task (this task is blocked by selected)
 			const taskDependencies = trackingDependencyGraph.getDependencies(taskId);
 			if (taskDependencies.includes(selectedTaskId)) {
-				return 'dependent';
+				return "dependent";
 			}
 
 			// Check for indirect relationships (tasks that share dependencies)
 			const selectedDeps = new Set(selectedDependencies);
 			const taskDeps = new Set(taskDependencies);
-			const hasSharedDependencies = [...selectedDeps].some(dep => taskDeps.has(dep));
+			const hasSharedDependencies = [...selectedDeps].some((dep) =>
+				taskDeps.has(dep),
+			);
 			if (hasSharedDependencies) {
-				return 'related';
+				return "related";
 			}
 
-			return 'none';
+			return "none";
 		},
 	}));
 

@@ -87,9 +87,48 @@ export const getNextTaskSchema = z.object({
 });
 
 /**
+ * Schema for complexity analysis input (for specific node)
+ */
+export const analyzeNodeComplexitySchema = z.object({
+  /** Node ID to analyze (includes all children) */
+  nodeId: z.string().min(1, "Node ID cannot be empty"),
+  /** Output file path for complexity report */
+  output: z.string().optional(),
+  /** Minimum complexity score threshold for expansion recommendations */
+  threshold: z.number().min(1).max(10).optional().default(5),
+  /** Enable research mode for more accurate analysis */
+  research: z.boolean().optional().default(false),
+});
+
+/**
+ * Schema for complexity analysis input
+ */
+export const analyzeComplexitySchema = z.object({
+  /** Path to tasks file (optional, auto-detected if not provided) */
+  file: z.string().optional(),
+  /** Output file path for complexity report */
+  output: z.string().optional().default('scripts/task-complexity-report.json'),
+  /** Minimum complexity score threshold for expansion recommendations */
+  threshold: z.number().min(1).max(10).optional().default(5),
+  /** Enable research mode for more accurate analysis */
+  research: z.boolean().optional().default(false),
+});
+
+/**
+ * Schema for complexity report viewing input
+ */
+export const complexityReportSchema = z.object({
+  /** Path to complexity report file */
+  file: z.string().optional().default('scripts/task-complexity-report.json'),
+});
+
+/**
  * TypeScript types inferred from the schemas
  */
 export type ParsePRDInput = z.infer<typeof parsePRDSchema>;
 export type ExpandTaskInput = z.infer<typeof expandTaskSchema>;
 export type AddDependencyInput = z.infer<typeof addDependencySchema>;
 export type GetNextTaskInput = z.infer<typeof getNextTaskSchema>;
+export type AnalyzeNodeComplexityInput = z.infer<typeof analyzeNodeComplexitySchema>;
+export type AnalyzeComplexityInput = z.infer<typeof analyzeComplexitySchema>;
+export type ComplexityReportInput = z.infer<typeof complexityReportSchema>;

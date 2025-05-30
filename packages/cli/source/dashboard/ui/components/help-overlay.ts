@@ -102,6 +102,8 @@ export class HelpOverlay {
 					{ keys: ["→", "l"], description: "Expand node" },
 					{ keys: ["g"], description: "Go to top" },
 					{ keys: ["G"], description: "Go to bottom" },
+					{ keys: ["f"], description: "Focus on task (set as tree root)" },
+					{ keys: ["Esc", "u"], description: "Reset to show all projects" },
 				],
 			},
 			{
@@ -123,9 +125,14 @@ export class HelpOverlay {
 			{
 				title: "Project Sidebar",
 				bindings: [
-					{ keys: ["Enter"], description: "Select project" },
+					{
+						keys: ["Enter", "Click"],
+						description: "Select project and switch to tree",
+					},
 					{ keys: ["↑", "k"], description: "Move up" },
 					{ keys: ["↓", "j"], description: "Move down" },
+					{ keys: ["PgUp"], description: "Page up" },
+					{ keys: ["PgDn"], description: "Page down" },
 				],
 			},
 			{

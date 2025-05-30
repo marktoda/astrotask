@@ -70,6 +70,17 @@ export class ProjectSidebar {
 				state().setActivePanel("tree");
 			}
 		});
+
+		// Mouse click handling - when clicking a project, select it and switch to tree view
+		this.list.on("click", () => {
+			const selected = (this.list as any).selected;
+			const projects = state().projects;
+			if (projects[selected]) {
+				state().selectProject(projects[selected].id);
+				// Focus on task tree to show the selected project
+				state().setActivePanel("tree");
+			}
+		});
 	}
 
 	private render(state: DashboardStore) {

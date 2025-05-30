@@ -8,7 +8,10 @@ import {
   parsePRDSchema,
   expandTaskSchema,
   addDependencySchema,
-  getNextTaskSchema
+  getNextTaskSchema,
+  analyzeNodeComplexitySchema,
+  analyzeComplexitySchema,
+  complexityReportSchema
 } from './handlers/index.js';
 import { wrapMCPHandler } from './utils/response.js';
 
@@ -72,11 +75,32 @@ async function main() {
     })
   );
 
+  server.tool('analyze_node_complexity',
+    analyzeNodeComplexitySchema.shape,
+    wrapMCPHandler(async (args) => {
+      return handlers.analyzeNodeComplexity(args);
+    })
+  );
+
+  server.tool('analyze_project_complexity',
+    analyzeComplexitySchema.shape,
+    wrapMCPHandler(async (args) => {
+      return handlers.analyzeComplexity(args);
+    })
+  );
+
+  server.tool('complexity_report',
+    complexityReportSchema.shape,
+    wrapMCPHandler(async (args) => {
+      return handlers.complexityReport(args);
+    })
+  );
+
   // Begin listening on stdio
   const transport = new StdioServerTransport();
   await server.connect(transport);
 
-  logger.info('Astrolabe Minimal MCP Server started with 4 essential tools: parsePRD, expandTask, addDependency, getNextTask');
+  logger.info('Astrolabe MCP Server started with 7 tools: parsePRD, expandTask, addDependency, getNextTask, analyze_node_complexity, analyze_project_complexity, complexity_report');
 }
 
 // Handle cleanup on process termination

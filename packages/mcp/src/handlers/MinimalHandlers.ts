@@ -14,10 +14,20 @@ import type {
   ParsePRDInput,
   ExpandTaskInput,
   AddDependencyInput,
-  GetNextTaskInput
+  GetNextTaskInput,
+  AnalyzeNodeComplexityInput,
+  AnalyzeComplexityInput,
+  ComplexityReportInput
 } from './types.js';
 import type { Task, TaskDependency } from '@astrolabe/core';
-import { createPRDTaskGenerator, createModuleLogger } from '@astrolabe/core';
+import { 
+  createPRDTaskGenerator, 
+  createModuleLogger,
+  createComplexityAnalyzer,
+  type ComplexityReport 
+} from '@astrolabe/core';
+import { promises as fs } from 'fs';
+import { dirname } from 'path';
 
 export class MinimalHandlers implements MCPHandler {
   private logger = createModuleLogger('MinimalHandlers');
@@ -198,9 +208,9 @@ Each subtask should be specific and actionable.
 
       const message = nextTask 
         ? `Next task to work on: ${nextTask.title}`
-        : availableTasks.length > 0 
-          ? `No pending tasks available. ${availableTasks.length} tasks are available but not pending.`
-          : 'No tasks available to work on';
+        : availableTasks.length > 0
+        ? 'No pending tasks available (all tasks are in progress or completed)'
+        : 'No tasks available';
 
       return {
         task: nextTask,
@@ -209,6 +219,138 @@ Each subtask should be specific and actionable.
       };
     } catch (error) {
       this.logger.error('Getting next task failed', {
+        error: error instanceof Error ? error.message : String(error),
+        requestId: this.context.requestId,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Analyze project complexity and generate recommendations
+   */
+  async analyzeComplexity(args: AnalyzeComplexityInput): Promise<{
+    report: ComplexityReport;
+    savedTo: string;
+    message: string;
+  }> {
+    try {
+      // Get all tasks from the store
+      const allTasks = await this.context.store.listTasks();
+      
+      if (allTasks.length === 0) {
+        throw new Error('No tasks found to analyze');
+      }
+
+      // Create complexity analyzer
+      const analyzer = createComplexityAnalyzer(this.logger, {
+        threshold: args.threshold || 5,
+        research: args.research || false,
+        batchSize: 5,
+      });
+
+      // Analyze tasks
+      const report = await analyzer.analyzeTasks(allTasks);
+
+      // Save report to file
+      const outputPath = args.output || 'scripts/task-complexity-report.json';
+      
+      // Ensure directory exists
+      await fs.mkdir(dirname(outputPath), { recursive: true });
+      
+      // Write report
+      await fs.writeFile(outputPath, JSON.stringify(report, null, 2), 'utf-8');
+
+      return {
+        report,
+        savedTo: outputPath,
+        message: `Analyzed ${report.meta.tasksAnalyzed} tasks. Report saved to ${outputPath}`
+      };
+    } catch (error) {
+      this.logger.error('Complexity analysis failed', {
+        error: error instanceof Error ? error.message : String(error),
+        requestId: this.context.requestId,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Analyze a specific node and all its children
+   */
+  async analyzeNodeComplexity(args: AnalyzeNodeComplexityInput): Promise<{
+    report: ComplexityReport;
+    savedTo: string;
+    message: string;
+  }> {
+    try {
+      // Create complexity analyzer
+      const analyzer = createComplexityAnalyzer(this.logger, {
+        threshold: args.threshold || 5,
+        research: args.research || false,
+        batchSize: 5,
+      });
+
+      // Analyze the specific node and its children
+      const report = await analyzer.analyzeNodeAndChildren(
+        args.nodeId,
+        async () => await this.context.store.listTasks()
+      );
+
+      // Save report to file
+      const outputPath = args.output || `scripts/task-complexity-report-${args.nodeId}.json`;
+      
+      // Ensure directory exists
+      await fs.mkdir(dirname(outputPath), { recursive: true });
+      
+      // Write report
+      await fs.writeFile(outputPath, JSON.stringify(report, null, 2), 'utf-8');
+
+      return {
+        report,
+        savedTo: outputPath,
+        message: `Analyzed node ${args.nodeId} and its ${report.meta.tasksAnalyzed - 1} children. Report saved to ${outputPath}`
+      };
+    } catch (error) {
+      this.logger.error('Node complexity analysis failed', {
+        error: error instanceof Error ? error.message : String(error),
+        nodeId: args.nodeId,
+        requestId: this.context.requestId,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Display complexity report in readable format
+   */
+  async complexityReport(args: ComplexityReportInput): Promise<{
+    report: ComplexityReport;
+    formatted: string;
+    message: string;
+  }> {
+    try {
+      const reportPath = args.file || 'scripts/task-complexity-report.json';
+      
+      // Read report file
+      const reportData = await fs.readFile(reportPath, 'utf-8');
+      const report: ComplexityReport = JSON.parse(reportData);
+
+      // Create analyzer to format the report
+      const analyzer = createComplexityAnalyzer(this.logger);
+      const formatted = analyzer.formatReport(report);
+
+      return {
+        report,
+        formatted,
+        message: `Complexity report loaded from ${reportPath}`
+      };
+    } catch (error) {
+      if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
+        throw new Error(`Complexity report not found at ${args.file || 'scripts/task-complexity-report.json'}. Run analyze-complexity first.`);
+      }
+      
+      this.logger.error('Loading complexity report failed', {
         error: error instanceof Error ? error.message : String(error),
         requestId: this.context.requestId,
       });

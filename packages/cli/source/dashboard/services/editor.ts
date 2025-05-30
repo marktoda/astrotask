@@ -105,10 +105,10 @@ notes: |
 
 	private generateTaskEditTemplate(existingTask: Task): string {
 		// Convert existing task data to match the template format
-		const tagsStr = Array.isArray(existingTask.contextDigest) 
-			? existingTask.contextDigest.join(", ") 
+		const tagsStr = Array.isArray(existingTask.contextDigest)
+			? existingTask.contextDigest.join(", ")
 			: "";
-		
+
 		const template = `# Task Template - Editing Existing Task
 # Lines starting with # are comments and will be ignored
 # Modify the sections below to update your task
@@ -118,11 +118,25 @@ title: ${existingTask.title}
 
 # Task Description (optional)
 description: |
-${existingTask.description ? existingTask.description.split('\n').map(line => `  ${line}`).join('\n') : '  Brief overview of what this task accomplishes.\n  You can use multiple lines here.'}
+${
+	existingTask.description
+		? existingTask.description
+				.split("\n")
+				.map((line) => `  ${line}`)
+				.join("\n")
+		: "  Brief overview of what this task accomplishes.\n  You can use multiple lines here."
+}
 
 # Detailed Implementation Notes (optional)
 details: |
-${existingTask.prd ? existingTask.prd.split('\n').map(line => `  ${line}`).join('\n') : '  Detailed implementation instructions, acceptance criteria,\n  technical notes, or any other relevant information.\n  \n  Examples:\n  - What files need to be modified\n  - What functions to implement\n  - What tests to write\n  - Dependencies or prerequisites'}
+${
+	existingTask.prd
+		? existingTask.prd
+				.split("\n")
+				.map((line) => `  ${line}`)
+				.join("\n")
+		: "  Detailed implementation instructions, acceptance criteria,\n  technical notes, or any other relevant information.\n  \n  Examples:\n  - What files need to be modified\n  - What functions to implement\n  - What tests to write\n  - Dependencies or prerequisites"
+}
 
 # Priority (low, medium, high)
 priority: ${existingTask.priority}

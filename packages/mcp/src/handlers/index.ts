@@ -14,10 +14,16 @@ export {
   expandTaskSchema,
   addDependencySchema,
   getNextTaskSchema,
+  analyzeNodeComplexitySchema,
+  analyzeComplexitySchema,
+  complexityReportSchema,
   type ParsePRDInput,
   type ExpandTaskInput,
   type AddDependencyInput,
   type GetNextTaskInput,
+  type AnalyzeNodeComplexityInput,
+  type AnalyzeComplexityInput,
+  type ComplexityReportInput,
   type HandlerContext,
   type MCPHandler
 } from './types.js';

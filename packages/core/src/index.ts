@@ -136,6 +136,17 @@ export type {
 export * from './services/generators/PRDTaskGenerator.js';
 export * from './services/generators/schemas.js';
 
+// Complexity analysis exports
+export {
+  ComplexityAnalyzer,
+  createComplexityAnalyzer,
+  taskComplexitySchema,
+  complexityReportSchema,
+  type TaskComplexity,
+  type ComplexityReport,
+  type ComplexityAnalysisConfig,
+} from './services/ComplexityAnalyzer.js';
+
 // Configuration and models
 export * from './utils/config.js';
 export * from './utils/models.js';
