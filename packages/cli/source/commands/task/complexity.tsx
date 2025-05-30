@@ -1,4 +1,8 @@
-import { createComplexityAnalyzer, createModuleLogger } from "@astrolabe/core";
+import {
+	createComplexityAnalyzer,
+	createComplexityContextService,
+	createModuleLogger,
+} from "@astrolabe/core";
 import { Box, Text } from "ink";
 import { useEffect, useState } from "react";
 import zod from "zod";
@@ -35,6 +39,11 @@ export const options = zod.object({
 		.optional()
 		.default(true)
 		.describe("Save the report to a file"),
+	createContext: zod
+		.boolean()
+		.optional()
+		.default(true)
+		.describe("Create context slices for analyzed tasks"),
 });
 
 type Props = {
@@ -45,6 +54,8 @@ interface ComplexityAnalysisResult {
 	report: any;
 	savedTo?: string;
 	message: string;
+	contextSlicesCreated?: number;
+	contextMessage?: string;
 }
 
 export default function Complexity({ options }: Props) {
@@ -66,8 +77,20 @@ export default function Complexity({ options }: Props) {
 					projectName: "Astrolabe",
 				});
 
+				// Create complexity context service
+				const contextService = createComplexityContextService(logger, db, {
+					threshold: options.threshold,
+					research: options.research,
+					batchSize: 5,
+					projectName: "Astrolabe",
+					autoUpdate: true,
+					includeRecommendations: true,
+				});
+
 				let report;
 				let analysisMessage: string;
+				let contextSlicesCreated = 0;
+				let contextMessage = "";
 
 				if (options.nodeId) {
 					// Analyze specific node and children
@@ -76,11 +99,46 @@ export default function Complexity({ options }: Props) {
 						async () => await db.listTasks(),
 					);
 					analysisMessage = `Analyzed node ${options.nodeId} and its ${report.meta.tasksAnalyzed - 1} children`;
+
+					// Create context slices for node and children
+					if (options.createContext) {
+						try {
+							const contextResult =
+								await contextService.generateComplexityContextForNodeAndChildren(
+									options.nodeId,
+								);
+							contextSlicesCreated = contextResult.contexts.length;
+							contextMessage = `Created ${contextSlicesCreated} context slices for node and children`;
+						} catch (contextError) {
+							logger.warn("Failed to create context slices", {
+								error: contextError,
+							});
+							contextMessage =
+								"Failed to create context slices (analysis still completed)";
+						}
+					}
 				} else {
 					// Analyze all tasks
 					const allTasks = await db.listTasks();
 					report = await analyzer.analyzeTasks(allTasks);
 					analysisMessage = `Analyzed all ${report.meta.tasksAnalyzed} tasks in the project`;
+
+					// Create context slices for all tasks
+					if (options.createContext) {
+						try {
+							const taskIds = allTasks.map((task) => task.id);
+							const contexts =
+								await contextService.generateComplexityContextBatch(taskIds);
+							contextSlicesCreated = contexts.length;
+							contextMessage = `Created ${contextSlicesCreated} context slices for all tasks`;
+						} catch (contextError) {
+							logger.warn("Failed to create context slices", {
+								error: contextError,
+							});
+							contextMessage =
+								"Failed to create context slices (analysis still completed)";
+						}
+					}
 				}
 
 				let savedTo: string | undefined;
@@ -114,6 +172,8 @@ export default function Complexity({ options }: Props) {
 					report,
 					savedTo,
 					message: analysisMessage,
+					contextSlicesCreated,
+					contextMessage,
 				});
 			} catch (err) {
 				setError(
@@ -139,6 +199,9 @@ export default function Complexity({ options }: Props) {
 				{options.research && (
 					<Text color="gray">Using research mode for enhanced analysis</Text>
 				)}
+				{options.createContext && (
+					<Text color="gray">Creating complexity context slices...</Text>
+				)}
 			</Box>
 		);
 	}
@@ -159,7 +222,8 @@ export default function Complexity({ options }: Props) {
 		return <Text color="red">No analysis result available</Text>;
 	}
 
-	const { report, savedTo, message } = result;
+	const { report, savedTo, message, contextSlicesCreated, contextMessage } =
+		result;
 	const avgComplexity =
 		report.complexityAnalysis.reduce(
 			(sum: number, t: any) => sum + t.complexityScore,
@@ -178,6 +242,17 @@ export default function Complexity({ options }: Props) {
 				</Text>
 				<Text color="green">✅ {message}</Text>
 				{savedTo && <Text color="gray">Report saved to: {savedTo}</Text>}
+				{contextMessage && (
+					<Text
+						color={
+							contextSlicesCreated && contextSlicesCreated > 0
+								? "green"
+								: "yellow"
+						}
+					>
+						📄 {contextMessage}
+					</Text>
+				)}
 			</Box>
 
 			{/* Summary Statistics */}
@@ -223,6 +298,12 @@ export default function Complexity({ options }: Props) {
 							{options.research ? "Enabled" : "Disabled"}
 						</Text>
 					</Text>
+					{contextSlicesCreated !== undefined && (
+						<Text>
+							Context Slices Created:{" "}
+							<Text color="cyan">{contextSlicesCreated}</Text>
+						</Text>
+					)}
 				</Box>
 			</Box>
 
@@ -336,6 +417,12 @@ export default function Complexity({ options }: Props) {
 					<Text>
 						<Text color="cyan">astrolabe task tree</Text> - View task hierarchy
 					</Text>
+					{contextSlicesCreated && contextSlicesCreated > 0 && (
+						<Text>
+							<Text color="cyan">astrolabe context list</Text> - View created
+							context slices
+						</Text>
+					)}
 				</Box>
 			</Box>
 		</Box>

@@ -19,11 +19,12 @@ import type {
   AnalyzeComplexityInput,
   ComplexityReportInput
 } from './types.js';
-import type { Task, TaskDependency } from '@astrolabe/core';
+import type { Task, TaskDependency, TaskTree, ContextSlice } from '@astrolabe/core';
 import { 
   createPRDTaskGenerator, 
   createModuleLogger,
   createComplexityAnalyzer,
+  createComplexityContextService,
   type ComplexityReport 
 } from '@astrolabe/core';
 import { promises as fs } from 'fs';
@@ -182,6 +183,16 @@ Each subtask should be specific and actionable.
     task: Task | null;
     availableTasks: Task[];
     message: string;
+    context?: {
+      ancestors: Task[];
+      descendants: TaskTree[];
+      root: TaskTree | null;
+      dependencies: Task[];
+      dependents: Task[];
+      isBlocked: boolean;
+      blockedBy: Task[];
+      contextSlices: ContextSlice[];
+    };
   }> {
     try {
       // Get available tasks (no incomplete dependencies)
@@ -212,10 +223,32 @@ Each subtask should be specific and actionable.
         ? 'No pending tasks available (all tasks are in progress or completed)'
         : 'No tasks available';
 
+      let context = undefined;
+
+      // If we have a next task, get its full context
+      if (nextTask) {
+        const taskWithContext = await this.context.taskService.getTaskWithContext(nextTask.id);
+        if (taskWithContext) {
+          const contextSlices = await this.context.store.listContextSlices(nextTask.id);
+          
+          context = {
+            ancestors: taskWithContext.ancestors,
+            descendants: taskWithContext.descendants,
+            root: taskWithContext.root,
+            dependencies: taskWithContext.dependencies,
+            dependents: taskWithContext.dependents,
+            isBlocked: taskWithContext.isBlocked,
+            blockedBy: taskWithContext.blockedBy,
+            contextSlices,
+          };
+        }
+      }
+
       return {
         task: nextTask,
         availableTasks,
-        message
+        message,
+        context
       };
     } catch (error) {
       this.logger.error('Getting next task failed', {
@@ -233,6 +266,8 @@ Each subtask should be specific and actionable.
     report: ComplexityReport;
     savedTo: string;
     message: string;
+    contextSlicesCreated: number;
+    contextMessage: string;
   }> {
     try {
       // Get all tasks from the store
@@ -249,8 +284,31 @@ Each subtask should be specific and actionable.
         batchSize: 5,
       });
 
+      // Create complexity context service
+      const contextService = createComplexityContextService(this.logger, this.context.store, {
+        threshold: args.threshold || 5,
+        research: args.research || false,
+        batchSize: 5,
+        autoUpdate: true,
+        includeRecommendations: true,
+      });
+
       // Analyze tasks
       const report = await analyzer.analyzeTasks(allTasks);
+
+      // Create context slices for all tasks
+      let contextSlicesCreated = 0;
+      let contextMessage = "";
+      
+      try {
+        const taskIds = allTasks.map(task => task.id);
+        const contexts = await contextService.generateComplexityContextBatch(taskIds);
+        contextSlicesCreated = contexts.length;
+        contextMessage = `Created ${contextSlicesCreated} context slices for analyzed tasks`;
+      } catch (contextError) {
+        this.logger.warn("Failed to create context slices", { error: contextError });
+        contextMessage = "Failed to create context slices (analysis still completed)";
+      }
 
       // Save report to file
       const outputPath = args.output || 'scripts/task-complexity-report.json';
@@ -264,7 +322,9 @@ Each subtask should be specific and actionable.
       return {
         report,
         savedTo: outputPath,
-        message: `Analyzed ${report.meta.tasksAnalyzed} tasks. Report saved to ${outputPath}`
+        message: `Analyzed ${report.meta.tasksAnalyzed} tasks. Report saved to ${outputPath}`,
+        contextSlicesCreated,
+        contextMessage,
       };
     } catch (error) {
       this.logger.error('Complexity analysis failed', {
@@ -282,6 +342,8 @@ Each subtask should be specific and actionable.
     report: ComplexityReport;
     savedTo: string;
     message: string;
+    contextSlicesCreated: number;
+    contextMessage: string;
   }> {
     try {
       // Create complexity analyzer
@@ -291,11 +353,33 @@ Each subtask should be specific and actionable.
         batchSize: 5,
       });
 
+      // Create complexity context service
+      const contextService = createComplexityContextService(this.logger, this.context.store, {
+        threshold: args.threshold || 5,
+        research: args.research || false,
+        batchSize: 5,
+        autoUpdate: true,
+        includeRecommendations: true,
+      });
+
       // Analyze the specific node and its children
       const report = await analyzer.analyzeNodeAndChildren(
         args.nodeId,
         async () => await this.context.store.listTasks()
       );
+
+      // Create context slices for node and children
+      let contextSlicesCreated = 0;
+      let contextMessage = "";
+      
+      try {
+        const contextResult = await contextService.generateComplexityContextForNodeAndChildren(args.nodeId);
+        contextSlicesCreated = contextResult.contexts.length;
+        contextMessage = `Created ${contextSlicesCreated} context slices for node and children`;
+      } catch (contextError) {
+        this.logger.warn("Failed to create context slices", { error: contextError });
+        contextMessage = "Failed to create context slices (analysis still completed)";
+      }
 
       // Save report to file
       const outputPath = args.output || `scripts/task-complexity-report-${args.nodeId}.json`;
@@ -309,7 +393,9 @@ Each subtask should be specific and actionable.
       return {
         report,
         savedTo: outputPath,
-        message: `Analyzed node ${args.nodeId} and its ${report.meta.tasksAnalyzed - 1} children. Report saved to ${outputPath}`
+        message: `Analyzed node ${args.nodeId} and its ${report.meta.tasksAnalyzed - 1} children. Report saved to ${outputPath}`,
+        contextSlicesCreated,
+        contextMessage,
       };
     } catch (error) {
       this.logger.error('Node complexity analysis failed', {

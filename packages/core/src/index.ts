@@ -146,6 +146,11 @@ export {
   type ComplexityReport,
   type ComplexityAnalysisConfig,
 } from './services/ComplexityAnalyzer.js';
+export {
+  ComplexityContextService,
+  createComplexityContextService,
+  type ComplexityContextConfig,
+} from './services/ComplexityContextService.js';
 
 // Configuration and models
 export * from './utils/config.js';
