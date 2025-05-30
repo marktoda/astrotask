@@ -39,6 +39,7 @@ export class StatusBar {
 			hasUnsavedChanges,
 			autoFlushEnabled,
 			expandedTaskIds,
+			isFlushingChanges,
 		} = state;
 
 		const parts: string[] = [];
@@ -79,15 +80,16 @@ export class StatusBar {
 			}
 		}
 
-		// Persistence status
-		if (hasUnsavedChanges) {
+		// Persistence status with better feedback
+		if (isFlushingChanges) {
+			parts.push("💾 Saving...");
+		} else if (hasUnsavedChanges) {
 			parts.push("● Unsaved");
+			if (autoFlushEnabled) {
+				parts.push("(auto-save active)");
+			}
 		} else {
 			parts.push("✓ Saved");
-		}
-
-		if (autoFlushEnabled) {
-			parts.push("Auto-save: ON");
 		}
 
 		// Status message

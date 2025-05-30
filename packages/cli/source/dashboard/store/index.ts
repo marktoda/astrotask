@@ -226,12 +226,15 @@ export function createDashboardStore(
 				// Calculate progress
 				get().recalculateAllProgress();
 
-				// Don't enable auto-flush by default since we now flush immediately after changes
-				// get().enableAutoFlush();
+				// Enable auto-flush for automatic saving
+				get().enableAutoFlush();
 			} catch (error) {
 				const errorMessage =
 					error instanceof Error ? error.message : String(error);
-				set({ statusMessage: `Error loading tasks: ${errorMessage}` });
+				set({
+					statusMessage: errorMessage,
+					treeVersion: get().treeVersion + 1,
+				});
 			}
 		},
 
@@ -275,55 +278,54 @@ export function createDashboardStore(
 				return;
 			}
 
-			// Wrap the entire operation in an async function so we can await flush
-			(async () => {
-				try {
-					// Create new task
-					const newTask: Task = {
-						id: `temp-${Date.now()}`, // Temporary ID - will be replaced on flush
-						parentId,
-						title,
-						description: null,
-						status: "pending",
-						priority: "medium",
-						prd: null,
-						contextDigest: null,
-						createdAt: new Date(),
-						updatedAt: new Date(),
-					};
+			try {
+				// Create new task
+				const newTask: Task = {
+					id: `temp-${Date.now()}`, // Temporary ID - will be replaced on flush
+					parentId,
+					title,
+					description: null,
+					status: "pending",
+					priority: "medium",
+					prd: null,
+					contextDigest: null,
+					createdAt: new Date(),
+					updatedAt: new Date(),
+				};
 
-					if (parentId) {
-						// Find parent and add child - mutable operation
-						const parentNode = trackingTree.find((task) => task.id === parentId);
-						if (parentNode) {
-							const childTree = TrackingTaskTree.fromTask(newTask);
-							parentNode.addChild(childTree); // Mutation recorded automatically
-						} else {
-							set({ statusMessage: `Parent task ${parentId} not found` });
-							return;
-						}
-					} else {
-						// Add as root child - mutable operation
+				if (parentId) {
+					// Find parent and add child - mutable operation
+					const parentNode = trackingTree.find((task) => task.id === parentId);
+					if (parentNode) {
 						const childTree = TrackingTaskTree.fromTask(newTask);
-						trackingTree.addChild(childTree); // Mutation recorded automatically
+						parentNode.addChild(childTree); // Mutation recorded automatically
+					} else {
+						set({ statusMessage: `Parent task ${parentId} not found` });
+						return;
 					}
-
-					// Trigger UI update
-					get().triggerTreeUpdate();
-					get().updateUnsavedChangesFlag();
-					get().recalculateAllProgress();
-
-					set({ statusMessage: `Added task: ${title}` });
-
-					// Immediately flush to disk and reload to get real ID
-					await get().flushChangesImmediate();
-					await get().reloadFromDatabase();
-				} catch (error) {
-					const errorMessage =
-						error instanceof Error ? error.message : String(error);
-					set({ statusMessage: `Error adding task: ${errorMessage}` });
+				} else {
+					// Add as root child - mutable operation
+					const childTree = TrackingTaskTree.fromTask(newTask);
+					trackingTree.addChild(childTree); // Mutation recorded automatically
 				}
-			})();
+
+				// Trigger UI update immediately (optimistic update)
+				get().triggerTreeUpdate();
+				get().updateUnsavedChangesFlag();
+				get().recalculateAllProgress();
+
+				set({ statusMessage: `Added task: ${title}` });
+
+				// Enable auto-flush if not already enabled
+				// This will save changes automatically after a short delay
+				if (!get().autoFlushEnabled) {
+					get().enableAutoFlush();
+				}
+			} catch (error) {
+				const errorMessage =
+					error instanceof Error ? error.message : String(error);
+				set({ statusMessage: `Error adding task: ${errorMessage}` });
+			}
 		},
 
 		addTaskWithEditor: async (parentId: string | null) => {
@@ -413,7 +415,35 @@ export function createDashboardStore(
 		},
 
 		updateTaskStatus: (taskId, status) => {
-			get().updateTask(taskId, { status });
+			const { trackingTree } = get();
+
+			if (!trackingTree) {
+				set({ statusMessage: "No task tree loaded" });
+				return;
+			}
+
+			// Find the task anywhere in the tree
+			const taskNode = trackingTree.find((task) => task.id === taskId);
+			if (!taskNode) {
+				set({ statusMessage: `Task ${taskId} not found` });
+				return;
+			}
+
+			// Simple mutation - operation recorded automatically
+			taskNode.withTask({ status });
+
+			// Trigger UI update immediately (optimistic update)
+			get().triggerTreeUpdate();
+			get().updateUnsavedChangesFlag();
+			get().recalculateAllProgress();
+
+			set({ statusMessage: `Status updated to ${status}` });
+
+			// Enable auto-flush if not already enabled
+			// This will save changes automatically after a short delay
+			if (!get().autoFlushEnabled) {
+				get().enableAutoFlush();
+			}
 		},
 
 		updateTask: (taskId, updates) => {
@@ -424,35 +454,28 @@ export function createDashboardStore(
 				return;
 			}
 
-			// Wrap in async to handle flush
-			(async () => {
-				try {
-					// Find the task anywhere in the tree
-					const taskNode = trackingTree.find((task) => task.id === taskId);
-					if (!taskNode) {
-						set({ statusMessage: `Task ${taskId} not found` });
-						return;
-					}
+			// Find the task anywhere in the tree
+			const taskNode = trackingTree.find((task) => task.id === taskId);
+			if (!taskNode) {
+				set({ statusMessage: `Task ${taskId} not found` });
+				return;
+			}
 
-					// Simple mutation - operation recorded automatically
-					taskNode.withTask(updates);
+			// Simple mutation - operation recorded automatically
+			taskNode.withTask(updates);
 
-					// Trigger UI update
-					get().triggerTreeUpdate();
-					get().updateUnsavedChangesFlag();
-					get().recalculateAllProgress();
+			// Trigger UI update immediately (optimistic update)
+			get().triggerTreeUpdate();
+			get().updateUnsavedChangesFlag();
+			get().recalculateAllProgress();
 
-					set({ statusMessage: `Updated task ${taskId}` });
+			set({ statusMessage: `Task updated` });
 
-					// Immediately flush to disk and reload
-					await get().flushChangesImmediate();
-					await get().reloadFromDatabase();
-				} catch (error) {
-					const errorMessage =
-						error instanceof Error ? error.message : String(error);
-					set({ statusMessage: `Error updating task: ${errorMessage}` });
-				}
-			})();
+			// Enable auto-flush if not already enabled
+			// This will save changes automatically after a short delay
+			if (!get().autoFlushEnabled) {
+				get().enableAutoFlush();
+			}
 		},
 
 		renameTask: (taskId, newTitle) => {
@@ -463,35 +486,28 @@ export function createDashboardStore(
 				return;
 			}
 
-			// Wrap in async to handle flush
-			(async () => {
-				try {
-					// Find the task anywhere in the tree
-					const taskNode = trackingTree.find((task) => task.id === taskId);
-					if (!taskNode) {
-						set({ statusMessage: `Task ${taskId} not found` });
-						return;
-					}
+			// Find the task anywhere in the tree
+			const taskNode = trackingTree.find((task) => task.id === taskId);
+			if (!taskNode) {
+				set({ statusMessage: `Task ${taskId} not found` });
+				return;
+			}
 
-					// Simple mutation - operation recorded automatically
-					taskNode.withTask({ title: newTitle });
+			// Simple mutation - operation recorded automatically
+			taskNode.withTask({ title: newTitle });
 
-					// Trigger UI update
-					get().triggerTreeUpdate();
-					get().updateUnsavedChangesFlag();
-					get().recalculateAllProgress();
+			// Trigger UI update immediately (optimistic update)
+			get().triggerTreeUpdate();
+			get().updateUnsavedChangesFlag();
+			get().recalculateAllProgress();
 
-					set({ statusMessage: `Renamed task ${taskId} to ${newTitle}` });
+			set({ statusMessage: `Task renamed` });
 
-					// Immediately flush to disk and reload
-					await get().flushChangesImmediate();
-					await get().reloadFromDatabase();
-				} catch (error) {
-					const errorMessage =
-						error instanceof Error ? error.message : String(error);
-					set({ statusMessage: `Error renaming task: ${errorMessage}` });
-				}
-			})();
+			// Enable auto-flush if not already enabled
+			// This will save changes automatically after a short delay
+			if (!get().autoFlushEnabled) {
+				get().enableAutoFlush();
+			}
 		},
 
 		deleteTask: (taskId) => {
@@ -502,42 +518,34 @@ export function createDashboardStore(
 				return;
 			}
 
-			// Wrap in async to handle flush
-			(async () => {
-				try {
-					// Find the task anywhere in the tree
-					const taskNode = trackingTree.find((task) => task.id === taskId);
-					if (!taskNode) {
-						set({ statusMessage: `Task ${taskId} not found` });
-						return;
-					}
+			// Find the task anywhere in the tree
+			const taskNode = trackingTree.find((task) => task.id === taskId);
+			if (!taskNode) {
+				set({ statusMessage: `Task ${taskId} not found` });
+				return;
+			}
 
-					const parent = taskNode.getParent();
+			const parent = taskNode.getParent();
 
-					if (parent) {
-						parent.removeChild(taskId); // Mutation recorded automatically
-					} else if (trackingTree.id === taskId) {
-						// Deleting root - handle specially
-						set({ statusMessage: "Cannot delete root task" });
-						return;
-					}
+			if (parent) {
+				parent.removeChild(taskId); // Mutation recorded automatically
+			} else if (trackingTree.id === taskId) {
+				// Deleting root - handle specially
+				set({ statusMessage: "Cannot delete root task" });
+				return;
+			}
 
-					// Trigger UI update
-					get().triggerTreeUpdate();
-					get().updateUnsavedChangesFlag();
+			// Trigger UI update immediately (optimistic update)
+			get().triggerTreeUpdate();
+			get().updateUnsavedChangesFlag();
 
-					set({ statusMessage: "Task deleted" });
+			set({ statusMessage: "Task deleted" });
 
-					// Immediately flush to disk and reload
-					await get().flushChangesImmediate();
-					await get().reloadFromDatabase();
-				} catch (error) {
-					console.error("Error in deleteTask:", error);
-					const errorMessage =
-						error instanceof Error ? error.message : String(error);
-					set({ statusMessage: `Error deleting task: ${errorMessage}` });
-				}
-			})();
+			// Enable auto-flush if not already enabled
+			// This will save changes automatically after a short delay
+			if (!get().autoFlushEnabled) {
+				get().enableAutoFlush();
+			}
 		},
 
 		// Persistence control - now works for ALL pending operations
@@ -680,14 +688,14 @@ export function createDashboardStore(
 			}
 		},
 
-		enableAutoFlush: (intervalMs = 5000) => {
-			// Reduced from 10s to 5s for faster saves
+		enableAutoFlush: (intervalMs = 2000) => {
+			// Reduced from 5s to 2s for more responsive saves
 			const state = get();
 			if (state.autoFlushEnabled) return;
 
 			autoFlushInterval = setInterval(async () => {
 				const currentState = get();
-				if (currentState.hasUnsavedChanges) {
+				if (currentState.hasUnsavedChanges && !currentState.isFlushingChanges) {
 					await currentState.flushChanges();
 				}
 			}, intervalMs);
@@ -712,31 +720,30 @@ export function createDashboardStore(
 				return;
 			}
 
-			// Wrap in async to handle flush
-			(async () => {
-				try {
-					// TrackingDependencyGraph uses immutable operations, so we need to update the store
-					const updatedGraph = trackingDependencyGraph.withDependency(
-						taskId,
-						dependsOnId,
-					);
+			try {
+				// TrackingDependencyGraph uses immutable operations, so we need to update the store
+				const updatedGraph = trackingDependencyGraph.withDependency(
+					taskId,
+					dependsOnId,
+				);
 
-					set({
-						trackingDependencyGraph: updatedGraph,
-						statusMessage: "Dependency added",
-					});
+				set({
+					trackingDependencyGraph: updatedGraph,
+					statusMessage: "Dependency added",
+				});
 
-					get().updateUnsavedChangesFlag();
+				get().updateUnsavedChangesFlag();
 
-					// Immediately flush to disk and reload
-					await get().flushChangesImmediate();
-					await get().reloadFromDatabase();
-				} catch (error) {
-					const errorMessage =
-						error instanceof Error ? error.message : String(error);
-					set({ statusMessage: `Error adding dependency: ${errorMessage}` });
+				// Enable auto-flush if not already enabled
+				// This will save changes automatically after a short delay
+				if (!get().autoFlushEnabled) {
+					get().enableAutoFlush();
 				}
-			})();
+			} catch (error) {
+				const errorMessage =
+					error instanceof Error ? error.message : String(error);
+				set({ statusMessage: `Error adding dependency: ${errorMessage}` });
+			}
 		},
 
 		removeDependency: (taskId, dependsOnId) => {
@@ -747,31 +754,30 @@ export function createDashboardStore(
 				return;
 			}
 
-			// Wrap in async to handle flush
-			(async () => {
-				try {
-					// TrackingDependencyGraph uses immutable operations, so we need to update the store
-					const updatedGraph = trackingDependencyGraph.withoutDependency(
-						taskId,
-						dependsOnId,
-					);
+			try {
+				// TrackingDependencyGraph uses immutable operations, so we need to update the store
+				const updatedGraph = trackingDependencyGraph.withoutDependency(
+					taskId,
+					dependsOnId,
+				);
 
-					set({
-						trackingDependencyGraph: updatedGraph,
-						statusMessage: "Dependency removed",
-					});
+				set({
+					trackingDependencyGraph: updatedGraph,
+					statusMessage: "Dependency removed",
+				});
 
-					get().updateUnsavedChangesFlag();
+				get().updateUnsavedChangesFlag();
 
-					// Immediately flush to disk and reload
-					await get().flushChangesImmediate();
-					await get().reloadFromDatabase();
-				} catch (error) {
-					const errorMessage =
-						error instanceof Error ? error.message : String(error);
-					set({ statusMessage: `Error removing dependency: ${errorMessage}` });
+				// Enable auto-flush if not already enabled
+				// This will save changes automatically after a short delay
+				if (!get().autoFlushEnabled) {
+					get().enableAutoFlush();
 				}
-			})();
+			} catch (error) {
+				const errorMessage =
+					error instanceof Error ? error.message : String(error);
+				set({ statusMessage: `Error removing dependency: ${errorMessage}` });
+			}
 		},
 
 		// UI actions

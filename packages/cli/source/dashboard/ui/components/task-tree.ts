@@ -183,25 +183,10 @@ export class TaskTreeComponent {
 						break;
 				}
 
-				try {
-					// Show immediate feedback
-					const currentState = state();
-					currentState.setStatusMessage(
-						`Updating task status to ${newStatus}...`,
-					);
+				// Update the status - this is now a synchronous operation with optimistic updates
+				state().updateTaskStatus(item.taskId, newStatus);
 
-					// Update the status
-					await state().updateTaskStatus(item.taskId, newStatus);
-
-					// Force re-render after the async operation completes
-					// The store subscription should have already triggered, but let's ensure it
-					setTimeout(() => {
-						this.list.screen.render();
-					}, 10);
-				} catch (error) {
-					console.error("Error updating task status:", error);
-					state().setStatusMessage("Error updating task status");
-				}
+				// The store will handle UI updates via subscriptions, no need to force render
 			}
 		});
 
