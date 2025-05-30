@@ -1,6 +1,12 @@
-import { create } from "zustand";
 import type { Task, createDatabase } from "@astrolabe/core";
-import { TaskService, TaskTree, DependencyService, TrackingTaskTree, TrackingDependencyGraph } from "@astrolabe/core";
+import {
+	DependencyService,
+	TaskService,
+	TaskTree,
+	TrackingDependencyGraph,
+	TrackingTaskTree,
+} from "@astrolabe/core";
+import { create } from "zustand";
 
 export interface DashboardState {
 	// Core data structures - TrackingTaskTree and TrackingDependencyGraph as source of truth
@@ -156,7 +162,7 @@ export function createDashboardStore(db: DatabaseStore) {
 						projects: [],
 						statusMessage: "No tasks found",
 						hasUnsavedChanges: false,
-						treeVersion: get().treeVersion + 1
+						treeVersion: get().treeVersion + 1,
 					});
 					return;
 				}
@@ -165,16 +171,23 @@ export function createDashboardStore(db: DatabaseStore) {
 				const trackingTree = TrackingTaskTree.fromTaskTree(baseTree);
 
 				// Load dependency graph and convert to TrackingDependencyGraph
-				const baseDependencyGraph = await dependencyService.createDependencyGraph();
-				const trackingDependencyGraph = TrackingDependencyGraph.fromDependencyGraph(baseDependencyGraph, 'dashboard-dependencies');
+				const baseDependencyGraph =
+					await dependencyService.createDependencyGraph();
+				const trackingDependencyGraph =
+					TrackingDependencyGraph.fromDependencyGraph(
+						baseDependencyGraph,
+						"dashboard-dependencies",
+					);
 
 				// Get projects as children of project root
-				const projects: Project[] = trackingTree.getChildren().map(projectNode => ({
-					id: projectNode.task.id,
-					name: projectNode.task.title,
-					rootTaskId: projectNode.task.id,
-					progress: 0 // Will be calculated
-				}));
+				const projects: Project[] = trackingTree
+					.getChildren()
+					.map((projectNode) => ({
+						id: projectNode.task.id,
+						name: projectNode.task.title,
+						rootTaskId: projectNode.task.id,
+						progress: 0, // Will be calculated
+					}));
 
 				set({
 					trackingTree,
@@ -182,7 +195,7 @@ export function createDashboardStore(db: DatabaseStore) {
 					projects,
 					statusMessage: "Tasks loaded successfully",
 					hasUnsavedChanges: false,
-					treeVersion: get().treeVersion + 1
+					treeVersion: get().treeVersion + 1,
 				});
 
 				// Calculate progress
@@ -190,9 +203,9 @@ export function createDashboardStore(db: DatabaseStore) {
 
 				// Enable auto-flush by default
 				get().enableAutoFlush();
-
 			} catch (error) {
-				const errorMessage = error instanceof Error ? error.message : String(error);
+				const errorMessage =
+					error instanceof Error ? error.message : String(error);
 				set({ statusMessage: `Error loading tasks: ${errorMessage}` });
 			}
 		},
@@ -254,7 +267,7 @@ export function createDashboardStore(db: DatabaseStore) {
 
 				if (parentId) {
 					// Find parent and add child - mutable operation
-					const parentNode = trackingTree.find(task => task.id === parentId);
+					const parentNode = trackingTree.find((task) => task.id === parentId);
 					if (parentNode) {
 						const childTree = TrackingTaskTree.fromTask(newTask);
 						parentNode.addChild(childTree); // Mutation recorded automatically
@@ -274,9 +287,9 @@ export function createDashboardStore(db: DatabaseStore) {
 				get().recalculateAllProgress();
 
 				set({ statusMessage: `Added task: ${title}` });
-
 			} catch (error) {
-				const errorMessage = error instanceof Error ? error.message : String(error);
+				const errorMessage =
+					error instanceof Error ? error.message : String(error);
 				set({ statusMessage: `Error adding task: ${errorMessage}` });
 			}
 		},
@@ -295,7 +308,7 @@ export function createDashboardStore(db: DatabaseStore) {
 
 			try {
 				// Find the task anywhere in the tree
-				const taskNode = trackingTree.find(task => task.id === taskId);
+				const taskNode = trackingTree.find((task) => task.id === taskId);
 				if (!taskNode) {
 					set({ statusMessage: `Task ${taskId} not found` });
 					return;
@@ -310,9 +323,9 @@ export function createDashboardStore(db: DatabaseStore) {
 				get().recalculateAllProgress();
 
 				set({ statusMessage: `Updated task ${taskId}` });
-
 			} catch (error) {
-				const errorMessage = error instanceof Error ? error.message : String(error);
+				const errorMessage =
+					error instanceof Error ? error.message : String(error);
 				set({ statusMessage: `Error updating task: ${errorMessage}` });
 			}
 		},
@@ -327,7 +340,7 @@ export function createDashboardStore(db: DatabaseStore) {
 
 			try {
 				// Find the task anywhere in the tree
-				const taskNode = trackingTree.find(task => task.id === taskId);
+				const taskNode = trackingTree.find((task) => task.id === taskId);
 				if (!taskNode) {
 					set({ statusMessage: `Task ${taskId} not found` });
 					return;
@@ -347,16 +360,17 @@ export function createDashboardStore(db: DatabaseStore) {
 				get().updateUnsavedChangesFlag();
 
 				set({ statusMessage: "Task deleted" });
-
 			} catch (error) {
-				const errorMessage = error instanceof Error ? error.message : String(error);
+				const errorMessage =
+					error instanceof Error ? error.message : String(error);
 				set({ statusMessage: `Error deleting task: ${errorMessage}` });
 			}
 		},
 
 		// Persistence control - now works for ALL pending operations
 		flushChanges: async () => {
-			const { trackingTree, trackingDependencyGraph, isFlushingChanges } = get();
+			const { trackingTree, trackingDependencyGraph, isFlushingChanges } =
+				get();
 
 			// Prevent concurrent flushes
 			if (isFlushingChanges) {
@@ -364,7 +378,10 @@ export function createDashboardStore(db: DatabaseStore) {
 				return;
 			}
 
-			if (!trackingTree?.hasPendingChanges && !trackingDependencyGraph?.hasPendingChanges) {
+			if (
+				!trackingTree?.hasPendingChanges &&
+				!trackingDependencyGraph?.hasPendingChanges
+			) {
 				set({ statusMessage: "No changes to save" });
 				return;
 			}
@@ -372,7 +389,7 @@ export function createDashboardStore(db: DatabaseStore) {
 			try {
 				set({
 					statusMessage: "Saving changes...",
-					isFlushingChanges: true
+					isFlushingChanges: true,
 				});
 
 				// Use Promise.all for parallel execution when possible
@@ -384,7 +401,10 @@ export function createDashboardStore(db: DatabaseStore) {
 				}
 
 				// Apply dependency changes
-				if (trackingDependencyGraph && trackingDependencyGraph.hasPendingChanges) {
+				if (
+					trackingDependencyGraph &&
+					trackingDependencyGraph.hasPendingChanges
+				) {
 					flushPromises.push(trackingDependencyGraph.flush(dependencyService));
 				}
 
@@ -396,7 +416,7 @@ export function createDashboardStore(db: DatabaseStore) {
 					hasUnsavedChanges: false,
 					lastFlushTime: Date.now(),
 					treeVersion: get().treeVersion + 1,
-					isFlushingChanges: false
+					isFlushingChanges: false,
 				};
 
 				if (results[0]) {
@@ -407,12 +427,12 @@ export function createDashboardStore(db: DatabaseStore) {
 				}
 
 				set(updateData);
-
 			} catch (error) {
-				const errorMessage = error instanceof Error ? error.message : String(error);
+				const errorMessage =
+					error instanceof Error ? error.message : String(error);
 				set({
 					statusMessage: `Error saving: ${errorMessage}`,
-					isFlushingChanges: false
+					isFlushingChanges: false,
 				});
 				throw error; // Re-throw for callers that need to handle it
 			}
@@ -425,7 +445,7 @@ export function createDashboardStore(db: DatabaseStore) {
 			if (isFlushingChanges) {
 				// Wait for current flush to complete
 				while (get().isFlushingChanges) {
-					await new Promise(resolve => setTimeout(resolve, 100));
+					await new Promise((resolve) => setTimeout(resolve, 100));
 				}
 				return;
 			}
@@ -443,13 +463,15 @@ export function createDashboardStore(db: DatabaseStore) {
 
 				set({ statusMessage: "All changes saved before exit" });
 			} catch (error) {
-				const errorMessage = error instanceof Error ? error.message : String(error);
+				const errorMessage =
+					error instanceof Error ? error.message : String(error);
 				set({ statusMessage: `Failed to save before exit: ${errorMessage}` });
 				throw error;
 			}
 		},
 
-		enableAutoFlush: (intervalMs = 5000) => { // Reduced from 10s to 5s for faster saves
+		enableAutoFlush: (intervalMs = 5000) => {
+			// Reduced from 10s to 5s for faster saves
 			const state = get();
 			if (state.autoFlushEnabled) return;
 
@@ -482,17 +504,20 @@ export function createDashboardStore(db: DatabaseStore) {
 
 			try {
 				// TrackingDependencyGraph uses immutable operations, so we need to update the store
-				const updatedGraph = trackingDependencyGraph.withDependency(taskId, dependsOnId);
+				const updatedGraph = trackingDependencyGraph.withDependency(
+					taskId,
+					dependsOnId,
+				);
 
 				set({
 					trackingDependencyGraph: updatedGraph,
-					statusMessage: "Dependency added"
+					statusMessage: "Dependency added",
 				});
 
 				get().updateUnsavedChangesFlag();
-
 			} catch (error) {
-				const errorMessage = error instanceof Error ? error.message : String(error);
+				const errorMessage =
+					error instanceof Error ? error.message : String(error);
 				set({ statusMessage: `Error adding dependency: ${errorMessage}` });
 			}
 		},
@@ -507,17 +532,20 @@ export function createDashboardStore(db: DatabaseStore) {
 
 			try {
 				// TrackingDependencyGraph uses immutable operations, so we need to update the store
-				const updatedGraph = trackingDependencyGraph.withoutDependency(taskId, dependsOnId);
+				const updatedGraph = trackingDependencyGraph.withoutDependency(
+					taskId,
+					dependsOnId,
+				);
 
 				set({
 					trackingDependencyGraph: updatedGraph,
-					statusMessage: "Dependency removed"
+					statusMessage: "Dependency removed",
 				});
 
 				get().updateUnsavedChangesFlag();
-
 			} catch (error) {
-				const errorMessage = error instanceof Error ? error.message : String(error);
+				const errorMessage =
+					error instanceof Error ? error.message : String(error);
 				set({ statusMessage: `Error removing dependency: ${errorMessage}` });
 			}
 		},
@@ -545,13 +573,15 @@ export function createDashboardStore(db: DatabaseStore) {
 
 		toggleDetailViewMode: () => {
 			set((state) => ({
-				detailViewMode: state.detailViewMode === "normal" ? "dependencies" : "normal"
+				detailViewMode:
+					state.detailViewMode === "normal" ? "dependencies" : "normal",
 			}));
 		},
 
 		toggleTreeViewMode: () => {
 			set((state) => ({
-				treeViewMode: state.treeViewMode === "hierarchy" ? "dependencies" : "hierarchy"
+				treeViewMode:
+					state.treeViewMode === "hierarchy" ? "dependencies" : "hierarchy",
 			}));
 		},
 
@@ -564,7 +594,7 @@ export function createDashboardStore(db: DatabaseStore) {
 		getTaskTree: (taskId: string) => {
 			const trackingTree = get().trackingTree;
 			if (!trackingTree) return null;
-			const node = trackingTree.find(task => task.id === taskId);
+			const node = trackingTree.find((task) => task.id === taskId);
 			return node ? node.toTaskTree() : null;
 		},
 
@@ -581,7 +611,7 @@ export function createDashboardStore(db: DatabaseStore) {
 		getProjects: () => {
 			const trackingTree = get().trackingTree;
 			if (!trackingTree) return [];
-			return trackingTree.getChildren().map(child => child.toTaskTree());
+			return trackingTree.getChildren().map((child) => child.toTaskTree());
 		},
 
 		// Dependency queries (using TrackingDependencyGraph)
@@ -614,7 +644,7 @@ export function createDashboardStore(db: DatabaseStore) {
 			const trackingTree = get().trackingTree;
 			if (!trackingTree) return 0;
 
-			const taskNode = trackingTree.find(task => task.id === taskId);
+			const taskNode = trackingTree.find((task) => task.id === taskId);
 			if (!taskNode) return 0;
 
 			const children = taskNode.getChildren();
@@ -628,7 +658,10 @@ export function createDashboardStore(db: DatabaseStore) {
 			let validChildren = 0;
 
 			for (const child of children) {
-				if (child.task.status !== "cancelled" && child.task.status !== "archived") {
+				if (
+					child.task.status !== "cancelled" &&
+					child.task.status !== "archived"
+				) {
 					totalProgress += get().calculateProgress(child.task.id);
 					validChildren++;
 				}
@@ -645,13 +678,16 @@ export function createDashboardStore(db: DatabaseStore) {
 
 			// Calculate progress for all tasks using TrackingTaskTree traversal
 			trackingTree.walkDepthFirst((node) => {
-				progressByTaskId.set(node.task.id, get().calculateProgress(node.task.id));
+				progressByTaskId.set(
+					node.task.id,
+					get().calculateProgress(node.task.id),
+				);
 			});
 
 			// Update project progress
 			const projects = get().projects.map((project) => ({
 				...project,
-				progress: progressByTaskId.get(project.rootTaskId) || 0
+				progress: progressByTaskId.get(project.rootTaskId) || 0,
 			}));
 
 			set({ progressByTaskId, projects });
@@ -669,9 +705,9 @@ export function createDashboardStore(db: DatabaseStore) {
 
 				// Then reload fresh data
 				await get().loadTasks();
-
 			} catch (error) {
-				const errorMessage = error instanceof Error ? error.message : String(error);
+				const errorMessage =
+					error instanceof Error ? error.message : String(error);
 				set({ statusMessage: `Error reloading: ${errorMessage}` });
 			}
 		},
@@ -680,10 +716,11 @@ export function createDashboardStore(db: DatabaseStore) {
 		updateUnsavedChangesFlag: () => {
 			const { trackingTree, trackingDependencyGraph } = get();
 			const hasUnsavedChanges = Boolean(
-				trackingTree?.hasPendingChanges || trackingDependencyGraph?.hasPendingChanges
+				trackingTree?.hasPendingChanges ||
+					trackingDependencyGraph?.hasPendingChanges,
 			);
 			set({ hasUnsavedChanges });
-		}
+		},
 	}));
 
 	return useStore;

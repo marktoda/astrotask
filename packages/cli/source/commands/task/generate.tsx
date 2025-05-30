@@ -211,35 +211,40 @@ export default function Generate({ options }: Props) {
 
 				// Apply the task tree and dependency graph using proper ID mapping
 				const taskService = new TaskService(db);
-				
+
 				// Step 1: Flush the tracking tree first to create tasks and get ID mappings
-				const { updatedTree, idMappings } = await result.tree.flush(taskService);
-				
+				const { updatedTree, idMappings } =
+					await result.tree.flush(taskService);
+
 				if (options.verbose) {
-					console.log('ID Mappings from tree flush:');
+					console.log("ID Mappings from tree flush:");
 					for (const [tempId, realId] of idMappings.entries()) {
 						console.log(`  ${tempId} -> ${realId}`);
 					}
 					console.log(`\nDependency operations before mapping:`);
 					for (const op of result.graph.pendingOperations) {
-						console.log(`  ${op.type}: ${op.dependentTaskId} -> ${op.dependencyTaskId}`);
+						console.log(
+							`  ${op.type}: ${op.dependentTaskId} -> ${op.dependencyTaskId}`,
+						);
 					}
 				}
-				
+
 				// Step 2: Apply dependency graph if it has operations
 				if (result.graph.hasPendingChanges) {
 					const dependencyService = new DependencyService(db);
-					
+
 					// Apply ID mappings to resolve temporary IDs to real database IDs
 					const mappedGraph = result.graph.applyIdMappings(idMappings);
-					
+
 					if (options.verbose) {
 						console.log(`\nDependency operations after mapping:`);
 						for (const op of mappedGraph.pendingOperations) {
-							console.log(`  ${op.type}: ${op.dependentTaskId} -> ${op.dependencyTaskId}`);
+							console.log(
+								`  ${op.type}: ${op.dependentTaskId} -> ${op.dependencyTaskId}`,
+							);
 						}
 					}
-					
+
 					// Now flush the dependency graph with resolved IDs
 					await mappedGraph.flush(dependencyService);
 				}

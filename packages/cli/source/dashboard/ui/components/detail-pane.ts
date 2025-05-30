@@ -51,7 +51,7 @@ export class DetailPane {
 		});
 
 		// Add key binding to toggle view modes
-		this.content.key(['g'], () => {
+		this.content.key(["g"], () => {
 			this.store.getState().toggleDetailViewMode();
 		});
 
@@ -83,7 +83,7 @@ export class DetailPane {
 		}
 
 		const task = taskNode.task;
-		
+
 		if (detailViewMode === "dependencies") {
 			this.renderDependencyGraphView(state, task);
 		} else {
@@ -135,13 +135,15 @@ export class DetailPane {
 					const statusIcon = this.getDependencyStatusIcon(status);
 					const statusColor = this.getDependencyStatusColor(status);
 					const priorityIcon = this.getPriorityEmoji(depTaskNode.task.priority);
-					lines.push(`  ${statusIcon} {${statusColor}-fg}${depTaskNode.task.title}{/${statusColor}-fg} ${priorityIcon}`);
+					lines.push(
+						`  ${statusIcon} {${statusColor}-fg}${depTaskNode.task.title}{/${statusColor}-fg} ${priorityIcon}`,
+					);
 				}
 			});
 			lines.push("");
 		}
 
-		// Dependents - use new store methods with prettier display  
+		// Dependents - use new store methods with prettier display
 		const dependents = state.getTaskDependents(task.id);
 		if (dependents.length > 0) {
 			lines.push("{magenta-fg}⛓️  Blocks these tasks:{/magenta-fg}");
@@ -153,8 +155,12 @@ export class DetailPane {
 					const status = dependentTaskNode.task.status;
 					const statusIcon = this.getDependencyStatusIcon(status);
 					const statusColor = this.getDependencyStatusColor(status);
-					const priorityIcon = this.getPriorityEmoji(dependentTaskNode.task.priority);
-					lines.push(`  ${statusIcon} {${statusColor}-fg}${dependentTaskNode.task.title}{/${statusColor}-fg} ${priorityIcon}`);
+					const priorityIcon = this.getPriorityEmoji(
+						dependentTaskNode.task.priority,
+					);
+					lines.push(
+						`  ${statusIcon} {${statusColor}-fg}${dependentTaskNode.task.title}{/${statusColor}-fg} ${priorityIcon}`,
+					);
 				}
 			});
 			lines.push("");
@@ -170,12 +176,18 @@ export class DetailPane {
 					(task: Task) => task.id === blockingId,
 				);
 				if (blockingTaskNode) {
-					const priorityIcon = this.getPriorityEmoji(blockingTaskNode.task.priority);
-					lines.push(`  ⏸️  {yellow-fg}${blockingTaskNode.task.title}{/yellow-fg} ${priorityIcon}`);
+					const priorityIcon = this.getPriorityEmoji(
+						blockingTaskNode.task.priority,
+					);
+					lines.push(
+						`  ⏸️  {yellow-fg}${blockingTaskNode.task.title}{/yellow-fg} ${priorityIcon}`,
+					);
 				}
 			});
 			lines.push("");
-			lines.push("{yellow-fg}💡 Complete dependencies above to unblock this task{/yellow-fg}");
+			lines.push(
+				"{yellow-fg}💡 Complete dependencies above to unblock this task{/yellow-fg}",
+			);
 			lines.push("");
 		}
 
@@ -186,7 +198,7 @@ export class DetailPane {
 	private renderDependencyGraphView(state: DashboardStore, task: Task) {
 		const { trackingTree } = state;
 		if (!trackingTree) return;
-		
+
 		const lines: string[] = [];
 
 		// Header
@@ -203,7 +215,9 @@ export class DetailPane {
 
 		// Show upstream dependencies (what this task needs)
 		if (deps.length > 0) {
-			lines.push("{cyan-fg}⬆️  UPSTREAM (Dependencies required before this task):{/cyan-fg}");
+			lines.push(
+				"{cyan-fg}⬆️  UPSTREAM (Dependencies required before this task):{/cyan-fg}",
+			);
 			this.renderDependencyTree(lines, deps, trackingTree, "  ", true);
 			lines.push("");
 		}
@@ -214,12 +228,16 @@ export class DetailPane {
 		const priorityIcon = this.getPriorityEmoji(task.priority);
 		const blockIcon = isBlocked ? " 🚫" : "";
 		lines.push(`{bold}📍 CURRENT TASK:{/bold}`);
-		lines.push(`   ${statusIcon} {${statusColor}-fg}${task.title}{/${statusColor}-fg} ${priorityIcon}${blockIcon}`);
+		lines.push(
+			`   ${statusIcon} {${statusColor}-fg}${task.title}{/${statusColor}-fg} ${priorityIcon}${blockIcon}`,
+		);
 		lines.push("");
 
 		// Show downstream dependents (what this task blocks)
 		if (dependents.length > 0) {
-			lines.push("{magenta-fg}⬇️  DOWNSTREAM (Tasks blocked by this task):{/magenta-fg}");
+			lines.push(
+				"{magenta-fg}⬇️  DOWNSTREAM (Tasks blocked by this task):{/magenta-fg}",
+			);
 			this.renderDependencyTree(lines, dependents, trackingTree, "  ", false);
 			lines.push("");
 		}
@@ -229,17 +247,21 @@ export class DetailPane {
 		if (deps.length === 0) {
 			lines.push("  🏁 No dependencies - can start immediately");
 		} else {
-			const completedDeps = deps.filter(depId => {
+			const completedDeps = deps.filter((depId) => {
 				const depNode = trackingTree.find((t: Task) => t.id === depId);
 				return depNode?.task.status === "done";
 			});
-			lines.push(`  📥 Dependencies: ${completedDeps.length}/${deps.length} completed`);
+			lines.push(
+				`  📥 Dependencies: ${completedDeps.length}/${deps.length} completed`,
+			);
 		}
-		
+
 		if (dependents.length === 0) {
 			lines.push("  🎯 No dependents - leaf task");
 		} else {
-			lines.push(`  📤 Blocks: ${dependents.length} downstream task${dependents.length > 1 ? 's' : ''}`);
+			lines.push(
+				`  📤 Blocks: ${dependents.length} downstream task${dependents.length > 1 ? "s" : ""}`,
+			);
 		}
 
 		if (isBlocked) {
@@ -252,7 +274,13 @@ export class DetailPane {
 		this.box.screen.render();
 	}
 
-	private renderDependencyTree(lines: string[], taskIds: string[], trackingTree: any, indent: string, showAsRequirements: boolean) {
+	private renderDependencyTree(
+		lines: string[],
+		taskIds: string[],
+		trackingTree: any,
+		indent: string,
+		showAsRequirements: boolean,
+	) {
 		taskIds.forEach((taskId, index) => {
 			const taskNode = trackingTree.find((t: Task) => t.id === taskId);
 			if (taskNode) {
@@ -262,21 +290,33 @@ export class DetailPane {
 				const statusIcon = this.getDependencyStatusIcon(status);
 				const statusColor = this.getDependencyStatusColor(status);
 				const priorityIcon = this.getPriorityEmoji(taskNode.task.priority);
-				
-				lines.push(`${indent}${connector}${statusIcon} {${statusColor}-fg}${taskNode.task.title}{/${statusColor}-fg} ${priorityIcon}`);
-				
+
+				lines.push(
+					`${indent}${connector}${statusIcon} {${statusColor}-fg}${taskNode.task.title}{/${statusColor}-fg} ${priorityIcon}`,
+				);
+
 				// Show nested dependencies/dependents (limited depth)
 				if (showAsRequirements) {
 					const nestedDeps = this.store.getState().getTaskDependencies(taskId);
-					if (nestedDeps.length > 0 && nestedDeps.length <= 3) { // Limit to avoid clutter
+					if (nestedDeps.length > 0 && nestedDeps.length <= 3) {
+						// Limit to avoid clutter
 						const nextIndent = indent + (isLast ? "    " : "│   ");
 						nestedDeps.forEach((nestedId, nestedIndex) => {
-							const nestedNode = trackingTree.find((t: Task) => t.id === nestedId);
+							const nestedNode = trackingTree.find(
+								(t: Task) => t.id === nestedId,
+							);
 							if (nestedNode) {
-								const nestedConnector = nestedIndex === nestedDeps.length - 1 ? "└── " : "├── ";
-								const nestedStatusIcon = this.getDependencyStatusIcon(nestedNode.task.status);
-								const nestedStatusColor = this.getDependencyStatusColor(nestedNode.task.status);
-								lines.push(`${nextIndent}${nestedConnector}${nestedStatusIcon} {${nestedStatusColor}-fg}${nestedNode.task.title}{/${nestedStatusColor}-fg}`);
+								const nestedConnector =
+									nestedIndex === nestedDeps.length - 1 ? "└── " : "├── ";
+								const nestedStatusIcon = this.getDependencyStatusIcon(
+									nestedNode.task.status,
+								);
+								const nestedStatusColor = this.getDependencyStatusColor(
+									nestedNode.task.status,
+								);
+								lines.push(
+									`${nextIndent}${nestedConnector}${nestedStatusIcon} {${nestedStatusColor}-fg}${nestedNode.task.title}{/${nestedStatusColor}-fg}`,
+								);
 							}
 						});
 					}

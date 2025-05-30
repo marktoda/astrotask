@@ -103,7 +103,7 @@ async function main() {
 			} catch (error) {
 				console.error("Failed to save before exit:", error);
 			}
-			
+
 			try {
 				syncService.stop();
 				screen.destroy();

@@ -251,7 +251,7 @@ export class TaskTreeComponent {
 		// Temporarily disable renders to prevent jittering
 		const originalRender = this.render.bind(this);
 		let renderingDisabled = true;
-		
+
 		// Override render to prevent updates during prompt
 		this.render = (state: DashboardStore) => {
 			if (!renderingDisabled) {
@@ -280,12 +280,12 @@ export class TaskTreeComponent {
 			// Re-enable rendering
 			renderingDisabled = false;
 			this.render = originalRender;
-			
+
 			// Remove the prompt
 			if (prompt.parent) {
 				prompt.destroy();
 			}
-			
+
 			// Force a render to update display
 			this.list.screen.render();
 		};
@@ -298,7 +298,7 @@ export class TaskTreeComponent {
 		});
 
 		// Handle escape/cancel
-		prompt.key(['escape', 'C-c'], () => {
+		prompt.key(["escape", "C-c"], () => {
 			cleanup();
 		});
 	}
@@ -307,7 +307,7 @@ export class TaskTreeComponent {
 		// Temporarily disable renders to prevent jittering
 		const originalRender = this.render.bind(this);
 		let renderingDisabled = true;
-		
+
 		// Override render to prevent updates during confirmation
 		this.render = (state: DashboardStore) => {
 			if (!renderingDisabled) {
@@ -336,12 +336,12 @@ export class TaskTreeComponent {
 			// Re-enable rendering
 			renderingDisabled = false;
 			this.render = originalRender;
-			
+
 			// Remove the question
 			if (question.parent) {
 				question.destroy();
 			}
-			
+
 			// Force a render to update display
 			this.list.screen.render();
 		};
@@ -354,7 +354,7 @@ export class TaskTreeComponent {
 		});
 
 		// Handle escape/cancel
-		question.key(['escape', 'C-c', 'n'], () => {
+		question.key(["escape", "C-c", "n"], () => {
 			cleanup();
 		});
 	}
@@ -468,12 +468,13 @@ export class TaskTreeComponent {
 
 		// Helper function to add a task and its dependents
 		const addDependencyNode = (taskId: string, depth: number) => {
-			if (visited.has(taskId) || depth > 10) { // Prevent infinite loops and excessive depth
+			if (visited.has(taskId) || depth > 10) {
+				// Prevent infinite loops and excessive depth
 				return;
 			}
 
 			visited.add(taskId);
-			const taskNode = trackingTree.find(task => task.id === taskId);
+			const taskNode = trackingTree.find((task) => task.id === taskId);
 			if (!taskNode) {
 				return;
 			}
@@ -484,7 +485,12 @@ export class TaskTreeComponent {
 
 			items.push({
 				taskId: taskId,
-				label: this.formatTaskLabel(taskNode.task, depth, hasChildren, isExpanded),
+				label: this.formatTaskLabel(
+					taskNode.task,
+					depth,
+					hasChildren,
+					isExpanded,
+				),
 				depth: depth,
 				isExpanded: isExpanded,
 				hasChildren: hasChildren,
@@ -505,7 +511,7 @@ export class TaskTreeComponent {
 			allTaskIds.add(node.task.id);
 		});
 
-		const rootTasks = Array.from(allTaskIds).filter(taskId => {
+		const rootTasks = Array.from(allTaskIds).filter((taskId) => {
 			const dependencies = trackingDependencyGraph.getDependencies(taskId);
 			return dependencies.length === 0;
 		});
