@@ -193,31 +193,7 @@ export class TaskTreeComponent {
 		});
 
 		// Add sibling task
-		this.list.key(["a"], () => {
-			const selectedIndex = (this.list as any).selected;
-			const item = this.currentItems[selectedIndex];
-			if (item) {
-				const taskTree = state().getTaskTree(item.taskId);
-				const parentId = taskTree?.getParent()?.task.id || null;
-				this.promptForTaskTitle((title) => {
-					state().addTask(parentId, title);
-				});
-			}
-		});
-
-		// Add child task
-		this.list.key(["A"], () => {
-			const selectedIndex = (this.list as any).selected;
-			const item = this.currentItems[selectedIndex];
-			if (item) {
-				this.promptForTaskTitle((title) => {
-					state().addTask(item.taskId, title);
-				});
-			}
-		});
-
-		// Add sibling task with editor
-		this.list.key(["e"], async () => {
+		this.list.key(["a"], async () => {
 			const selectedIndex = (this.list as any).selected;
 			const item = this.currentItems[selectedIndex];
 			if (item) {
@@ -227,8 +203,8 @@ export class TaskTreeComponent {
 			}
 		});
 
-		// Add child task with editor
-		this.list.key(["E"], async () => {
+		// Add child task
+		this.list.key(["S-a"], async () => {
 			const selectedIndex = (this.list as any).selected;
 			const item = this.currentItems[selectedIndex];
 			if (item) {
@@ -236,14 +212,25 @@ export class TaskTreeComponent {
 			}
 		});
 
-		// Delete task
-		this.list.key(["D"], () => {
+		// Delete task - use correct Blessed uppercase key format
+		this.list.key(["S-d"], () => {
 			const selectedIndex = (this.list as any).selected;
 			const item = this.currentItems[selectedIndex];
+
 			if (item) {
+				// Show immediate status feedback
+				state().setStatusMessage(`Deleting task: ${item.task.title}...`);
+
 				this.confirmDelete(item.task, () => {
-					state().deleteTask(item.taskId);
+					try {
+						state().deleteTask(item.taskId);
+					} catch (error) {
+						console.error("Error in deleteTask:", error);
+						state().setStatusMessage(`Error deleting task: ${error}`);
+					}
 				});
+			} else {
+				state().setStatusMessage("No task selected for deletion");
 			}
 		});
 
@@ -281,62 +268,6 @@ export class TaskTreeComponent {
 			if (item) {
 				this.store.getState().selectTask(item.taskId);
 			}
-		});
-	}
-
-	private promptForTaskTitle(callback: (title: string) => void) {
-		// Temporarily disable renders to prevent jittering
-		const originalRender = this.render.bind(this);
-		let renderingDisabled = true;
-
-		// Override render to prevent updates during prompt
-		this.render = (state: DashboardStore) => {
-			if (!renderingDisabled) {
-				originalRender(state);
-			}
-		};
-
-		const prompt = blessed.prompt({
-			parent: this.list.screen,
-			top: "center",
-			left: "center",
-			height: "shrink",
-			width: "50%",
-			border: {
-				type: "line",
-			},
-			style: {
-				border: {
-					fg: "yellow",
-				},
-			},
-			label: " New Task ",
-		});
-
-		const cleanup = () => {
-			// Re-enable rendering
-			renderingDisabled = false;
-			this.render = originalRender;
-
-			// Remove the prompt
-			if (prompt.parent) {
-				prompt.destroy();
-			}
-
-			// Force a render to update display
-			this.list.screen.render();
-		};
-
-		prompt.input("Enter task title:", "", (err, value) => {
-			cleanup();
-			if (!err && value && value.trim()) {
-				callback(value.trim());
-			}
-		});
-
-		// Handle escape/cancel
-		prompt.key(["escape", "C-c"], () => {
-			cleanup();
 		});
 	}
 
@@ -385,7 +316,13 @@ export class TaskTreeComponent {
 
 		question.ask(`Delete task "${task.title}"? (y/n)`, (err, value) => {
 			cleanup();
-			if (!err && value && value.toLowerCase() === "y") {
+			// Handle both boolean true (blessed returns this) and string "y"
+			const shouldDelete =
+				!err &&
+				value &&
+				((value as any) === true ||
+					(typeof value === "string" && value.toLowerCase() === "y"));
+			if (shouldDelete) {
 				callback();
 			}
 		});
@@ -470,31 +407,31 @@ export class TaskTreeComponent {
 
 			// Force complete redraw by temporarily hiding and showing the list
 			this.list.hide();
-			
+
 			// Clear the list completely before setting new items
 			this.list.clearItems();
 			this.list.setContent("");
-			
+
 			// Clear the internal render cache if it exists
 			if ((this.list as any)._clines) {
 				(this.list as any)._clines = [];
 			}
-			
+
 			// Set items with blessed color tags for blocked tasks
 			const formattedItems = items.map((item) => {
 				const plainLabel = this.stripAnsi(item.label);
 				const isBlocked = this.isTaskBlocked(item.task);
-				
+
 				// Apply red text for blocked tasks
 				if (isBlocked) {
 					return `{red-fg}${plainLabel}{/red-fg}`;
 				}
-				
+
 				return plainLabel;
 			});
-			
+
 			this.list.setItems(formattedItems);
-			
+
 			// Show the list again
 			this.list.show();
 
@@ -520,7 +457,7 @@ export class TaskTreeComponent {
 			if (targetIndex >= 0 && targetIndex < items.length) {
 				this.list.select(targetIndex);
 			}
-			
+
 			// Force the parent box to redraw as well
 			if (this.list.parent) {
 				(this.list.parent as any).render();
@@ -666,7 +603,7 @@ export class TaskTreeComponent {
 
 		// Build the base label
 		let label = `${indent}${expandIcon} ${statusIcon} ${task.title}`;
-		
+
 		// Add priority indicator if not medium
 		if (task.priority !== "medium") {
 			label += priorityIcon;
@@ -678,7 +615,7 @@ export class TaskTreeComponent {
 		// This helps overwrite any residual text when collapsing
 		const maxWidth = (this.list.width as number) - 4; // Account for borders and padding
 		if (label.length < maxWidth) {
-			label = label.padEnd(maxWidth, ' ');
+			label = label.padEnd(maxWidth, " ");
 		}
 
 		return label;
@@ -689,13 +626,13 @@ export class TaskTreeComponent {
 			case "done":
 				return "✓";
 			case "in-progress":
-				return "◉";  // Changed to filled circle for better visibility
+				return "◉"; // Changed to filled circle for better visibility
 			case "pending":
 				return "○";
 			case "cancelled":
 				return "✗";
 			case "archived":
-				return "⧈";  // Changed to a better archive icon
+				return "⧈"; // Changed to a better archive icon
 			default:
 				return "?";
 		}
@@ -704,7 +641,7 @@ export class TaskTreeComponent {
 	private getPriorityIcon(priority: Task["priority"]): string {
 		switch (priority) {
 			case "high":
-				return " !";  // Changed back to exclamation mark to avoid emoji rendering issues
+				return " !"; // Changed back to exclamation mark to avoid emoji rendering issues
 			case "low":
 				return " ↓";
 			case "medium":

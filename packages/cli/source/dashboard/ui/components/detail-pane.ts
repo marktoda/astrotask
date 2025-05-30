@@ -98,16 +98,18 @@ export class DetailPane {
 		// Header with improved styling
 		lines.push(`{bold}Task: ${task.title}{/bold}`);
 		lines.push(`{gray-fg}ID: ${task.id}{/gray-fg}`);
-		
+
 		// Status with icon
 		const statusIcon = this.getStatusIcon(task.status);
 		const statusColor = this.getDependencyStatusColor(task.status);
-		lines.push(`Status: ${statusIcon} {${statusColor}-fg}${task.status}{/${statusColor}-fg}`);
-		
+		lines.push(
+			`Status: ${statusIcon} {${statusColor}-fg}${task.status}{/${statusColor}-fg}`,
+		);
+
 		// Priority with icon
 		const priorityIcon = this.getPriorityIcon(task.priority);
 		lines.push(`Priority: ${priorityIcon} ${task.priority}`);
-		
+
 		lines.push("");
 		lines.push("{gray-fg}Press 'g' for dependency graph view{/gray-fg}");
 		lines.push("");
@@ -126,7 +128,9 @@ export class DetailPane {
 			children.forEach((child: any) => {
 				const statusIcon = this.getStatusIcon(child.task.status);
 				const statusColor = this.getDependencyStatusColor(child.task.status);
-				lines.push(`  ${statusIcon} {${statusColor}-fg}${child.task.title}{/${statusColor}-fg}`);
+				lines.push(
+					`  ${statusIcon} {${statusColor}-fg}${child.task.title}{/${statusColor}-fg}`,
+				);
 			});
 			lines.push("");
 		}
@@ -134,7 +138,9 @@ export class DetailPane {
 		// Dependencies - use new store methods with prettier display
 		const deps = state.getTaskDependencies(task.id);
 		if (deps.length > 0) {
-			lines.push("{bold}{cyan-fg}Dependencies (required first):{/cyan-fg}{/bold}");
+			lines.push(
+				"{bold}{cyan-fg}Dependencies (required first):{/cyan-fg}{/bold}",
+			);
 			deps.forEach((depId: string) => {
 				const depTaskNode = trackingTree?.find(
 					(task: Task) => task.id === depId,

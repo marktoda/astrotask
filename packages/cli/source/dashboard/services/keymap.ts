@@ -94,21 +94,11 @@ export class KeymapService {
 			},
 			addSibling: {
 				keys: ["a"],
-				description: "Add sibling task",
+				description: "Add sibling task with editor",
 				action: () => {}, // Will be overridden
 			},
 			addChild: {
 				keys: ["A"],
-				description: "Add child task",
-				action: () => {}, // Will be overridden
-			},
-			addSiblingEditor: {
-				keys: ["e"],
-				description: "Add sibling task with editor",
-				action: () => {}, // Will be overridden
-			},
-			addChildEditor: {
-				keys: ["E"],
 				description: "Add child task with editor",
 				action: () => {}, // Will be overridden
 			},

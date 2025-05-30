@@ -21,11 +21,26 @@ export interface EditorResult {
 	error?: string;
 }
 
+export interface PendingTaskData {
+	task: TaskTemplate;
+	parentId: string | null;
+}
+
+// Global storage for pending task data that needs to survive screen recreation
+let pendingTaskData: PendingTaskData | null = null;
+
 export class EditorService {
 	private screen: blessed.Widgets.Screen | null = null;
 
 	setScreen(screen: blessed.Widgets.Screen) {
 		this.screen = screen;
+	}
+
+	// Static method to check and retrieve pending task data
+	static getPendingTaskData(): PendingTaskData | null {
+		const data = pendingTaskData;
+		pendingTaskData = null; // Clear after retrieval
+		return data;
 	}
 
 	private getEditor(): string {
@@ -78,30 +93,30 @@ notes: |
 			tags: [],
 		};
 
-		const lines = content.split('\n');
+		const lines = content.split("\n");
 		let currentField: string | null = null;
 		let currentValue: string[] = [];
 
 		for (let line of lines) {
 			line = line.trim();
-			
+
 			// Skip comments and empty lines
-			if (line.startsWith('#') || line === '') {
+			if (line.startsWith("#") || line === "") {
 				continue;
 			}
 
 			// Check for field starts
-			if (line.includes(':')) {
+			if (line.includes(":")) {
 				// Save previous field if exists
 				if (currentField && currentValue.length > 0) {
-					this.setTaskField(task, currentField, currentValue.join('\n').trim());
+					this.setTaskField(task, currentField, currentValue.join("\n").trim());
 				}
 
-				const [field, ...valueParts] = line.split(':');
+				const [field, ...valueParts] = line.split(":");
 				currentField = field?.trim() || null;
-				
-				const value = valueParts.join(':').trim();
-				if (value === '|') {
+
+				const value = valueParts.join(":").trim();
+				if (value === "|") {
 					// Multi-line value starts
 					currentValue = [];
 				} else if (value) {
@@ -118,7 +133,7 @@ notes: |
 
 		// Save the last field
 		if (currentField && currentValue.length > 0) {
-			this.setTaskField(task, currentField, currentValue.join('\n').trim());
+			this.setTaskField(task, currentField, currentValue.join("\n").trim());
 		}
 
 		// Validate required fields
@@ -138,47 +153,60 @@ notes: |
 		};
 	}
 
-	private setTaskField(task: Partial<TaskTemplate>, field: string, value: string) {
+	private setTaskField(
+		task: Partial<TaskTemplate>,
+		field: string,
+		value: string,
+	) {
 		switch (field.toLowerCase()) {
-			case 'title':
+			case "title":
 				task.title = value;
 				break;
-			case 'description':
+			case "description":
 				task.description = value;
 				break;
-			case 'details':
+			case "details":
 				task.details = value;
 				break;
-			case 'priority':
+			case "priority":
 				task.priority = value as any;
 				break;
-			case 'status':
+			case "status":
 				task.status = value as any;
 				break;
-			case 'tags':
-				task.tags = typeof value === 'string' ? [value] : value;
+			case "tags":
+				task.tags = typeof value === "string" ? [value] : value;
 				break;
-			case 'notes':
+			case "notes":
 				task.notes = value;
 				break;
 		}
 	}
 
 	private validatePriority(priority: any): "low" | "medium" | "high" | null {
-		if (typeof priority === 'string') {
+		if (typeof priority === "string") {
 			const p = priority.toLowerCase();
-			if (['low', 'medium', 'high'].includes(p)) {
+			if (["low", "medium", "high"].includes(p)) {
 				return p as "low" | "medium" | "high";
 			}
 		}
 		return null;
 	}
 
-	private validateStatus(status: any): "pending" | "in-progress" | "done" | "cancelled" | "archived" | null {
-		if (typeof status === 'string') {
+	private validateStatus(
+		status: any,
+	): "pending" | "in-progress" | "done" | "cancelled" | "archived" | null {
+		if (typeof status === "string") {
 			const s = status.toLowerCase();
-			if (['pending', 'in-progress', 'done', 'cancelled', 'archived'].includes(s)) {
-				return s as "pending" | "in-progress" | "done" | "cancelled" | "archived";
+			if (
+				["pending", "in-progress", "done", "cancelled", "archived"].includes(s)
+			) {
+				return s as
+					| "pending"
+					| "in-progress"
+					| "done"
+					| "cancelled"
+					| "archived";
 			}
 		}
 		return null;
@@ -186,19 +214,28 @@ notes: |
 
 	private parseTags(tags: string | string[]): string[] {
 		if (Array.isArray(tags)) {
-			return tags.flatMap(tag => 
-				typeof tag === 'string' 
-					? tag.split(',').map(t => t.trim()).filter(Boolean)
-					: []
+			return tags.flatMap((tag) =>
+				typeof tag === "string"
+					? tag
+							.split(",")
+							.map((t) => t.trim())
+							.filter(Boolean)
+					: [],
 			);
 		}
-		if (typeof tags === 'string') {
-			return tags.split(',').map(t => t.trim()).filter(Boolean);
+		if (typeof tags === "string") {
+			return tags
+				.split(",")
+				.map((t) => t.trim())
+				.filter(Boolean);
 		}
 		return [];
 	}
 
-	async openEditorForTask(parentTask?: Task): Promise<EditorResult> {
+	async openEditorForTask(
+		parentTask?: Task,
+		parentId: string | null = null,
+	): Promise<EditorResult> {
 		if (!this.screen) {
 			return {
 				success: false,
@@ -207,18 +244,18 @@ notes: |
 		}
 
 		const tempFile = join(tmpdir(), `astrolabe-task-${Date.now()}.md`);
-		
+
 		try {
 			// Write template to temp file
 			const template = this.generateTaskTemplate(parentTask);
-			await fs.writeFile(tempFile, template, 'utf8');
+			await fs.writeFile(tempFile, template, "utf8");
 
 			// Get editor command
 			const editor = this.getEditor();
-			
+
 			// Parse editor command in case it has arguments
 			const [command, ...args] = editor.split(/\s+/);
-			
+
 			if (!command) {
 				return {
 					success: false,
@@ -230,46 +267,56 @@ notes: |
 			this.screen.destroy();
 
 			// Step 2: Reset terminal to normal state
-			process.stdout.write('\x1b[?1049l'); // Exit alternate screen
-			process.stdout.write('\x1b[2J\x1b[H'); // Clear and home
-			process.stdout.write('\x1b[?25h'); // Show cursor
-			
+			process.stdout.write("\x1b[?1049l"); // Exit alternate screen
+			process.stdout.write("\x1b[2J\x1b[H"); // Clear and home
+			process.stdout.write("\x1b[?25h"); // Show cursor
+
 			// Step 3: Run editor synchronously - this blocks until editor exits
 			try {
 				execFileSync(command, [...args, tempFile], {
-					stdio: 'inherit',
+					stdio: "inherit",
 					env: {
 						...process.env,
-						TERM: process.env['TERM'] || 'xterm-256color',
-					}
+						TERM: process.env["TERM"] || "xterm-256color",
+					},
 				});
 			} catch (error: any) {
 				// Editor exited with non-zero code or failed to launch
-				const errorMessage = error.code === 'ENOENT' 
-					? `Editor '${command}' not found`
-					: error.message || 'Editor failed';
-					
+				const errorMessage =
+					error.code === "ENOENT"
+						? `Editor '${command}' not found`
+						: error.message || "Editor failed";
+
 				// Re-create the screen before returning
 				this.recreateScreen();
-				
+
 				return {
 					success: false,
 					error: errorMessage,
 				};
 			}
 
-			// Step 4: Re-create blessed screen
-			this.recreateScreen();
-
-			// Step 5: Read and parse the result
-			const content = await fs.readFile(tempFile, 'utf8');
+			// Step 4: Read and parse the result
+			const content = await fs.readFile(tempFile, "utf8");
 			const task = this.parseTaskFromTemplate(content);
+
+			// Step 5: Store the pending task data
+			pendingTaskData = {
+				task,
+				parentId: parentId || null,
+			};
+
+			// Step 6: Re-create blessed screen
+			this.recreateScreen();
 
 			return {
 				success: true,
 				task,
 			};
 		} catch (error) {
+			// Make sure to recreate screen on any error
+			this.recreateScreen();
+
 			return {
 				success: false,
 				error: error instanceof Error ? error.message : String(error),
@@ -286,10 +333,10 @@ notes: |
 
 	private recreateScreen() {
 		// Re-enter alternate screen
-		process.stdout.write('\x1b[?1049h');
-		
+		process.stdout.write("\x1b[?1049h");
+
 		// The dashboard needs to recreate its screen
 		// This is handled by emitting a custom event
-		process.emit('blessed-screen-restart' as any);
+		process.emit("blessed-screen-restart" as any);
 	}
-} 
+}

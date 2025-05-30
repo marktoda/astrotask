@@ -1,14 +1,14 @@
-import type { Task, createDatabase } from "@astrolabe/core";
+import type { Task, TaskTree } from "@astrolabe/core";
 import {
 	DependencyService,
 	TaskService,
-	TaskTree,
 	TrackingDependencyGraph,
 	TrackingTaskTree,
+	createDatabase,
 } from "@astrolabe/core";
+import type blessed from "blessed";
 import { create } from "zustand";
-import { EditorService } from "../services/editor.js";
-import * as blessed from "blessed";
+import { EditorService, type PendingTaskData } from "../services/editor.js";
 
 export interface DashboardState {
 	// Core data structures - TrackingTaskTree and TrackingDependencyGraph as source of truth
@@ -113,17 +113,23 @@ export interface DashboardActions {
 
 	// Helper methods
 	updateUnsavedChangesFlag: () => void;
+
+	// New method for processing pending task data from the editor
+	processPendingTask: (taskData: PendingTaskData) => Promise<void>;
 }
 
 export type DashboardStore = DashboardState & DashboardActions;
 
 type DatabaseStore = Awaited<ReturnType<typeof createDatabase>>;
 
-export function createDashboardStore(db: DatabaseStore, screen?: blessed.Widgets.Screen) {
+export function createDashboardStore(
+	db: DatabaseStore,
+	screen?: blessed.Widgets.Screen,
+) {
 	const taskService = new TaskService(db);
 	const dependencyService = new DependencyService(db);
 	const editorService = new EditorService();
-	
+
 	// Set screen if provided
 	if (screen) {
 		editorService.setScreen(screen);
@@ -316,77 +322,38 @@ export function createDashboardStore(db: DatabaseStore, screen?: blessed.Widgets
 
 			try {
 				// Set editor active flag to prevent rendering
-				set({ editorActive: true, statusMessage: "Opening editor for task creation..." });
+				set({
+					editorActive: true,
+					statusMessage: "Opening editor for task creation...",
+				});
 
 				// Get parent task if parentId is provided
 				let parentTask: Task | undefined;
 				if (parentId) {
 					const parentNode = trackingTree.find((task) => task.id === parentId);
 					if (!parentNode) {
-						set({ statusMessage: `Parent task ${parentId} not found`, editorActive: false });
+						set({
+							statusMessage: `Parent task ${parentId} not found`,
+							editorActive: false,
+						});
 						return;
 					}
 					parentTask = parentNode.task;
 				}
 
-				// Open editor with template
-				const result = await editorService.openEditorForTask(parentTask);
+				// Open editor with template and pass parentId
+				await editorService.openEditorForTask(parentTask, parentId);
 
-				// Clear editor active flag
-				set({ editorActive: false });
-
-				if (!result.success) {
-					set({ statusMessage: `Editor error: ${result.error}` });
-					return;
-				}
-
-				if (!result.task) {
-					set({ statusMessage: "No task data received from editor" });
-					return;
-				}
-
-				const taskTemplate = result.task;
-
-				// Create new task with all the details from the template
-				const newTask: Task = {
-					id: `temp-${Date.now()}`, // Temporary ID - will be replaced on flush
-					parentId,
-					title: taskTemplate.title,
-					description: taskTemplate.description || null,
-					status: taskTemplate.status,
-					priority: taskTemplate.priority,
-					prd: taskTemplate.details || null, // Store detailed notes in PRD field
-					contextDigest: taskTemplate.notes || null, // Store additional notes in contextDigest
-					createdAt: new Date(),
-					updatedAt: new Date(),
-				};
-
-				if (parentId) {
-					// Find parent and add child - mutable operation
-					const parentNode = trackingTree.find((task) => task.id === parentId);
-					if (parentNode) {
-						const childTree = TrackingTaskTree.fromTask(newTask);
-						parentNode.addChild(childTree); // Mutation recorded automatically
-					} else {
-						set({ statusMessage: `Parent task ${parentId} not found` });
-						return;
-					}
-				} else {
-					// Add as root child - mutable operation
-					const childTree = TrackingTaskTree.fromTask(newTask);
-					trackingTree.addChild(childTree); // Mutation recorded automatically
-				}
-
-				// Trigger UI update
-				get().triggerTreeUpdate();
-				get().updateUnsavedChangesFlag();
-				get().recalculateAllProgress();
-
-				set({ statusMessage: `Created task: ${taskTemplate.title}` });
+				// Note: At this point, the screen has been recreated and this context is lost
+				// The task data is stored in the EditorService and will be processed
+				// when the dashboard reinitializes
 			} catch (error) {
 				const errorMessage =
 					error instanceof Error ? error.message : String(error);
-				set({ statusMessage: `Error creating task: ${errorMessage}`, editorActive: false });
+				set({
+					statusMessage: `Error creating task: ${errorMessage}`,
+					editorActive: false,
+				});
 			}
 		},
 
@@ -475,6 +442,7 @@ export function createDashboardStore(db: DatabaseStore, screen?: blessed.Widgets
 				}
 
 				const parent = taskNode.getParent();
+
 				if (parent) {
 					parent.removeChild(taskId); // Mutation recorded automatically
 				} else if (trackingTree.id === taskId) {
@@ -489,6 +457,7 @@ export function createDashboardStore(db: DatabaseStore, screen?: blessed.Widgets
 
 				set({ statusMessage: "Task deleted" });
 			} catch (error) {
+				console.error("Error in deleteTask:", error);
 				const errorMessage =
 					error instanceof Error ? error.message : String(error);
 				set({ statusMessage: `Error deleting task: ${errorMessage}` });
@@ -520,38 +489,75 @@ export function createDashboardStore(db: DatabaseStore, screen?: blessed.Widgets
 					isFlushingChanges: true,
 				});
 
-				// Use Promise.all for parallel execution when possible
-				const flushPromises: Promise<any>[] = [];
+				// Apply tree changes first to get ID mappings
+				let treeResult: any = null;
+				let dependencyResult: any = null;
 
-				// Apply tree changes
 				if (trackingTree && trackingTree.hasPendingChanges) {
-					flushPromises.push(trackingTree.flush(taskService));
+					treeResult = await trackingTree.flush(taskService);
 				}
 
-				// Apply dependency changes
+				// Apply dependency changes, using ID mappings if available
 				if (
 					trackingDependencyGraph &&
 					trackingDependencyGraph.hasPendingChanges
 				) {
-					flushPromises.push(trackingDependencyGraph.flush(dependencyService));
+					let graphToFlush = trackingDependencyGraph;
+
+					// If we have ID mappings from the tree flush, apply them to the dependency graph
+					if (
+						treeResult &&
+						treeResult.idMappings &&
+						treeResult.idMappings.size > 0
+					) {
+						graphToFlush = trackingDependencyGraph.applyIdMappings(
+							treeResult.idMappings,
+						);
+					}
+
+					dependencyResult = await graphToFlush.flush(dependencyService);
 				}
 
-				const results = await Promise.all(flushPromises);
-
-				// Update state with results
+				// Update state with results and handle ID mappings
+				const currentState = get();
 				let updateData: any = {
 					statusMessage: "Changes saved successfully",
 					hasUnsavedChanges: false,
 					lastFlushTime: Date.now(),
-					treeVersion: get().treeVersion + 1,
+					treeVersion: currentState.treeVersion + 1,
 					isFlushingChanges: false,
 				};
 
-				if (results[0]) {
-					updateData.trackingTree = results[0].clearedTrackingTree;
+				// Update tracking tree
+				if (treeResult) {
+					updateData.trackingTree = treeResult.clearedTrackingTree;
+
+					// Update any UI references that might be using temporary IDs
+					if (treeResult.idMappings && treeResult.idMappings.size > 0) {
+						// Update selectedTaskId if it was a temporary ID
+						if (
+							currentState.selectedTaskId &&
+							treeResult.idMappings.has(currentState.selectedTaskId)
+						) {
+							updateData.selectedTaskId = treeResult.idMappings.get(
+								currentState.selectedTaskId,
+							);
+						}
+
+						// Update expandedTaskIds if they contain temporary IDs
+						const newExpandedTaskIds = new Set<string>();
+						for (const taskId of currentState.expandedTaskIds) {
+							const newId = treeResult.idMappings.get(taskId) || taskId;
+							newExpandedTaskIds.add(newId);
+						}
+						updateData.expandedTaskIds = newExpandedTaskIds;
+					}
 				}
-				if (results[1]) {
-					updateData.trackingDependencyGraph = results[1].clearedTrackingGraph;
+
+				// Update tracking dependency graph
+				if (dependencyResult) {
+					updateData.trackingDependencyGraph =
+						dependencyResult.clearedTrackingGraph;
 				}
 
 				set(updateData);
@@ -848,6 +854,79 @@ export function createDashboardStore(db: DatabaseStore, screen?: blessed.Widgets
 					trackingDependencyGraph?.hasPendingChanges,
 			);
 			set({ hasUnsavedChanges });
+		},
+
+		// New method for processing pending task data from the editor
+		processPendingTask: async (taskData: PendingTaskData) => {
+			const { trackingTree } = get();
+
+			if (!trackingTree) {
+				set({ statusMessage: "No task tree loaded" });
+				return;
+			}
+
+			try {
+				const { task: taskTemplate, parentId } = taskData;
+
+				// Create new task with all the details from the template
+				const newTask: Task = {
+					id: `temp-${Date.now()}`, // Temporary ID - will be replaced on flush
+					parentId,
+					title: taskTemplate.title,
+					description: taskTemplate.description || null,
+					status: taskTemplate.status,
+					priority: taskTemplate.priority,
+					prd: taskTemplate.details || null, // Store detailed notes in PRD field
+					contextDigest: taskTemplate.notes || null, // Store additional notes in contextDigest
+					createdAt: new Date(),
+					updatedAt: new Date(),
+				};
+
+				if (parentId) {
+					// Find parent and add child - mutable operation
+					const parentNode = trackingTree.find((task) => task.id === parentId);
+					if (parentNode) {
+						const childTree = TrackingTaskTree.fromTask(newTask);
+						parentNode.addChild(childTree); // Mutation recorded automatically
+					} else {
+						set({ statusMessage: `Parent task ${parentId} not found` });
+						return;
+					}
+				} else {
+					// Add as root child - mutable operation
+					const childTree = TrackingTaskTree.fromTask(newTask);
+					trackingTree.addChild(childTree); // Mutation recorded automatically
+				}
+
+				// Trigger UI update
+				get().triggerTreeUpdate();
+				get().updateUnsavedChangesFlag();
+				get().recalculateAllProgress();
+
+				set({
+					statusMessage: `Created task: ${taskTemplate.title}`,
+					editorActive: false,
+				});
+
+				// Immediately flush to get real ID and avoid temporary ID issues
+				try {
+					await get().flushChanges();
+					set({
+						statusMessage: `Task "${taskTemplate.title}" saved successfully`,
+					});
+				} catch (flushError) {
+					console.error("Failed to flush task after creation:", flushError);
+					// Don't overwrite the success message with an error - the task was created,
+					// it just wasn't immediately persisted
+				}
+			} catch (error) {
+				const errorMessage =
+					error instanceof Error ? error.message : String(error);
+				set({
+					statusMessage: `Error creating task: ${errorMessage}`,
+					editorActive: false,
+				});
+			}
 		},
 	}));
 

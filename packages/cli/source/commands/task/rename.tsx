@@ -22,7 +22,9 @@ export default function Rename({ options }: Props) {
 	useEffect(() => {
 		async function renameTask() {
 			try {
-				const updated = await db.updateTask(options.id, { title: options.title });
+				const updated = await db.updateTask(options.id, {
+					title: options.title,
+				});
 				if (!updated) throw new Error("Task not found");
 				setResult(`Task ${options.id} renamed to "${options.title}" ✨`);
 			} catch (err) {
@@ -36,4 +38,4 @@ export default function Rename({ options }: Props) {
 	if (result) return <Text color="green">{result}</Text>;
 
 	return <Text>Renaming task...</Text>;
-} 
+}

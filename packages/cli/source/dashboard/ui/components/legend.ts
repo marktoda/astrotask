@@ -80,10 +80,10 @@ export class Legend {
 
 		// Build content
 		const activePanelBindings = panelBindings[activePanel] || [];
-		
+
 		// First row: icon legend
 		const row1 = `Icons: ${iconLegend.join(" │ ")}`;
-		
+
 		// Second row: key bindings
 		const keyBindings = [...activePanelBindings, ...commonBindings];
 		const row2 = keyBindings.join(" │ ");
@@ -91,9 +91,10 @@ export class Legend {
 		// Add view mode indicator for tree panel
 		let viewModeIndicator = "";
 		if (activePanel === "tree") {
-			viewModeIndicator = treeViewMode === "dependencies" 
-				? " {yellow-fg}[Dependency View]{/}" 
-				: " {green-fg}[Hierarchy View]{/}";
+			viewModeIndicator =
+				treeViewMode === "dependencies"
+					? " {yellow-fg}[Dependency View]{/}"
+					: " {green-fg}[Hierarchy View]{/}";
 		}
 
 		content = `${row1}${viewModeIndicator}\n${row2}`;

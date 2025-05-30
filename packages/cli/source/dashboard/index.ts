@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { createDatabase } from "@astrolabe/core";
 import blessed from "blessed";
+import { EditorService } from "./services/editor.js";
 import { KeymapService } from "./services/keymap.js";
 import { SyncService } from "./services/sync.js";
 import { createDashboardStore } from "./store/index.js";
@@ -97,6 +98,15 @@ async function main() {
 			// Initialize layout
 			await layout.initialize();
 
+			// Check for pending task data from editor
+			const pendingTaskData = EditorService.getPendingTaskData();
+			if (pendingTaskData) {
+				// Process the pending task after a short delay to ensure UI is ready
+				setTimeout(async () => {
+					await store.processPendingTask(pendingTaskData);
+				}, 200);
+			}
+
 			// Cleanup function
 			async function cleanup(exitProcess = true) {
 				try {
@@ -115,7 +125,7 @@ async function main() {
 				} catch (error) {
 					// Ignore cleanup errors
 				}
-				
+
 				if (exitProcess) {
 					process.exit(0);
 				}
@@ -162,10 +172,10 @@ async function main() {
 		let currentDashboard = await createDashboard();
 
 		// Handle screen restart after editor closes
-		process.on('blessed-screen-restart' as any, async () => {
+		process.on("blessed-screen-restart" as any, async () => {
 			// Clean up current screen without exiting
 			await currentDashboard.cleanup(false);
-			
+
 			// Small delay to ensure terminal is ready
 			setTimeout(async () => {
 				// Recreate the dashboard
