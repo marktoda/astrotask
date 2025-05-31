@@ -64,6 +64,9 @@ export {
   type TreeMetrics,
 } from './utils/TaskTree.js';
 
+// TaskTree constants
+export { TASK_IDENTIFIERS } from './utils/TaskTreeConstants.js';
+
 // TrackingTaskTree utilities
 export {
   TrackingTaskTree,

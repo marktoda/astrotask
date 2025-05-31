@@ -373,7 +373,7 @@ describe('Task ID Generation', () => {
 
       // Should get a root-level task ID (4 uppercase letters)
       expect(task.id).toMatch(/^[A-Z]{4}$/);
-      expect(task.parentId).toBe(null); // Simplified - no PROJECT_ROOT
+      expect(task.parentId).toBe(TASK_IDENTIFIERS.PROJECT_ROOT); // Restored PROJECT_ROOT system
     });
 
     it('should generate subtask IDs for tasks with non-null parent', async () => {
@@ -422,9 +422,9 @@ describe('Task ID Generation', () => {
       expect(task1.id).toMatch(/^[A-Z]{4}$/);
       expect(task2.id).toMatch(/^[A-Z]{4}$/);
       
-      // Both should have null as parent in database
-      expect(task1.parentId).toBe(null);
-      expect(task2.parentId).toBe(null);
+      // Both should have PROJECT_ROOT as parent in database (restored PROJECT_ROOT system)
+      expect(task1.parentId).toBe(TASK_IDENTIFIERS.PROJECT_ROOT);
+      expect(task2.parentId).toBe(TASK_IDENTIFIERS.PROJECT_ROOT);
     });
   });
 

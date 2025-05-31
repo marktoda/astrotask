@@ -8,7 +8,7 @@
     "doc": "docs"
   },
   "scripts": {
-    "build": "tsc && cp -r drizzle dist/",
+    "build": "tsc && cp -r migrations/drizzle dist/migrations/",
     "start": "tsx src/index.ts",
     "dev": "tsx watch src/index.ts",
     "type-check": "tsc --noEmit",
@@ -21,7 +21,7 @@
     "test:watch": "vitest",
     "db:generate": "drizzle-kit generate",
     "db:electrify": "node scripts/patch-electrify.js",
-    "db:migrate:remote": "drizzle-kit push",
+    "db:migrate:remote": "PGHOST=$PGHOST PGPORT=$PGPORT drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "db:setup": "pnpm db:generate && pnpm db:electrify",
     "db:deploy": "pnpm db:setup && pnpm db:migrate:remote"

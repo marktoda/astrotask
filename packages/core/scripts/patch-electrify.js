@@ -3,11 +3,11 @@
 /**
  * Auto-electrify Drizzle migrations
  * 
- * This script patches generated SQL migrations to include `ALTER TABLE ... ENABLE ELECTRIC`
- * statements for all created tables. This ensures tables are ready for ElectricSQL replication
- * when deployed to production.
+ * This script creates electrified versions of migrations in a separate folder
+ * for deployment to production via Electric's migration proxy.
  * 
- * Local PGlite ignores these statements, but Electric's migration proxy processes them.
+ * - Input: drizzle/ (local migrations without ENABLE ELECTRIC)
+ * - Output: drizzle-electric/ (remote migrations with ENABLE ELECTRIC)
  */
 
 import fs from 'fs/promises';
@@ -15,21 +15,38 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const MIGRATIONS_DIR = path.join(__dirname, '..', 'drizzle');
+const SOURCE_DIR = path.join(__dirname, '..', 'migrations', 'drizzle');
+const TARGET_DIR = path.join(__dirname, '..', 'migrations', 'drizzle-electric');
 
 console.log('🔌 Electrifying migrations...');
 
 try {
-  // Check if migrations directory exists
+  // Check if source migrations directory exists
   try {
-    await fs.access(MIGRATIONS_DIR);
+    await fs.access(SOURCE_DIR);
   } catch {
-    console.log(`📁 Migrations directory not found: ${MIGRATIONS_DIR}`);
+    console.log(`📁 Source migrations directory not found: ${SOURCE_DIR}`);
     console.log('   Run `pnpm db:generate` first to create migrations');
     process.exit(0);
   }
 
-  const files = await fs.readdir(MIGRATIONS_DIR);
+  // Create target directory if it doesn't exist
+  await fs.mkdir(TARGET_DIR, { recursive: true });
+
+  // Copy meta directory
+  const metaSourceDir = path.join(SOURCE_DIR, 'meta');
+  const metaTargetDir = path.join(TARGET_DIR, 'meta');
+  
+  try {
+    await fs.access(metaSourceDir);
+    await fs.cp(metaSourceDir, metaTargetDir, { recursive: true });
+    console.log('📋 Copied migration metadata');
+  } catch {
+    console.log('📝 No metadata directory found (this is OK for simple migrations)');
+  }
+
+  // Process SQL files
+  const files = await fs.readdir(SOURCE_DIR);
   const sqlFiles = files.filter(file => file.endsWith('.sql'));
 
   if (sqlFiles.length === 0) {
@@ -41,11 +58,10 @@ try {
   let processedFiles = 0;
 
   for (const file of sqlFiles) {
-    const filePath = path.join(MIGRATIONS_DIR, file);
-    let sql = await fs.readFile(filePath, 'utf8');
+    const sourcePath = path.join(SOURCE_DIR, file);
+    const targetPath = path.join(TARGET_DIR, file);
     
-    // Track original content to see if we need to update
-    const originalSql = sql;
+    let sql = await fs.readFile(sourcePath, 'utf8');
     
     // Find all CREATE TABLE statements and extract table names
     const createTableMatches = sql.matchAll(/CREATE TABLE\s+(?:"?(\w+)"?)/gi);
@@ -65,19 +81,25 @@ try {
         }
       }
       
-      // Only write if we made changes
-      if (sql !== originalSql) {
-        await fs.writeFile(filePath, sql, 'utf8');
-        processedFiles++;
-      }
+      processedFiles++;
     }
+    
+    // Write to target directory
+    await fs.writeFile(targetPath, sql, 'utf8');
   }
 
   if (totalTables > 0) {
-    console.log(`✅ Electrified ${totalTables} table(s) across ${processedFiles} migration file(s)`);
+    console.log(`✅ Created ${processedFiles} electrified migration file(s) with ${totalTables} ENABLE ELECTRIC statement(s)`);
+    console.log(`📁 Electrified migrations saved to: ${TARGET_DIR}`);
+  } else if (processedFiles > 0) {
+    console.log(`✨ Copied ${processedFiles} migration file(s) (already electrified)`);
   } else {
-    console.log('✨ All migrations already electrified');
+    console.log('📋 All migrations copied without changes');
   }
+
+  console.log('\n🚀 Next steps:');
+  console.log('   - Local development: Migrations in drizzle/ will be used automatically');
+  console.log('   - Production deploy: Run `pnpm db:deploy` to push drizzle-electric/ through Electric proxy');
 
 } catch (error) {
   console.error('❌ Error electrifying migrations:', error.message);

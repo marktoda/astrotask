@@ -12,8 +12,10 @@ import { PGlite } from '@electric-sql/pglite';
 import { electricSync } from '@electric-sql/pglite-sync';
 import { drizzle } from 'drizzle-orm/pglite';
 import { migrate } from 'drizzle-orm/pglite/migrator';
+import { eq } from 'drizzle-orm';
 import { cfg } from '../utils/config.js';
 import { createModuleLogger } from '../utils/logger.js';
+import { TASK_IDENTIFIERS } from '../utils/TaskTreeConstants.js';
 import * as schema from './schema.js';
 import { DatabaseStore, type Store } from './store.js';
 
@@ -21,7 +23,7 @@ const logger = createModuleLogger('database');
 
 // Get the directory of this file
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const MIGRATIONS_DIR = join(__dirname, '..', '..', 'drizzle');
+const MIGRATIONS_DIR = join(__dirname, '..', '..', 'migrations', 'drizzle');
 
 export interface DatabaseOptions {
   /** Database file path or connection string */
@@ -52,6 +54,37 @@ function ensureDataDir(dataDir: string): void {
     mkdirSync(dirname(dataDir), { recursive: true });
   } catch (_error) {
     // Ignore errors if directory already exists
+  }
+}
+
+/**
+ * Ensure PROJECT_ROOT task exists in the database
+ */
+async function ensureProjectRoot(db: ReturnType<typeof drizzle>): Promise<void> {
+  // Check if PROJECT_ROOT already exists
+  const existingProjectRoot = await db
+    .select()
+    .from(schema.tasks)
+    .where(eq(schema.tasks.id, TASK_IDENTIFIERS.PROJECT_ROOT))
+    .limit(1);
+
+  if (existingProjectRoot.length === 0) {
+    // Create PROJECT_ROOT task
+    const now = new Date();
+    await db.insert(schema.tasks).values({
+      id: TASK_IDENTIFIERS.PROJECT_ROOT,
+      parentId: null,
+      title: 'Project Tasks',
+      description: 'Project root containing all task hierarchies',
+      status: 'pending',
+      priority: 'medium',
+      prd: null,
+      contextDigest: null,
+      createdAt: now,
+      updatedAt: now,
+    });
+    
+    logger.debug('Created PROJECT_ROOT task');
   }
 }
 
@@ -88,6 +121,9 @@ export async function createDatabase(options: DatabaseOptions = {}): Promise<Sto
 
     // Run migrations
     await migrate(db, { migrationsFolder: MIGRATIONS_DIR });
+
+    // Ensure PROJECT_ROOT task exists
+    await ensureProjectRoot(db);
 
     // Start Electric SQL sync if enabled
     let isSyncing = false;

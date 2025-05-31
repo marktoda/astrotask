@@ -1,6 +1,6 @@
 {
-  "id": "15c933e2-579d-4abf-bfea-d863bc21e84b",
-  "prevId": "00000000-0000-0000-0000-000000000000",
+  "id": "759c7b0f-fc68-49ef-94ea-51ce0fe09646",
+  "prevId": "92f8298c-5b6d-4b29-a9f3-b342924f6bf7",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -59,12 +59,8 @@
           "name": "context_slices_task_id_tasks_id_fk",
           "tableFrom": "context_slices",
           "tableTo": "tasks",
-          "columnsFrom": [
-            "task_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["task_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -73,85 +69,6 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.task_dependencies": {
-      "name": "task_dependencies",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "dependent_task_id": {
-          "name": "dependent_task_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "dependency_task_id": {
-          "name": "dependency_task_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "task_dependencies_dependent_task_id_tasks_id_fk": {
-          "name": "task_dependencies_dependent_task_id_tasks_id_fk",
-          "tableFrom": "task_dependencies",
-          "tableTo": "tasks",
-          "columnsFrom": [
-            "dependent_task_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "task_dependencies_dependency_task_id_tasks_id_fk": {
-          "name": "task_dependencies_dependency_task_id_tasks_id_fk",
-          "tableFrom": "task_dependencies",
-          "tableTo": "tasks",
-          "columnsFrom": [
-            "dependency_task_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "unique_dependency": {
-          "name": "unique_dependency",
-          "nullsNotDistinct": false,
-          "columns": [
-            "dependent_task_id",
-            "dependency_task_id"
-          ]
-        }
-      },
-      "policies": {},
-      "checkConstraints": {
-        "no_self_dependency": {
-          "name": "no_self_dependency",
-          "value": "\"task_dependencies\".\"dependent_task_id\" != \"task_dependencies\".\"dependency_task_id\""
-        }
-      },
       "isRLSEnabled": false
     },
     "public.tasks": {
@@ -229,12 +146,8 @@
           "name": "tasks_parent_id_tasks_id_fk",
           "tableFrom": "tasks",
           "tableTo": "tasks",
-          "columnsFrom": [
-            "parent_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["parent_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }

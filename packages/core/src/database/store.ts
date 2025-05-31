@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { PGlite } from '@electric-sql/pglite';
-import { and, desc, eq, isNull } from 'drizzle-orm';
+import { and, desc, eq, isNull, ne } from 'drizzle-orm';
 import type { PgliteDatabase } from 'drizzle-orm/pglite';
 import type {
   ContextSlice,
@@ -8,6 +8,7 @@ import type {
 } from '../schemas/contextSlice.js';
 import type { CreateTask as NewTask, Task, TaskStatus } from '../schemas/task.js';
 import { generateNextTaskId } from '../utils/taskId.js';
+import { TASK_IDENTIFIERS } from '../utils/TaskTreeConstants.js';
 import * as schema from './schema.js';
 
 /**
@@ -32,6 +33,7 @@ export interface Store {
   listTasks(filters?: {
     status?: TaskStatus;
     parentId?: string | null;
+    includeProjectRoot?: boolean;
   }): Promise<Task[]>;
   addTask(data: NewTask): Promise<Task>;
   addTaskWithId(data: NewTask & { id: string }): Promise<Task>;
@@ -79,6 +81,7 @@ export class DatabaseStore implements Store {
     filters: {
       status?: TaskStatus;
       parentId?: string | null;
+      includeProjectRoot?: boolean;
     } = {}
   ): Promise<Task[]> {
     const conditions = [];
@@ -93,6 +96,11 @@ export class DatabaseStore implements Store {
       } else {
         conditions.push(eq(schema.tasks.parentId, filters.parentId));
       }
+    }
+
+    // Exclude PROJECT_ROOT from normal listings unless explicitly requested
+    if (!filters.includeProjectRoot) {
+      conditions.push(ne(schema.tasks.id, TASK_IDENTIFIERS.PROJECT_ROOT));
     }
 
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
@@ -119,7 +127,7 @@ export class DatabaseStore implements Store {
       priority: data.priority,
       prd: data.prd ?? null,
       contextDigest: data.contextDigest ?? null,
-      parentId: data.parentId ?? null,
+      parentId: data.parentId ?? TASK_IDENTIFIERS.PROJECT_ROOT,
       createdAt: now,
       updatedAt: now,
     };
@@ -167,7 +175,7 @@ export class DatabaseStore implements Store {
   }
 
   async listRootTasks(): Promise<Task[]> {
-    return this.listTasks({ parentId: null });
+    return this.listTasks({ parentId: TASK_IDENTIFIERS.PROJECT_ROOT });
   }
 
   async listSubtasks(parentId: string): Promise<Task[]> {

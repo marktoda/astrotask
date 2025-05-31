@@ -142,8 +142,6 @@ describe('TaskService', () => {
     expect(new Set(statuses)).toEqual(new Set(['done']));
   });
 
-  // Commented out - PROJECT_ROOT functionality was removed in simplification
-  /*
   describe('Project Tree functionality', () => {
     it('returns project tree with all parentless tasks when no ID provided', async () => {
       const projectTree = await service.getTaskTree();
@@ -234,7 +232,6 @@ describe('TaskService', () => {
       expect(projectTree!.getChildren()).toHaveLength(0); // No child tasks
     });
   });
-  */
 
   describe('Store operations', () => {
     it('should list all tasks', async () => {
@@ -263,7 +260,7 @@ describe('TaskService', () => {
 
       expect(newTask.id).toBeDefined();
       expect(newTask.title).toBe('New Task');
-      expect(newTask.parentId).toBe(null); // Root tasks have null parentId
+      expect(newTask.parentId).toBe(TASK_IDENTIFIERS.PROJECT_ROOT); // Root tasks have PROJECT_ROOT parentId
       expect(newTask.status).toBe('pending');
     });
 

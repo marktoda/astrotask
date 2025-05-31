@@ -1,15 +1,26 @@
 import { defineConfig } from 'drizzle-kit';
 import 'dotenv/config';
 
+// Determine if we're targeting remote/production
+const isRemote = process.env.PGHOST && process.env.PGPORT;
+
 // Database configuration based on environment
 const getDbConfig = () => {
   // For remote migrations through Electric proxy
-  if (process.env.PGHOST && process.env.PGPORT) {
+  if (isRemote) {
+    const host = process.env.PGHOST;
+    const port = process.env.PGPORT;
+    const password = process.env.PGPASSWORD;
+    
+    if (!host || !port || !password) {
+      throw new Error('Missing required environment variables for remote deployment: PGHOST, PGPORT, PGPASSWORD');
+    }
+    
     return {
-      host: process.env.PGHOST,
-      port: parseInt(process.env.PGPORT),
+      host,
+      port: parseInt(port),
       user: process.env.PGUSER || 'postgres',
-      password: process.env.PGPASSWORD,
+      password,
       database: process.env.PGDATABASE || 'electric',
       ssl: process.env.PGSSL === 'true' ? { rejectUnauthorized: false } : false,
     };
@@ -27,8 +38,8 @@ export default defineConfig({
   // Schema files
   schema: './src/database/schema.ts',
 
-  // Migration output directory (standard location)
-  out: './drizzle',
+  // Migration output directory based on target
+  out: isRemote ? './migrations/drizzle-electric' : './migrations/drizzle',
 
   // Database configuration
   dbCredentials: getDbConfig(),
