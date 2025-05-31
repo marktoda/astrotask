@@ -30,15 +30,6 @@ export const options = zod.object({
 		.optional()
 		.default(false)
 		.describe("Enable research mode for more accurate analysis"),
-	output: zod
-		.string()
-		.optional()
-		.describe("Output file path for the complexity report (optional)"),
-	save: zod
-		.boolean()
-		.optional()
-		.default(true)
-		.describe("Save the report to a file"),
 	createContext: zod
 		.boolean()
 		.optional()
@@ -52,7 +43,6 @@ type Props = {
 
 interface ComplexityAnalysisResult {
 	report: any;
-	savedTo?: string;
 	message: string;
 	contextSlicesCreated?: number;
 	contextMessage?: string;
@@ -141,36 +131,8 @@ export default function Complexity({ options }: Props) {
 					}
 				}
 
-				let savedTo: string | undefined;
-
-				if (options.save) {
-					// Save report to file
-					const outputPath =
-						options.output ||
-						(options.nodeId
-							? `complexity-report-${options.nodeId}.json`
-							: "complexity-report.json");
-
-					const fs = await import("fs");
-					const path = await import("path");
-
-					// Ensure directory exists
-					await fs.promises.mkdir(path.dirname(outputPath), {
-						recursive: true,
-					});
-
-					// Write report
-					await fs.promises.writeFile(
-						outputPath,
-						JSON.stringify(report, null, 2),
-						"utf-8",
-					);
-					savedTo = outputPath;
-				}
-
 				setResult({
 					report,
-					savedTo,
 					message: analysisMessage,
 					contextSlicesCreated,
 					contextMessage,
@@ -222,8 +184,7 @@ export default function Complexity({ options }: Props) {
 		return <Text color="red">No analysis result available</Text>;
 	}
 
-	const { report, savedTo, message, contextSlicesCreated, contextMessage } =
-		result;
+	const { report, message, contextSlicesCreated, contextMessage } = result;
 	const avgComplexity =
 		report.complexityAnalysis.reduce(
 			(sum: number, t: any) => sum + t.complexityScore,
@@ -241,7 +202,6 @@ export default function Complexity({ options }: Props) {
 					📊 Task Complexity Analysis Results
 				</Text>
 				<Text color="green">✅ {message}</Text>
-				{savedTo && <Text color="gray">Report saved to: {savedTo}</Text>}
 				{contextMessage && (
 					<Text
 						color={
@@ -311,21 +271,28 @@ export default function Complexity({ options }: Props) {
 			<Box flexDirection="column">
 				<Text bold>📊 Complexity Distribution</Text>
 				<Box flexDirection="column" paddingLeft={2}>
-					{(() => {
-						const distribution: Record<string, number> = {};
-						for (const task of report.complexityAnalysis) {
-							const score = task.complexityScore.toString();
-							distribution[score] = (distribution[score] || 0) + 1;
-						}
-						return Object.entries(distribution)
-							.sort(([a], [b]) => Number(a) - Number(b))
-							.map(([score, count]) => (
-								<Text key={score}>
-									Score {score}: <Text color="cyan">{count}</Text> task
-									{count !== 1 ? "s" : ""}
+					{[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((score) => {
+						const tasksAtScore = report.complexityAnalysis.filter(
+							(t: any) => t.complexityScore === score,
+						).length;
+						if (tasksAtScore === 0) return null;
+
+						const percentage = (
+							(tasksAtScore / report.meta.tasksAnalyzed) *
+							100
+						).toFixed(1);
+						const color =
+							score >= 8 ? "red" : score >= 6 ? "yellow" : "green";
+						const bar = "█".repeat(Math.ceil((tasksAtScore / 10) * 5) || 1);
+
+						return (
+							<Text key={score}>
+								<Text color={color}>
+									{score}: {bar} {tasksAtScore} ({percentage}%)
 								</Text>
-							));
-					})()}
+							</Text>
+						);
+					})}
 				</Box>
 			</Box>
 
@@ -333,34 +300,21 @@ export default function Complexity({ options }: Props) {
 			{highComplexityTasks.length > 0 && (
 				<Box flexDirection="column">
 					<Text bold color="yellow">
-						⚠️ High Complexity Tasks Requiring Attention
+						⚠️ High Complexity Tasks (Score ≥ {options.threshold})
 					</Text>
 					<Box flexDirection="column" paddingLeft={2}>
-						{highComplexityTasks
-							.sort((a: any, b: any) => b.complexityScore - a.complexityScore)
-							.slice(0, 5) // Show top 5
-							.map((task: any) => (
-								<Box key={task.taskId} flexDirection="column" marginBottom={1}>
-									<Text>
-										<Text color="cyan">{task.taskId}</Text>:{" "}
-										<Text bold>{task.taskTitle}</Text>
+						{highComplexityTasks.slice(0, 5).map((task: any) => (
+							<Text key={task.taskId}>
+								<Text color="red">{task.complexityScore}/10</Text>{" "}
+								<Text color="cyan">#{task.taskId}</Text> {task.taskTitle}
+								{task.recommendedSubtasks > 1 && (
+									<Text color="gray">
+										{" "}
+										(→ {task.recommendedSubtasks} subtasks)
 									</Text>
-									<Text color="gray" wrap="wrap">
-										Complexity:{" "}
-										<Text color={task.complexityScore >= 8 ? "red" : "yellow"}>
-											{task.complexityScore}/10
-										</Text>
-										{" | "}
-										Recommended Subtasks:{" "}
-										<Text color="cyan">{task.recommendedSubtasks}</Text>
-									</Text>
-									<Text color="gray" wrap="wrap">
-										{task.reasoning.length > 100
-											? `${task.reasoning.substring(0, 100)}...`
-											: task.reasoning}
-									</Text>
-								</Box>
-							))}
+								)}
+							</Text>
+						))}
 						{highComplexityTasks.length > 5 && (
 							<Text color="gray">
 								... and {highComplexityTasks.length - 5} more
@@ -370,41 +324,10 @@ export default function Complexity({ options }: Props) {
 				</Box>
 			)}
 
-			{/* All Tasks Summary */}
-			<Box flexDirection="column">
-				<Text bold>📋 All Tasks Analyzed</Text>
-				<Box flexDirection="column" paddingLeft={2}>
-					{report.complexityAnalysis
-						.sort((a: any, b: any) => b.complexityScore - a.complexityScore)
-						.map((task: any) => (
-							<Text key={task.taskId}>
-								<Text color="cyan">{task.taskId}</Text>: {task.taskTitle}{" "}
-								<Text
-									color={
-										task.complexityScore >= 8
-											? "red"
-											: task.complexityScore >= 5
-												? "yellow"
-												: "green"
-									}
-								>
-									[{task.complexityScore}/10]
-								</Text>{" "}
-								<Text color="gray">({task.recommendedSubtasks} subtasks)</Text>
-							</Text>
-						))}
-				</Box>
-			</Box>
-
 			{/* Quick Actions */}
 			<Box flexDirection="column">
 				<Text bold>⚡ Quick Actions</Text>
 				<Box flexDirection="column" paddingLeft={2}>
-					{savedTo && (
-						<Text>
-							<Text color="cyan">cat {savedTo}</Text> - View full JSON report
-						</Text>
-					)}
 					{highComplexityTasks.length > 0 && (
 						<Text>
 							<Text color="cyan">
@@ -423,6 +346,9 @@ export default function Complexity({ options }: Props) {
 							context slices
 						</Text>
 					)}
+					<Text>
+						<Text color="cyan">astrolabe task expand --id=&lt;taskId&gt;</Text> - Expand high-complexity tasks into subtasks
+					</Text>
 				</Box>
 			</Box>
 		</Box>

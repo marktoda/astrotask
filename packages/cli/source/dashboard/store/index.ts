@@ -1,4 +1,4 @@
-import type { Task, TaskTree } from "@astrolabe/core";
+import type { Task, TaskTree, ContextSlice } from "@astrolabe/core";
 import {
 	DependencyService,
 	TaskService,
@@ -19,6 +19,10 @@ export interface DashboardState {
 
 	// Version counter for triggering React re-renders after mutations
 	treeVersion: number;
+
+	// Context slices cache
+	contextSlicesByTaskId: Map<string, ContextSlice[]>;
+	loadingContextSlices: Set<string>; // Track which task IDs are currently loading
 
 	// UI state
 	activePanel: "sidebar" | "tree" | "details";
@@ -71,6 +75,12 @@ export interface DashboardActions {
 	// Helper to trigger re-renders after mutations
 	triggerTreeUpdate: () => void;
 
+	// Context slice actions
+	loadContextSlices: (taskId: string) => Promise<ContextSlice[]>;
+	getContextSlices: (taskId: string) => ContextSlice[];
+	getComplexityValue: (taskId: string) => number | null;
+	isLoadingContextSlices: (taskId: string) => boolean;
+
 	// Persistence control
 	flushChanges: () => Promise<void>;
 	enableAutoFlush: (intervalMs?: number) => void;
@@ -119,9 +129,7 @@ export interface DashboardActions {
 	processPendingTask: (taskData: PendingTaskData) => Promise<void>;
 
 	// New method for processing pending task edit data from the editor
-	processPendingTaskEdit: (
-		taskEditData: import("../services/editor.js").PendingTaskEditData,
-	) => Promise<void>;
+	processPendingTaskEdit: (taskEditData: import("../services/editor.js").PendingTaskEditData) => Promise<void>;
 
 	// Get relationship of a task to the currently selected task for visual highlighting
 	getTaskRelationshipToSelected: (taskId: string) => string;
@@ -153,6 +161,8 @@ export function createDashboardStore(
 		selectedTaskId: null,
 		expandedTaskIds: new Set(),
 		treeVersion: 0,
+		contextSlicesByTaskId: new Map(),
+		loadingContextSlices: new Set(),
 		activePanel: "tree",
 		commandPaletteOpen: false,
 		helpOverlayOpen: false,
@@ -242,6 +252,16 @@ export function createDashboardStore(
 
 		selectTask: (taskId) => {
 			set({ selectedTaskId: taskId });
+			
+			// Automatically load context slices for the selected task if not already loaded or loading
+			if (taskId) {
+				const { contextSlicesByTaskId, loadingContextSlices } = get();
+				if (!contextSlicesByTaskId.has(taskId) && !loadingContextSlices.has(taskId)) {
+					get().loadContextSlices(taskId).catch(error => {
+						console.error('Failed to load context slices for task:', taskId, error);
+					});
+				}
+			}
 		},
 
 		toggleTaskExpanded: (taskId) => {
@@ -929,7 +949,7 @@ export function createDashboardStore(
 		reloadFromDatabase: async () => {
 			try {
 				// Don't show loading message if we're just syncing in background
-				const isSilentReload = get().statusMessage?.includes("Finalizing");
+				const isSilentReload = get().statusMessage?.includes('Finalizing');
 				if (!isSilentReload) {
 					set({ statusMessage: "Reloading from database..." });
 				}
@@ -952,19 +972,19 @@ export function createDashboardStore(
 				if (previousSelectedTaskId && newState.trackingTree) {
 					// For temporary IDs, try to find the task by title
 					let taskToSelect: string | null = previousSelectedTaskId;
-
-					if (previousSelectedTaskId.startsWith("temp-")) {
+					
+					if (previousSelectedTaskId.startsWith('temp-')) {
 						// Find the newly created task by matching other properties
 						const oldTask = currentState.trackingTree?.find(
-							(task) => task.id === previousSelectedTaskId,
+							(task) => task.id === previousSelectedTaskId
 						);
 						if (oldTask) {
 							// Find by title and parent
 							const newTask = newState.trackingTree.find(
-								(task) =>
-									task.title === oldTask.task.title &&
+								(task) => 
+									task.title === oldTask.task.title && 
 									task.parentId === oldTask.task.parentId &&
-									!task.id.startsWith("temp-"),
+									!task.id.startsWith('temp-')
 							);
 							if (newTask) {
 								taskToSelect = newTask.task.id;
@@ -974,7 +994,7 @@ export function createDashboardStore(
 
 					// Check if the task still exists
 					const taskStillExists = newState.trackingTree.find(
-						(task) => task.id === taskToSelect,
+						(task) => task.id === taskToSelect
 					);
 					if (taskStillExists) {
 						newState.selectTask(taskToSelect);
@@ -986,13 +1006,13 @@ export function createDashboardStore(
 				if (newState.trackingTree) {
 					previousExpandedTaskIds.forEach((taskId) => {
 						// Handle temporary IDs
-						if (taskId.startsWith("temp-")) {
+						if (taskId.startsWith('temp-')) {
 							// Skip temp IDs in expansion restoration
 							return;
 						}
-
+						
 						const taskStillExists = newState.trackingTree!.find(
-							(task) => task.id === taskId,
+							(task) => task.id === taskId
 						);
 						if (taskStillExists) {
 							restoredExpandedTaskIds.add(taskId);
@@ -1061,7 +1081,7 @@ export function createDashboardStore(
 						const childTree = TrackingTaskTree.fromTask(newTask);
 						parentNode.addChild(childTree); // Mutation recorded automatically
 					} else {
-						set({
+						set({ 
 							statusMessage: `Parent task ${parentId} not found`,
 						});
 						return;
@@ -1078,11 +1098,11 @@ export function createDashboardStore(
 				get().recalculateAllProgress();
 
 				// Show task immediately with temp ID
-				set({
+				set({ 
 					selectedTaskId: newTask.id,
 					statusMessage: `Saving task: ${taskTemplate.title}...`,
 				});
-
+				
 				// Flush immediately to persist the task
 				try {
 					await get().flushChangesImmediate();
@@ -1092,7 +1112,7 @@ export function createDashboardStore(
 					});
 					return;
 				}
-
+				
 				// Reload to get the real IDs and ensure UI is in sync
 				set({ statusMessage: `Finalizing task...` });
 				try {
@@ -1103,7 +1123,7 @@ export function createDashboardStore(
 					});
 					return;
 				}
-
+				
 				set({
 					statusMessage: `Task "${taskTemplate.title}" created successfully`,
 				});
@@ -1118,9 +1138,7 @@ export function createDashboardStore(
 		},
 
 		// New method for processing pending task edit data from the editor
-		processPendingTaskEdit: async (
-			taskEditData: import("../services/editor.js").PendingTaskEditData,
-		) => {
+		processPendingTaskEdit: async (taskEditData: import("../services/editor.js").PendingTaskEditData) => {
 			const { trackingTree } = get();
 
 			if (!trackingTree) {
@@ -1141,7 +1159,7 @@ export function createDashboardStore(
 				// Find the task if taskId is provided
 				const taskNode = trackingTree.find((task) => task.id === taskId);
 				if (!taskNode) {
-					set({
+					set({ 
 						statusMessage: `Task ${taskId} not found`,
 						isFlushingChanges: false,
 					});
@@ -1168,7 +1186,7 @@ export function createDashboardStore(
 				get().recalculateAllProgress();
 
 				// Keep the task selected
-				set({
+				set({ 
 					selectedTaskId: taskId,
 					statusMessage: `Saving changes...`,
 				});
@@ -1179,11 +1197,11 @@ export function createDashboardStore(
 				}
 
 				// Small delay to ensure UI updates are visible
-				await new Promise((resolve) => setTimeout(resolve, 50));
+				await new Promise(resolve => setTimeout(resolve, 50));
 
 				// Flush changes - for edits, we don't need to reload since IDs don't change
 				await get().flushChanges();
-
+				
 				set({
 					statusMessage: `Task "${taskTemplate.title}" updated successfully`,
 					isFlushingChanges: false,
@@ -1202,49 +1220,103 @@ export function createDashboardStore(
 		// Get relationship of a task to the currently selected task for visual highlighting
 		getTaskRelationshipToSelected: (taskId: string) => {
 			const { selectedTaskId, trackingDependencyGraph } = get();
-
-			if (
-				!selectedTaskId ||
-				!trackingDependencyGraph ||
-				taskId === selectedTaskId
-			) {
-				return "none";
+			
+			if (!selectedTaskId || !trackingDependencyGraph || taskId === selectedTaskId) {
+				return 'none';
 			}
 
 			// Check if this task is blocking the selected task (selected depends on this task)
-			const selectedDependencies =
-				trackingDependencyGraph.getDependencies(selectedTaskId);
+			const selectedDependencies = trackingDependencyGraph.getDependencies(selectedTaskId);
 			if (selectedDependencies.includes(taskId)) {
 				// Further check if this blocking task is done or still pending
 				const { trackingTree } = get();
 				if (trackingTree) {
 					const taskNode = trackingTree.find((task) => task.id === taskId);
 					if (taskNode) {
-						return taskNode.task.status === "done"
-							? "blocking-completed"
-							: "blocking-pending";
+						return taskNode.task.status === 'done' ? 'blocking-completed' : 'blocking-pending';
 					}
 				}
-				return "blocking-pending";
+				return 'blocking-pending';
 			}
 
 			// Check if this task depends on the selected task (this task is blocked by selected)
 			const taskDependencies = trackingDependencyGraph.getDependencies(taskId);
 			if (taskDependencies.includes(selectedTaskId)) {
-				return "dependent";
+				return 'dependent';
 			}
 
 			// Check for indirect relationships (tasks that share dependencies)
 			const selectedDeps = new Set(selectedDependencies);
 			const taskDeps = new Set(taskDependencies);
-			const hasSharedDependencies = [...selectedDeps].some((dep) =>
-				taskDeps.has(dep),
-			);
+			const hasSharedDependencies = [...selectedDeps].some(dep => taskDeps.has(dep));
 			if (hasSharedDependencies) {
-				return "related";
+				return 'related';
 			}
 
-			return "none";
+			return 'none';
+		},
+
+		// Context slice actions
+		loadContextSlices: async (taskId: string) => {
+			const { loadingContextSlices, contextSlicesByTaskId } = get();
+			
+			// Prevent duplicate loading
+			if (loadingContextSlices.has(taskId) || contextSlicesByTaskId.has(taskId)) {
+				return contextSlicesByTaskId.get(taskId) || [];
+			}
+			
+			try {
+				// Mark as loading
+				const newLoadingSet = new Set(loadingContextSlices);
+				newLoadingSet.add(taskId);
+				set({ loadingContextSlices: newLoadingSet });
+				
+				const contextSlices = await db.listContextSlices(taskId);
+				const newContextSlicesMap = new Map(contextSlicesByTaskId);
+				newContextSlicesMap.set(taskId, contextSlices);
+				
+				// Update both cache and remove from loading
+				const finalLoadingSet = new Set(loadingContextSlices);
+				finalLoadingSet.delete(taskId);
+				
+				set({ 
+					contextSlicesByTaskId: newContextSlicesMap,
+					loadingContextSlices: finalLoadingSet
+				});
+				
+				return contextSlices;
+			} catch (error) {
+				// Remove from loading state on error
+				const finalLoadingSet = new Set(loadingContextSlices);
+				finalLoadingSet.delete(taskId);
+				set({ loadingContextSlices: finalLoadingSet });
+				
+				console.error('Failed to load context slices:', error);
+				return [];
+			}
+		},
+
+		getContextSlices: (taskId: string) => {
+			const { contextSlicesByTaskId } = get();
+			return contextSlicesByTaskId.get(taskId) || [];
+		},
+
+		getComplexityValue: (taskId: string) => {
+			const contextSlices = get().getContextSlices(taskId);
+			const complexitySlice = contextSlices.find(slice => 
+				slice.title.toLowerCase().includes('complexity')
+			);
+			if (complexitySlice && complexitySlice.description) {
+				// Try to extract complexity number from description
+				const match = complexitySlice.description.match(/complexity[:\s]*(\d+(?:\.\d+)?)/i);
+				return match && match[1] ? parseFloat(match[1]) : null;
+			}
+			return null;
+		},
+
+		isLoadingContextSlices: (taskId: string) => {
+			const { loadingContextSlices } = get();
+			return loadingContextSlices.has(taskId);
 		},
 	}));
 

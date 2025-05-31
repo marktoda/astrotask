@@ -8,27 +8,31 @@
  * - getNextTask: Get next available task to work on
  */
 
-import type { 
-  HandlerContext, 
-  MCPHandler, 
-  ParsePRDInput,
-  ExpandTaskInput,
+import { createModuleLogger } from '@astrolabe/core';
+import {
+  createComplexityAnalyzer,
+  createComplexityContextService,
+  type ComplexityReport,
+  DependencyService,
+  TaskService,
+  TrackingDependencyGraph,
+  TrackingTaskTree,
+} from '@astrolabe/core';
+import type {
   AddDependencyInput,
-  GetNextTaskInput,
-  AnalyzeNodeComplexityInput,
   AnalyzeComplexityInput,
-  ComplexityReportInput
+  AnalyzeNodeComplexityInput,
+  ComplexityReportInput,
+  ExpandTaskInput,
+  GetNextTaskInput,
+  HandlerContext,
+  MCPHandler,
+  ParsePRDInput,
 } from './types.js';
 import type { Task, TaskDependency, TaskTree, ContextSlice } from '@astrolabe/core';
 import { 
   createPRDTaskGenerator, 
-  createModuleLogger,
-  createComplexityAnalyzer,
-  createComplexityContextService,
-  type ComplexityReport 
 } from '@astrolabe/core';
-import { promises as fs } from 'fs';
-import { dirname } from 'path';
 
 export class MinimalHandlers implements MCPHandler {
   private logger = createModuleLogger('MinimalHandlers');
@@ -264,7 +268,6 @@ Each subtask should be specific and actionable.
    */
   async analyzeComplexity(args: AnalyzeComplexityInput): Promise<{
     report: ComplexityReport;
-    savedTo: string;
     message: string;
     contextSlicesCreated: number;
     contextMessage: string;
@@ -310,19 +313,9 @@ Each subtask should be specific and actionable.
         contextMessage = "Failed to create context slices (analysis still completed)";
       }
 
-      // Save report to file
-      const outputPath = args.output || 'scripts/task-complexity-report.json';
-      
-      // Ensure directory exists
-      await fs.mkdir(dirname(outputPath), { recursive: true });
-      
-      // Write report
-      await fs.writeFile(outputPath, JSON.stringify(report, null, 2), 'utf-8');
-
       return {
         report,
-        savedTo: outputPath,
-        message: `Analyzed ${report.meta.tasksAnalyzed} tasks. Report saved to ${outputPath}`,
+        message: `Analyzed ${report.meta.tasksAnalyzed} tasks and saved complexity data to database`,
         contextSlicesCreated,
         contextMessage,
       };
@@ -340,7 +333,6 @@ Each subtask should be specific and actionable.
    */
   async analyzeNodeComplexity(args: AnalyzeNodeComplexityInput): Promise<{
     report: ComplexityReport;
-    savedTo: string;
     message: string;
     contextSlicesCreated: number;
     contextMessage: string;
@@ -381,19 +373,9 @@ Each subtask should be specific and actionable.
         contextMessage = "Failed to create context slices (analysis still completed)";
       }
 
-      // Save report to file
-      const outputPath = args.output || `scripts/task-complexity-report-${args.nodeId}.json`;
-      
-      // Ensure directory exists
-      await fs.mkdir(dirname(outputPath), { recursive: true });
-      
-      // Write report
-      await fs.writeFile(outputPath, JSON.stringify(report, null, 2), 'utf-8');
-
       return {
         report,
-        savedTo: outputPath,
-        message: `Analyzed node ${args.nodeId} and its ${report.meta.tasksAnalyzed - 1} children. Report saved to ${outputPath}`,
+        message: `Analyzed node ${args.nodeId} and its ${report.meta.tasksAnalyzed - 1} children and saved complexity data to database`,
         contextSlicesCreated,
         contextMessage,
       };
@@ -408,35 +390,88 @@ Each subtask should be specific and actionable.
   }
 
   /**
-   * Display complexity report in readable format
+   * Display complexity information from database context slices
    */
   async complexityReport(args: ComplexityReportInput): Promise<{
-    report: ComplexityReport;
+    complexityData: Array<{ taskId: string; taskTitle: string; complexity: number | null; analysis: string | null }>;
     formatted: string;
     message: string;
   }> {
     try {
-      const reportPath = args.file || 'scripts/task-complexity-report.json';
+      // Get all tasks from the database
+      const allTasks = await this.context.store.listTasks();
       
-      // Read report file
-      const reportData = await fs.readFile(reportPath, 'utf-8');
-      const report: ComplexityReport = JSON.parse(reportData);
+      if (allTasks.length === 0) {
+        return {
+          complexityData: [],
+          formatted: "No tasks found in the database.",
+          message: "No tasks available for complexity analysis"
+        };
+      }
 
-      // Create analyzer to format the report
-      const analyzer = createComplexityAnalyzer(this.logger);
-      const formatted = analyzer.formatReport(report);
+      // Get complexity data from context slices for each task
+      const complexityData = [];
+      
+      for (const task of allTasks) {
+        const contextSlices = await this.context.store.listContextSlices(task.id);
+        const complexitySlice = contextSlices.find(slice => 
+          slice.title.toLowerCase().includes('complexity')
+        );
+        
+        let complexity: number | null = null;
+        let analysis: string | null = null;
+        
+        if (complexitySlice && complexitySlice.description) {
+          // Extract complexity score from description
+          const match = complexitySlice.description.match(/complexity[:\s]*(\d+(?:\.\d+)?)/i);
+          complexity = match && match[1] ? parseFloat(match[1]) : null;
+          analysis = complexitySlice.description;
+        }
+        
+        complexityData.push({
+          taskId: task.id,
+          taskTitle: task.title,
+          complexity,
+          analysis
+        });
+      }
+
+      // Filter to only tasks with complexity data
+      const tasksWithComplexity = complexityData.filter(item => item.complexity !== null);
+      
+      if (tasksWithComplexity.length === 0) {
+        return {
+          complexityData,
+          formatted: "No complexity analysis found in database. Run 'analyze-complexity' first to generate complexity data.",
+          message: "No complexity data available"
+        };
+      }
+
+      // Format the report
+      const avgComplexity = tasksWithComplexity.reduce((sum, item) => sum + (item.complexity || 0), 0) / tasksWithComplexity.length;
+      const highComplexityTasks = tasksWithComplexity.filter(item => (item.complexity || 0) >= 7);
+      
+      const formatted = [
+        '📊 Task Complexity Analysis (from Database)',
+        '============================================',
+        '',
+        `Tasks with Complexity Data: ${tasksWithComplexity.length}`,
+        `Average Complexity: ${avgComplexity.toFixed(1)}/10`,
+        `High Complexity Tasks (≥7): ${highComplexityTasks.length}`,
+        '',
+        'Task Details:',
+        ...tasksWithComplexity
+          .sort((a, b) => (b.complexity || 0) - (a.complexity || 0))
+          .map(item => `  ${item.taskId}: ${item.taskTitle} [${item.complexity}/10]`)
+      ].join('\n');
 
       return {
-        report,
+        complexityData,
         formatted,
-        message: `Complexity report loaded from ${reportPath}`
+        message: `Found complexity data for ${tasksWithComplexity.length} tasks in database`
       };
     } catch (error) {
-      if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
-        throw new Error(`Complexity report not found at ${args.file || 'scripts/task-complexity-report.json'}. Run analyze-complexity first.`);
-      }
-      
-      this.logger.error('Loading complexity report failed', {
+      this.logger.error('Loading complexity data from database failed', {
         error: error instanceof Error ? error.message : String(error),
         requestId: this.context.requestId,
       });

@@ -106,6 +106,25 @@ export class DetailPane {
 			`Status: ${statusIcon} {${statusColor}-fg}${task.status}{/${statusColor}-fg}`,
 		);
 
+		// Complexity value prominently displayed below status
+		const complexity = state.getComplexityValue(task.id);
+		const isLoadingContext = state.isLoadingContextSlices(task.id);
+		const contextSlices = state.getContextSlices(task.id);
+		
+		if (complexity !== null) {
+			const complexityColor = complexity >= 8 ? "red" : complexity >= 6 ? "yellow" : complexity >= 4 ? "cyan" : "green";
+			lines.push(`Complexity: {${complexityColor}-fg}${complexity}/10{/${complexityColor}-fg} ${this.getComplexityIcon(complexity)}`);
+		} else if (isLoadingContext) {
+			lines.push(`Complexity: {gray-fg}Loading...{/gray-fg}`);
+		} else if (contextSlices.length === 0) {
+			// Don't call loadContextSlices here during render to avoid infinite loops
+			// The selectTask method already handles loading context slices
+			lines.push(`Complexity: {gray-fg}Not analyzed{/gray-fg}`);
+		} else {
+			// Context slices loaded but no complexity found
+			lines.push(`Complexity: {gray-fg}Not analyzed{/gray-fg}`);
+		}
+
 		// Priority with icon
 		const priorityIcon = this.getPriorityIcon(task.priority);
 		lines.push(`Priority: ${priorityIcon} ${task.priority}`);
@@ -118,6 +137,28 @@ export class DetailPane {
 		if (task.description) {
 			lines.push("{bold}Description:{/bold}");
 			lines.push(task.description);
+			lines.push("");
+		}
+
+		// Context Slices
+		if (contextSlices.length > 0) {
+			lines.push("{bold}{blue-fg}Context & Analysis:{/blue-fg}{/bold}");
+			contextSlices.forEach((slice) => {
+				const sliceType = this.getContextSliceType(slice.title);
+				lines.push(`  ${sliceType.icon} {${sliceType.color}-fg}${slice.title}{/${sliceType.color}-fg}`);
+				if (slice.description) {
+					// Show first 2 lines of description, safely handle potential null
+					const descLines = slice.description.split('\n').slice(0, 2);
+					descLines.forEach(line => {
+						if (line && line.trim()) {
+							lines.push(`    {gray-fg}${line.trim()}{/gray-fg}`);
+						}
+					});
+					if (slice.description.split('\n').length > 2) {
+						lines.push(`    {gray-fg}...{/gray-fg}`);
+					}
+				}
+			});
 			lines.push("");
 		}
 
@@ -401,14 +442,44 @@ export class DetailPane {
 	private getPriorityIcon(priority: Task["priority"]): string {
 		switch (priority) {
 			case "high":
-				return " !";
+				return "🔴";
 			case "medium":
-				return "";
+				return "🟡";
 			case "low":
-				return " ↓";
+				return "🟢";
 			default:
-				return "";
+				return "⚪";
 		}
+	}
+
+	private getComplexityIcon(complexity: number): string {
+		if (complexity >= 8) return "🔥"; // High complexity
+		if (complexity >= 6) return "⚠️";  // Medium-high complexity
+		if (complexity >= 4) return "📊"; // Medium complexity
+		return "✅"; // Low complexity
+	}
+
+	private getContextSliceType(title: string): { icon: string; color: string } {
+		const titleLower = title.toLowerCase();
+		
+		if (titleLower.includes('complexity')) {
+			return { icon: "📊", color: "cyan" };
+		}
+		if (titleLower.includes('analysis')) {
+			return { icon: "🔍", color: "blue" };
+		}
+		if (titleLower.includes('research')) {
+			return { icon: "📚", color: "magenta" };
+		}
+		if (titleLower.includes('notes') || titleLower.includes('note')) {
+			return { icon: "📝", color: "yellow" };
+		}
+		if (titleLower.includes('implementation')) {
+			return { icon: "⚙️", color: "green" };
+		}
+		
+		// Default
+		return { icon: "💡", color: "white" };
 	}
 
 	destroy() {

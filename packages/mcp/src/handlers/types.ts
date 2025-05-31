@@ -92,8 +92,6 @@ export const getNextTaskSchema = z.object({
 export const analyzeNodeComplexitySchema = z.object({
   /** Node ID to analyze (includes all children) */
   nodeId: z.string().min(1, "Node ID cannot be empty"),
-  /** Output file path for complexity report */
-  output: z.string().optional(),
   /** Minimum complexity score threshold for expansion recommendations */
   threshold: z.number().min(1).max(10).optional().default(5),
   /** Enable research mode for more accurate analysis */
@@ -106,8 +104,6 @@ export const analyzeNodeComplexitySchema = z.object({
 export const analyzeComplexitySchema = z.object({
   /** Path to tasks file (optional, auto-detected if not provided) */
   file: z.string().optional(),
-  /** Output file path for complexity report */
-  output: z.string().optional().default('scripts/task-complexity-report.json'),
   /** Minimum complexity score threshold for expansion recommendations */
   threshold: z.number().min(1).max(10).optional().default(5),
   /** Enable research mode for more accurate analysis */
@@ -118,8 +114,7 @@ export const analyzeComplexitySchema = z.object({
  * Schema for complexity report viewing input
  */
 export const complexityReportSchema = z.object({
-  /** Path to complexity report file */
-  file: z.string().optional().default('scripts/task-complexity-report.json'),
+  // No parameters needed since we read from database
 });
 
 /**

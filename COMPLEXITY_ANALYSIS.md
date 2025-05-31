@@ -2,7 +2,7 @@
 
 ## Overview
 
-The TaskMaster system now includes comprehensive complexity analysis functionality that uses LLM to analyze implementation complexity of tasks on a scale of 1-10. This feature helps developers identify which tasks need to be broken down into smaller subtasks and provides intelligent recommendations for task expansion.
+The TaskMaster system now includes comprehensive complexity analysis functionality that uses LLM to analyze implementation complexity of tasks on a scale of 1-10. This feature helps developers identify which tasks need to be broken down into smaller subtasks and provides intelligent recommendations for task expansion. **Complexity data is stored in the database as context slices rather than file-based reports.**
 
 ## Features Implemented
 
@@ -14,25 +14,23 @@ The TaskMaster system now includes comprehensive complexity analysis functionali
 - **Detailed reasoning**: Provides comprehensive explanations for complexity assessments
 - **Batch processing**: Efficiently processes multiple tasks in configurable batches
 - **Fallback analysis**: Provides heuristic-based analysis when LLM is unavailable
-- **Comprehensive reporting**: Generates detailed reports with statistics and recommendations
+- **Database storage**: Saves results as context slices in the database for easy access
 
 ### 2. MCP Tools Integration
 
 Two new MCP tools were added to the system:
 
 #### `analyze_project_complexity`
-- **Purpose**: Analyze all tasks in a project and generate complexity report
+- **Purpose**: Analyze all tasks in a project and save complexity data to database
 - **Parameters**:
   - `file` (optional): Path to tasks file (auto-detected if not provided)
-  - `output` (optional): Output file path (default: `scripts/task-complexity-report.json`)
   - `threshold` (optional): Minimum complexity score for expansion recommendations (default: 5)
   - `research` (optional): Enable research mode for more accurate analysis (default: false)
-- **Output**: Saves detailed JSON report and returns analysis summary
+- **Output**: Creates context slices in database with complexity scores and analysis
 
 #### `complexity_report`
-- **Purpose**: Display existing complexity report in human-readable format
-- **Parameters**:
-  - `file` (optional): Path to complexity report file (default: `scripts/task-complexity-report.json`)
+- **Purpose**: Display existing complexity data from database in human-readable format
+- **Parameters**: None required - reads from database context slices
 - **Output**: Returns formatted report with statistics, recommendations, and ready-to-use commands
 
 ### 3. CLI Command Support
@@ -43,11 +41,8 @@ The functionality is accessible via CLI commands:
 # Analyze project complexity
 task-master analyze-complexity --research --threshold=6
 
-# View formatted complexity report
+# View formatted complexity report from database
 task-master complexity-report
-
-# Analyze with custom output location
-task-master analyze-complexity --output=reports/complexity.json
 ```
 
 ## Complexity Scoring Guidelines
