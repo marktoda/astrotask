@@ -165,6 +165,7 @@ notes: |
 		let currentValue: string[] = [];
 
 		for (let line of lines) {
+			const originalLine = line;
 			line = line.trim();
 
 			// Skip comments and empty lines
@@ -172,10 +173,10 @@ notes: |
 				continue;
 			}
 
-			// Check for field starts
-			if (line.includes(":")) {
-				// Save previous field if exists
-				if (currentField && currentValue.length > 0) {
+			// Check for field starts - only if line doesn't start with whitespace (not indented content)
+			if (line.includes(":") && !originalLine.startsWith(" ") && !originalLine.startsWith("\t")) {
+				// Save previous field if exists (FIX: save regardless of currentValue length)
+				if (currentField) {
 					this.setTaskField(task, currentField, currentValue.join("\n").trim());
 				}
 
@@ -198,8 +199,8 @@ notes: |
 			}
 		}
 
-		// Save the last field
-		if (currentField && currentValue.length > 0) {
+		// Save the last field (FIX: This was not properly saving the last field when it had content)
+		if (currentField) {
 			this.setTaskField(task, currentField, currentValue.join("\n").trim());
 		}
 
@@ -208,13 +209,25 @@ notes: |
 			throw new Error("Task title is required");
 		}
 
+		// Enhanced validation with user feedback
+		const validatedPriority = this.validatePriority(task.priority);
+		const validatedStatus = this.validateStatus(task.status);
+
+		// Warn about invalid values
+		if (task.priority && !validatedPriority) {
+			throw new Error(`Invalid priority "${task.priority}". Valid values are: low, medium, high`);
+		}
+		if (task.status && !validatedStatus) {
+			throw new Error(`Invalid status "${task.status}". Valid values are: pending, in-progress, done, cancelled, archived`);
+		}
+
 		// Set defaults
 		return {
 			title: task.title.trim(),
 			description: task.description?.trim() || "",
 			details: task.details?.trim() || "",
-			priority: this.validatePriority(task.priority) || "medium",
-			status: this.validateStatus(task.status) || "pending",
+			priority: validatedPriority || "medium",
+			status: validatedStatus || "pending", 
 			tags: this.parseTags(task.tags || []),
 			notes: task.notes?.trim() || "",
 		};

@@ -103,5 +103,37 @@ priority: low
 			expect(result.description).toBe("Task description");
 			expect(result.priority).toBe("low");
 		});
+
+		it("should throw error for invalid priority values", () => {
+			const template = `title: Test Task
+priority: urgent
+`;
+
+			const parseMethod = (editorService as any).parseTaskFromTemplate.bind(editorService);
+			expect(() => parseMethod(template)).toThrow('Invalid priority "urgent". Valid values are: low, medium, high');
+		});
+
+		it("should throw error for invalid status values", () => {
+			const template = `title: Test Task
+status: todo
+`;
+
+			const parseMethod = (editorService as any).parseTaskFromTemplate.bind(editorService);
+			expect(() => parseMethod(template)).toThrow('Invalid status "todo". Valid values are: pending, in-progress, done, cancelled, archived');
+		});
+
+		it("should handle valid priority and status values", () => {
+			const template = `title: Test Task
+priority: high
+status: in-progress
+`;
+
+			const parseMethod = (editorService as any).parseTaskFromTemplate.bind(editorService);
+			const result: TaskTemplate = parseMethod(template);
+
+			expect(result.title).toBe("Test Task");
+			expect(result.priority).toBe("high");
+			expect(result.status).toBe("in-progress");
+		});
 	});
 }); 
