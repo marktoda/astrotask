@@ -12,21 +12,18 @@
 import type { Logger } from 'pino';
 import type { Store } from '../database/store.js';
 import type { Task } from '../schemas/task.js';
-import { 
-  ComplexityAnalyzer, 
-  type ComplexityReport, 
+import {
+  type ComplexityAnalyzer,
+  type ComplexityReport,
   type TaskComplexity,
-  createComplexityAnalyzer 
+  createComplexityAnalyzer,
 } from './ComplexityAnalyzer.js';
-import { 
-  ComplexityContextService,
-  createComplexityContextService
+import {
+  type ComplexityContextService,
+  createComplexityContextService,
 } from './ComplexityContextService.js';
-import { 
-  createPRDTaskGenerator,
-  type PRDTaskGenerator 
-} from './generators/PRDTaskGenerator.js';
 import type { TaskService } from './TaskService.js';
+import { type PRDTaskGenerator, createPRDTaskGenerator } from './generators/PRDTaskGenerator.js';
 
 /**
  * Configuration for task expansion
@@ -161,9 +158,9 @@ export class TaskExpansionService {
       // Manual override - user specified exact number
       actualNumSubtasks = Math.min(input.numSubtasks, this.config.maxSubtasks);
       expansionMethod = 'manual';
-      this.logger.info('Using manual subtask count', { 
-        requested: input.numSubtasks, 
-        actual: actualNumSubtasks 
+      this.logger.info('Using manual subtask count', {
+        requested: input.numSubtasks,
+        actual: actualNumSubtasks,
       });
     } else if (this.config.useComplexityAnalysis) {
       // Use complexity analysis to determine optimal subtask count
@@ -173,7 +170,7 @@ export class TaskExpansionService {
         actualNumSubtasks = Math.min(recommendedSubtasks, this.config.maxSubtasks);
         usedComplexityAnalysis = true;
         expansionMethod = 'complexity-guided';
-        
+
         this.logger.info('Using complexity-guided expansion', {
           complexityScore: complexityAnalysis.complexityScore,
           recommended: recommendedSubtasks,
@@ -218,7 +215,7 @@ export class TaskExpansionService {
 
     // Apply the generated subtasks
     const { updatedTree } = await generationResult.tree.flush(this.taskService);
-    const subtasks = updatedTree.getChildren().map(child => child.task);
+    const subtasks = updatedTree.getChildren().map((child) => child.task);
 
     // Create complexity context slice if enabled
     let contextSlicesCreated = 0;
@@ -313,9 +310,7 @@ export class TaskExpansionService {
   /**
    * Analyze and expand high-complexity tasks automatically
    */
-  async expandHighComplexityTasks(
-    complexityThreshold?: number
-  ): Promise<{
+  async expandHighComplexityTasks(complexityThreshold?: number): Promise<{
     complexityReport: ComplexityReport;
     expansionResults: TaskExpansionResult[];
     summary: {
@@ -326,7 +321,7 @@ export class TaskExpansionService {
     };
   }> {
     const threshold = complexityThreshold ?? this.config.complexityThreshold;
-    
+
     this.logger.info('Starting automatic expansion of high-complexity tasks', {
       threshold,
     });
@@ -337,7 +332,7 @@ export class TaskExpansionService {
 
     // Identify high-complexity tasks that should be expanded
     const highComplexityTasks = complexityReport.complexityAnalysis
-      .filter(analysis => analysis.complexityScore >= threshold)
+      .filter((analysis) => analysis.complexityScore >= threshold)
       .sort((a, b) => b.complexityScore - a.complexityScore); // Highest complexity first
 
     this.logger.info('Identified high-complexity tasks for expansion', {
@@ -380,7 +375,10 @@ export class TaskExpansionService {
       tasksAnalyzed: allTasks.length,
       highComplexityTasks: highComplexityTasks.length,
       tasksExpanded: expansionResults.length,
-      totalSubtasksCreated: expansionResults.reduce((sum, result) => sum + result.subtasks.length, 0),
+      totalSubtasksCreated: expansionResults.reduce(
+        (sum, result) => sum + result.subtasks.length,
+        0
+      ),
     };
 
     this.logger.info('Automatic expansion of high-complexity tasks completed', summary);
@@ -397,7 +395,7 @@ export class TaskExpansionService {
    */
   private async clearExistingSubtasks(taskId: string): Promise<void> {
     const existingSubtasks = await this.store.listTasks({ parentId: taskId });
-    
+
     if (existingSubtasks.length > 0) {
       this.logger.info('Clearing existing subtasks', {
         taskId,
@@ -423,7 +421,7 @@ export class TaskExpansionService {
       }
 
       const siblingTasks = await this.store.listTasks({ parentId: task.parentId });
-      return siblingTasks.filter(t => t.id !== taskId);
+      return siblingTasks.filter((t) => t.id !== taskId);
     } catch (error) {
       this.logger.warn('Failed to get contextual tasks', {
         taskId,
@@ -463,7 +461,7 @@ export class TaskExpansionService {
       sections.push(`- Complexity Score: ${complexityAnalysis.complexityScore}/10`);
       sections.push(`- Reasoning: ${complexityAnalysis.reasoning}`);
       sections.push(`- Recommended Subtasks: ${complexityAnalysis.recommendedSubtasks}`);
-      
+
       if (complexityAnalysis.expansionPrompt) {
         sections.push('');
         sections.push('**Expansion Guidance:**');
@@ -501,9 +499,11 @@ export class TaskExpansionService {
     const parts: string[] = [];
 
     parts.push(`Successfully expanded task "${parentTask.title}" into ${subtaskCount} subtasks`);
-    
+
     if (complexityAnalysis) {
-      parts.push(`using complexity-guided analysis (score: ${complexityAnalysis.complexityScore}/10)`);
+      parts.push(
+        `using complexity-guided analysis (score: ${complexityAnalysis.complexityScore}/10)`
+      );
     } else {
       parts.push(`using ${expansionMethod} expansion strategy`);
     }
@@ -537,4 +537,4 @@ export function createTaskExpansionService(
   };
 
   return new TaskExpansionService(logger, store, taskService, defaultConfig);
-} 
+}

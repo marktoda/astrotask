@@ -1,5 +1,5 @@
-import type { Task, TaskTree, ContextSlice } from "@astrolabe/core";
-import { taskStatus, taskPriority } from "@astrolabe/core";
+import type { ContextSlice, Task, TaskTree } from "@astrolabe/core";
+import { taskPriority, taskStatus } from "@astrolabe/core";
 import { Box, Text } from "ink";
 import { useEffect, useState } from "react";
 import zod from "zod";
@@ -50,35 +50,40 @@ export default function Next({ options }: Props) {
 				});
 
 				// Find the highest priority pending task (same logic as MCP)
-				const nextTask = availableTasks
-					.filter(task => task.status === 'pending')
-					.sort((a, b) => {
-						// Sort by priority (high > medium > low), then by ID
-						const priorityOrder = { high: 3, medium: 2, low: 1 };
-						const aPriority = priorityOrder[a.priority as keyof typeof priorityOrder] || 1;
-						const bPriority = priorityOrder[b.priority as keyof typeof priorityOrder] || 1;
-						
-						if (aPriority !== bPriority) {
-							return bPriority - aPriority;
-						}
-						
-						return a.id.localeCompare(b.id);
-					})[0] || null;
+				const nextTask =
+					availableTasks
+						.filter((task) => task.status === "pending")
+						.sort((a, b) => {
+							// Sort by priority (high > medium > low), then by ID
+							const priorityOrder = { high: 3, medium: 2, low: 1 };
+							const aPriority =
+								priorityOrder[a.priority as keyof typeof priorityOrder] || 1;
+							const bPriority =
+								priorityOrder[b.priority as keyof typeof priorityOrder] || 1;
 
-				const message = nextTask 
+							if (aPriority !== bPriority) {
+								return bPriority - aPriority;
+							}
+
+							return a.id.localeCompare(b.id);
+						})[0] || null;
+
+				const message = nextTask
 					? `Next task to work on: ${nextTask.title}`
 					: availableTasks.length > 0
-					? 'No pending tasks available (all tasks are in progress or completed)'
-					: 'No tasks available';
+						? "No pending tasks available (all tasks are in progress or completed)"
+						: "No tasks available";
 
 				let context = undefined;
 
 				// If we have a next task, get its full context
 				if (nextTask) {
-					const taskWithContext = await taskService.getTaskWithContext(nextTask.id);
+					const taskWithContext = await taskService.getTaskWithContext(
+						nextTask.id,
+					);
 					if (taskWithContext) {
 						const contextSlices = await store.listContextSlices(nextTask.id);
-						
+
 						context = {
 							ancestors: taskWithContext.ancestors,
 							descendants: taskWithContext.descendants,
@@ -96,7 +101,7 @@ export default function Next({ options }: Props) {
 					task: nextTask,
 					availableTasks,
 					message,
-					context
+					context,
 				});
 			} catch (err) {
 				setError(
@@ -143,7 +148,9 @@ export default function Next({ options }: Props) {
 	if (!result.task) {
 		return (
 			<Box flexDirection="column">
-				<Text bold color="yellow">No Next Task Available</Text>
+				<Text bold color="yellow">
+					No Next Task Available
+				</Text>
 				<Text>{result.message}</Text>
 
 				{result.availableTasks.length > 0 && (
@@ -153,8 +160,14 @@ export default function Next({ options }: Props) {
 							<Box key={task.id} marginLeft={2}>
 								<Text>
 									<Text color="cyan">{task.id}</Text> - {task.title}
-									<Text color={getStatusColor(task.status)}> [{task.status}]</Text>
-									<Text color={getPriorityColor(task.priority)}> ({task.priority})</Text>
+									<Text color={getStatusColor(task.status)}>
+										{" "}
+										[{task.status}]
+									</Text>
+									<Text color={getPriorityColor(task.priority)}>
+										{" "}
+										({task.priority})
+									</Text>
 								</Text>
 							</Box>
 						))}
@@ -170,8 +183,9 @@ export default function Next({ options }: Props) {
 
 				<Box marginTop={1}>
 					<Text color="green">
-						💡 Use <Text color="cyan">astrolabe task list</Text> to see all tasks or{" "}
-						<Text color="cyan">astrolabe start &lt;task-id&gt;</Text> to begin a specific task
+						💡 Use <Text color="cyan">astrolabe task list</Text> to see all
+						tasks or <Text color="cyan">astrolabe start &lt;task-id&gt;</Text>{" "}
+						to begin a specific task
 					</Text>
 				</Box>
 			</Box>
@@ -182,18 +196,29 @@ export default function Next({ options }: Props) {
 	const { task, context } = result;
 
 	return (
-		<Box flexDirection="column" borderStyle="round" borderColor="green" padding={1}>
-			<Text bold color="green">Next Task</Text>
-			
+		<Box
+			flexDirection="column"
+			borderStyle="round"
+			borderColor="green"
+			padding={1}
+		>
+			<Text bold color="green">
+				Next Task
+			</Text>
+
 			<Box flexDirection="column" marginTop={1}>
 				<Text>
-					<Text color="cyan" bold>{task.id}</Text> - <Text bold>{task.title}</Text>
+					<Text color="cyan" bold>
+						{task.id}
+					</Text>{" "}
+					- <Text bold>{task.title}</Text>
 				</Text>
 				<Text>
-					Status: <Text color={getStatusColor(task.status)}>{task.status}</Text> | 
-					Priority: <Text color={getPriorityColor(task.priority)}> {task.priority}</Text>
+					Status: <Text color={getStatusColor(task.status)}>{task.status}</Text>{" "}
+					| Priority:{" "}
+					<Text color={getPriorityColor(task.priority)}> {task.priority}</Text>
 				</Text>
-				
+
 				{task.description && (
 					<Box marginTop={1}>
 						<Text color="gray">{task.description}</Text>
@@ -242,13 +267,15 @@ export default function Next({ options }: Props) {
 							{context.ancestors.map((ancestor, index) => (
 								<Box key={ancestor.id} marginLeft={index * 2 + 2}>
 									<Text color="blue">
-										{"└─ ".repeat(index + 1)}{ancestor.id} - {ancestor.title}
+										{"└─ ".repeat(index + 1)}
+										{ancestor.id} - {ancestor.title}
 									</Text>
 								</Box>
 							))}
 							<Box marginLeft={(context.ancestors.length + 1) * 2}>
 								<Text bold color="green">
-									{"└─ ".repeat(context.ancestors.length + 1)}{task.id} - {task.title} (current)
+									{"└─ ".repeat(context.ancestors.length + 1)}
+									{task.id} - {task.title} (current)
 								</Text>
 							</Box>
 						</Box>
@@ -257,16 +284,20 @@ export default function Next({ options }: Props) {
 			)}
 
 			<Box flexDirection="column" marginTop={1}>
-				<Text bold color="cyan">Suggested Actions:</Text>
+				<Text bold color="cyan">
+					Suggested Actions:
+				</Text>
 				<Text color="green">
 					• Start: <Text color="cyan">astrolabe start {task.id}</Text>
 				</Text>
 				<Text color="green">
-					• View details: <Text color="cyan">astrolabe task tree {task.id}</Text>
+					• View details:{" "}
+					<Text color="cyan">astrolabe task tree {task.id}</Text>
 				</Text>
 				{context?.dependents && context.dependents.length > 0 && (
 					<Text color="green">
-						• See blocked tasks: <Text color="cyan">astrolabe task available</Text>
+						• See blocked tasks:{" "}
+						<Text color="cyan">astrolabe task available</Text>
 					</Text>
 				)}
 			</Box>
@@ -274,10 +305,11 @@ export default function Next({ options }: Props) {
 			{result.availableTasks.length > 1 && (
 				<Box marginTop={1}>
 					<Text color="gray">
-						{result.availableTasks.length - 1} other tasks also available to work on
+						{result.availableTasks.length - 1} other tasks also available to
+						work on
 					</Text>
 				</Box>
 			)}
 		</Box>
 	);
-} 
+}

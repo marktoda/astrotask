@@ -45,6 +45,9 @@ export const configSchema = z.object({
   DB_DEFAULT_DIR: z.string().default('~/.astrolabe'),
   DB_DEFAULT_NAME: z.string().default('astrolabe.db'),
 
+  // Data directory for PGLite database
+  DATA_DIR: z.string().default('./data/astrolabe.db'),
+
   // ElectricSQL configuration (optional for local-first operation)
   ELECTRIC_URL: z.string().optional(),
 

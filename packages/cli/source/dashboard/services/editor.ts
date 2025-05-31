@@ -174,7 +174,11 @@ notes: |
 			}
 
 			// Check for field starts - only if line doesn't start with whitespace (not indented content)
-			if (line.includes(":") && !originalLine.startsWith(" ") && !originalLine.startsWith("\t")) {
+			if (
+				line.includes(":") &&
+				!originalLine.startsWith(" ") &&
+				!originalLine.startsWith("\t")
+			) {
 				// Save previous field if exists (FIX: save regardless of currentValue length)
 				if (currentField) {
 					this.setTaskField(task, currentField, currentValue.join("\n").trim());
@@ -215,10 +219,14 @@ notes: |
 
 		// Warn about invalid values
 		if (task.priority && !validatedPriority) {
-			throw new Error(`Invalid priority "${task.priority}". Valid values are: low, medium, high`);
+			throw new Error(
+				`Invalid priority "${task.priority}". Valid values are: low, medium, high`,
+			);
 		}
 		if (task.status && !validatedStatus) {
-			throw new Error(`Invalid status "${task.status}". Valid values are: pending, in-progress, done, cancelled, archived`);
+			throw new Error(
+				`Invalid status "${task.status}". Valid values are: pending, in-progress, done, cancelled, archived`,
+			);
 		}
 
 		// Set defaults
@@ -227,7 +235,7 @@ notes: |
 			description: task.description?.trim() || "",
 			details: task.details?.trim() || "",
 			priority: validatedPriority || "medium",
-			status: validatedStatus || "pending", 
+			status: validatedStatus || "pending",
 			tags: this.parseTags(task.tags || []),
 			notes: task.notes?.trim() || "",
 		};

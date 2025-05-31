@@ -281,8 +281,7 @@ export default function Complexity({ options }: Props) {
 							(tasksAtScore / report.meta.tasksAnalyzed) *
 							100
 						).toFixed(1);
-						const color =
-							score >= 8 ? "red" : score >= 6 ? "yellow" : "green";
+						const color = score >= 8 ? "red" : score >= 6 ? "yellow" : "green";
 						const bar = "█".repeat(Math.ceil((tasksAtScore / 10) * 5) || 1);
 
 						return (
@@ -347,7 +346,8 @@ export default function Complexity({ options }: Props) {
 						</Text>
 					)}
 					<Text>
-						<Text color="cyan">astrolabe task expand --id=&lt;taskId&gt;</Text> - Expand high-complexity tasks into subtasks
+						<Text color="cyan">astrolabe task expand --id=&lt;taskId&gt;</Text>{" "}
+						- Expand high-complexity tasks into subtasks
 					</Text>
 				</Box>
 			</Box>

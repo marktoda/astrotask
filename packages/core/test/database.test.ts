@@ -2,14 +2,8 @@ import { describe, expect, it, afterEach, beforeEach } from 'vitest';
 import { join } from 'path';
 import { existsSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
-import {
-  initializeDatabase,
-  DatabaseError,
-  EncryptionError,
-} from '../src/database/config';
-import { createDatabase } from '../src/database/index';
+import { createDatabase, createLocalDatabase, createSyncedDatabase } from '../src/database/index';
 import { cfg } from '../src/utils/config';
-import { TASK_IDENTIFIERS } from '../src/utils/TaskTreeConstants';
 
 describe('Database Configuration', () => {
   const testDbDir = join(tmpdir(), 'astrolabe-test');
@@ -30,102 +24,84 @@ describe('Database Configuration', () => {
   });
 
   describe('Database Initialization', () => {
-    it('should create and initialize database without encryption', async () => {
-      const connection = await initializeDatabase({
-        dbPath: testDbPath,
-        encrypted: false,
-        verbose: false,
-      });
+    it('should create and initialize database without sync', async () => {
+      const store = await createLocalDatabase(testDbPath);
 
-      expect(connection).toBeDefined();
-      expect(connection.db).toBeDefined();
-      expect(connection.drizzle).toBeDefined();
-      expect(connection.isEncrypted).toBe(false);
-      expect(typeof connection.db.close).toBe('function');
-
-      // Skip verifying physical path existence because PGLite lazily creates files
+      expect(store).toBeDefined();
+      expect(store.pgLite).toBeDefined();
+      expect(store.sql).toBeDefined();
+      expect(store.electric).toBeUndefined();
+      expect(store.isEncrypted).toBe(false);
+      expect(store.isSyncing).toBe(false);
+      expect(typeof store.close).toBe('function');
 
       // Test basic database operation
-      const result = await connection.db.query('SELECT 1 as test');
+      const result = await store.pgLite.query('SELECT 1 as test');
       expect(result.rows[0]).toEqual({ test: 1 });
 
-      await connection.db.close();
+      await store.close();
     });
 
-    it('should create and initialize database with encryption', async () => {
-      // Set a test encryption key
-      process.env.ASTROLABE_DB_KEY = 'test-encryption-key-12345';
-
-      const connection = await initializeDatabase({
-        dbPath: testDbPath,
-        encrypted: true,
+    it('should create database with Electric SQL sync disabled', async () => {
+      const store = await createDatabase({
+        dataDir: testDbPath,
+        enableSync: false,
         verbose: false,
       });
 
-      expect(connection).toBeDefined();
-      expect(connection.isEncrypted).toBe(true);
+      expect(store).toBeDefined();
+      expect(store.electric).toBeUndefined();
+      expect(store.isSyncing).toBe(false);
 
-      // Test basic database operation with encryption
-      const result = await connection.db.query('SELECT 1 as test');
-      expect(result.rows[0]).toEqual({ test: 1 });
+      await store.close();
+    });
 
-      await connection.db.close();
+    it('should create database with Electric SQL sync (but not connected)', async () => {
+      // Don't set ELECTRIC_URL so sync won't actually connect
+      const originalUrl = process.env.ELECTRIC_URL;
+      delete process.env.ELECTRIC_URL;
 
-      // Clean up environment
-      delete process.env.ASTROLABE_DB_KEY;
-    }, 10000);
-
-    it('should apply correct pragmas for performance', async () => {
-      const connection = await initializeDatabase({
-        dbPath: testDbPath,
-        encrypted: false,
+      const store = await createDatabase({
+        dataDir: testDbPath,
+        enableSync: true,
+        verbose: false,
       });
 
-      // PGLite doesn't have SQLite pragmas, but we can test that the connection works
-      // and basic PostgreSQL configuration is available
-      const result = await connection.db.query('SELECT version()');
-      expect(result.rows).toBeDefined();
-      expect(result.rows.length).toBeGreaterThan(0);
+      expect(store).toBeDefined();
+      expect(store.electric).toBeDefined();
+      expect(store.isSyncing).toBe(false); // Not syncing because no URL
 
-      await connection.db.close();
+      await store.close();
+
+      // Restore env
+      if (originalUrl) process.env.ELECTRIC_URL = originalUrl;
     });
 
     it('should handle database directory creation', async () => {
       const nestedTestDbPath = join(testDbDir, 'nested', 'deep', 'test.db');
 
-      const connection = await initializeDatabase({
-        dbPath: nestedTestDbPath,
-        encrypted: false,
-      });
+      const store = await createLocalDatabase(nestedTestDbPath);
 
-      // Skip verifying physical path existence because PGLite may lazily create files/directories
+      expect(store).toBeDefined();
 
-      await connection.db.close();
+      await store.close();
 
       // Clean up nested directories
       rmSync(join(testDbDir, 'nested'), { recursive: true, force: true });
-    });
-
-    it('should throw EncryptionError for invalid encryption setup', () => {
-      // Test that the error types are properly exported
-      expect(EncryptionError).toBeDefined();
-      expect(DatabaseError).toBeDefined();
     });
   });
 
   describe('Simplified Database API', () => {
     it('should create database store with all features', async () => {
       const store = await createDatabase({
-        dbPath: testDbPath,
-        encrypted: false,
+        dataDir: testDbPath,
+        enableSync: false,
         verbose: false,
-        autoSync: false, // Disable sync for tests
       });
 
       expect(store).toBeDefined();
       expect(store.pgLite).toBeDefined();
       expect(store.sql).toBeDefined();
-      expect(store.electric).toBeDefined();
       expect(store.isEncrypted).toBe(false);
       expect(typeof store.close).toBe('function');
 
@@ -138,8 +114,8 @@ describe('Database Configuration', () => {
 
     it('should auto-migrate on database creation', async () => {
       const store = await createDatabase({
-        dbPath: testDbPath,
-        encrypted: false,
+        dataDir: testDbPath,
+        enableSync: false,
         verbose: false,
       });
 
@@ -155,25 +131,21 @@ describe('Database Configuration', () => {
       const tableNames = (result.rows as Array<{ table_name: string }>).map(row => row.table_name);
       expect(tableNames).toContain('tasks');
       expect(tableNames).toContain('context_slices');
-      // projects table should no longer exist after migration
-      expect(tableNames).not.toContain('projects');
+      expect(tableNames).toContain('task_dependencies');
 
       await store.close();
     });
 
     it('should provide business methods for tasks', async () => {
       const store = await createDatabase({
-        dbPath: testDbPath,
-        encrypted: false,
+        dataDir: testDbPath,
+        enableSync: false,
         verbose: false,
-        autoSync: false,
       });
 
       // Test task business methods
       const tasks = await store.listTasks();
-      // Filter out the PROJECT_ROOT task since it's automatically created
-      const userTasks = tasks.filter(task => task.id !== TASK_IDENTIFIERS.PROJECT_ROOT);
-      expect(userTasks).toEqual([]);
+      expect(tasks).toEqual([]);
 
       const newTask = await store.addTask({
         title: 'Test Task',
@@ -185,7 +157,6 @@ describe('Database Configuration', () => {
       expect(newTask).toBeDefined();
       expect(newTask.title).toBe('Test Task');
       expect(newTask.priority).toBe('medium');
-      expect(newTask.parentId).toBe(TASK_IDENTIFIERS.PROJECT_ROOT); // Root task
 
       const foundTask = await store.getTask(newTask.id);
       expect(foundTask).toEqual(newTask);
@@ -196,25 +167,29 @@ describe('Database Configuration', () => {
 
       // Test filtering by status
       const doneTasks = await store.listTasksByStatus('done');
-      // Filter out PROJECT_ROOT task since it's automatically created with 'done' status
-      const userDoneTasks = doneTasks.filter(task => task.id !== TASK_IDENTIFIERS.PROJECT_ROOT);
-      expect(userDoneTasks).toHaveLength(1);
-      expect(userDoneTasks[0].status).toBe('done');
+      expect(doneTasks).toHaveLength(1);
+      expect(doneTasks[0].status).toBe('done');
 
       // Test root tasks filtering
       const rootTasks = await store.listRootTasks();
       expect(rootTasks).toHaveLength(1);
-      expect(rootTasks[0].parentId).toBe(TASK_IDENTIFIERS.PROJECT_ROOT);
+      expect(rootTasks[0].parentId).toBeNull();
+
+      // Test delete
+      const deleted = await store.deleteTask(newTask.id);
+      expect(deleted).toBe(true);
+
+      const deletedTask = await store.getTask(newTask.id);
+      expect(deletedTask).toBeNull();
 
       await store.close();
     });
 
     it('should provide business methods for task hierarchy', async () => {
       const store = await createDatabase({
-        dbPath: testDbPath,
-        encrypted: false,
+        dataDir: testDbPath,
+        enableSync: false,
         verbose: false,
-        autoSync: false,
       });
 
       // Create a parent task
@@ -248,15 +223,70 @@ describe('Database Configuration', () => {
 
       await store.close();
     });
+
+    it('should provide context slice methods', async () => {
+      const store = await createDatabase({
+        dataDir: testDbPath,
+        enableSync: false,
+        verbose: false,
+      });
+
+      // Create a task first
+      const task = await store.addTask({
+        title: 'Task with Context',
+        description: 'A task that will have context',
+        status: 'pending',
+        priority: 'medium',
+      });
+
+      // Add a context slice
+      const contextSlice = await store.addContextSlice({
+        title: 'Context 1',
+        description: 'Some context',
+        taskId: task.id,
+      });
+
+      expect(contextSlice).toBeDefined();
+      expect(contextSlice.title).toBe('Context 1');
+      expect(contextSlice.taskId).toBe(task.id);
+
+      // List context slices
+      const slices = await store.listContextSlices(task.id);
+      expect(slices).toHaveLength(1);
+      expect(slices[0].id).toBe(contextSlice.id);
+
+      await store.close();
+    });
+  });
+
+  describe('Factory Functions', () => {
+    it('should create local database with createLocalDatabase', async () => {
+      const store = await createLocalDatabase(testDbPath);
+      
+      expect(store.electric).toBeUndefined();
+      expect(store.isSyncing).toBe(false);
+      
+      await store.close();
+    });
+
+    it('should create synced database with createSyncedDatabase', async () => {
+      const store = await createSyncedDatabase(testDbPath, {
+        // Don't provide URL so it runs in local mode
+      });
+      
+      expect(store.electric).toBeDefined();
+      expect(store.isSyncing).toBe(false); // False because no URL
+      
+      await store.close();
+    });
   });
 
   describe('Database Configuration Constants', () => {
     it('should have correct default configuration', () => {
       expect(cfg.DB_DEFAULT_NAME).toBe('astrolabe.db');
-      expect(cfg.DB_CIPHER).toBe('aes-256-cbc');
-      expect(cfg.DB_KDF_ITER).toBe(4000);
       expect(cfg.DB_JOURNAL_MODE).toBe('WAL');
       expect(cfg.DB_SYNCHRONOUS).toBe('NORMAL');
+      expect(cfg.DATA_DIR).toBe('./data/astrolabe.db');
     });
   });
 });

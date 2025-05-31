@@ -71,7 +71,9 @@ export class DetailPane {
 		const { selectedTaskId, trackingTree, detailViewMode } = state;
 
 		// Skip render if nothing significant has changed
-		const contextSliceCount = selectedTaskId ? state.getContextSlices(selectedTaskId).length : 0;
+		const contextSliceCount = selectedTaskId
+			? state.getContextSlices(selectedTaskId).length
+			: 0;
 		if (
 			selectedTaskId === this.lastRenderedTaskId &&
 			detailViewMode === this.lastRenderedViewMode &&
@@ -127,10 +129,19 @@ export class DetailPane {
 		const complexity = state.getComplexityValue(task.id);
 		const isLoadingContext = state.isLoadingContextSlices(task.id);
 		const contextSlices = state.getContextSlices(task.id);
-		
+
 		if (complexity !== null) {
-			const complexityColor = complexity >= 8 ? "red" : complexity >= 6 ? "yellow" : complexity >= 4 ? "cyan" : "green";
-			lines.push(`Complexity: {${complexityColor}-fg}${complexity}/10{/${complexityColor}-fg} ${this.getComplexityIcon(complexity)}`);
+			const complexityColor =
+				complexity >= 8
+					? "red"
+					: complexity >= 6
+						? "yellow"
+						: complexity >= 4
+							? "cyan"
+							: "green";
+			lines.push(
+				`Complexity: {${complexityColor}-fg}${complexity}/10{/${complexityColor}-fg} ${this.getComplexityIcon(complexity)}`,
+			);
 		} else if (isLoadingContext) {
 			lines.push(`Complexity: {gray-fg}Loading...{/gray-fg}`);
 		} else if (contextSlices.length === 0) {
@@ -144,7 +155,9 @@ export class DetailPane {
 
 		// Priority with icon
 		const priorityIcon = this.getPriorityIcon(task.priority);
-		const priorityDisplay = priorityIcon ? `${priorityIcon} ${task.priority}` : task.priority;
+		const priorityDisplay = priorityIcon
+			? `${priorityIcon} ${task.priority}`
+			: task.priority;
 		lines.push(`Priority: ${priorityDisplay}`);
 
 		lines.push("");
@@ -164,18 +177,20 @@ export class DetailPane {
 			lines.push("{bold}{blue-fg}Context & Analysis:{/blue-fg}{/bold}");
 			contextSlices.forEach((slice) => {
 				const sliceType = this.getContextSliceType(slice.title);
-				lines.push(`  ${sliceType.icon} {${sliceType.color}-fg}${slice.title}{/${sliceType.color}-fg}`);
+				lines.push(
+					`  ${sliceType.icon} {${sliceType.color}-fg}${slice.title}{/${sliceType.color}-fg}`,
+				);
 				if (slice.description) {
 					// Show first 2 lines of description, safely handle potential null
-					const descLines = slice.description.split('\n').slice(0, 2);
-					descLines.forEach(line => {
+					const descLines = slice.description.split("\n").slice(0, 2);
+					descLines.forEach((line) => {
 						if (line && line.trim()) {
 							// Escape the line content to prevent blessed tag parsing issues
 							const escapedLine = this.escapeForBlessed(line.trim());
 							lines.push(`    {gray-fg}${escapedLine}{/gray-fg}`);
 						}
 					});
-					if (slice.description.split('\n').length > 2) {
+					if (slice.description.split("\n").length > 2) {
 						lines.push(`    {gray-fg}...{/gray-fg}`);
 					}
 				}
@@ -480,30 +495,30 @@ export class DetailPane {
 
 	private getComplexityIcon(complexity: number): string {
 		if (complexity >= 8) return "🔥"; // High complexity
-		if (complexity >= 6) return "⚠️";  // Medium-high complexity
+		if (complexity >= 6) return "⚠️"; // Medium-high complexity
 		if (complexity >= 4) return "📊"; // Medium complexity
 		return "✅"; // Low complexity
 	}
 
 	private getContextSliceType(title: string): { icon: string; color: string } {
 		const titleLower = title.toLowerCase();
-		
-		if (titleLower.includes('complexity')) {
+
+		if (titleLower.includes("complexity")) {
 			return { icon: "📊", color: "cyan" };
 		}
-		if (titleLower.includes('analysis')) {
+		if (titleLower.includes("analysis")) {
 			return { icon: "🔍", color: "blue" };
 		}
-		if (titleLower.includes('research')) {
+		if (titleLower.includes("research")) {
 			return { icon: "📚", color: "magenta" };
 		}
-		if (titleLower.includes('notes') || titleLower.includes('note')) {
+		if (titleLower.includes("notes") || titleLower.includes("note")) {
 			return { icon: "📝", color: "yellow" };
 		}
-		if (titleLower.includes('implementation')) {
+		if (titleLower.includes("implementation")) {
 			return { icon: "⚙️", color: "green" };
 		}
-		
+
 		// Default
 		return { icon: "💡", color: "white" };
 	}
@@ -512,11 +527,11 @@ export class DetailPane {
 	private escapeForBlessed(text: string): string {
 		// Escape curly braces and markdown characters that might be interpreted as blessed tags
 		return text
-			.replace(/{/g, '\\{')
-			.replace(/}/g, '\\}')
-			.replace(/\*\*/g, '')  // Remove markdown bold markers
-			.replace(/\*/g, '')    // Remove markdown italic markers
-			.replace(/_/g, '\\_'); // Escape underscores
+			.replace(/{/g, "\\{")
+			.replace(/}/g, "\\}")
+			.replace(/\*\*/g, "") // Remove markdown bold markers
+			.replace(/\*/g, "") // Remove markdown italic markers
+			.replace(/_/g, "\\_"); // Escape underscores
 	}
 
 	destroy() {

@@ -1,267 +1,236 @@
+/**
+ * Simple Electric SQL Integration
+ *
+ * Provides real-time database synchronization using Electric SQL's built-in capabilities.
+ * This implementation focuses on simplicity and reliability over complex features.
+ */
+
 import { Shape, ShapeStream } from '@electric-sql/client';
-import type { ShapeStreamOptions } from '@electric-sql/client';
-import type { PGlite } from '@electric-sql/pglite';
 import type { PgliteDatabase } from 'drizzle-orm/pglite';
 import { cfg } from '../utils/config.js';
 import { createModuleLogger } from '../utils/logger.js';
 import type { schema } from './schema.js';
-import { DatabaseStore, type Store } from './store.js';
+import * as dbSchema from './schema.js';
 
-const logger = createModuleLogger('electric-sql');
+const logger = createModuleLogger('electric');
 
 /**
- * Store initialization options
+ * Configuration for Electric SQL sync
  */
-export interface StoreOptions {
-  sync?: boolean;
+export interface ElectricConfig {
+  /** Electric SQL server URL */
+  syncUrl?: string;
+  /** Tables to sync (defaults to ['tasks', 'context_slices']) */
+  tables?: string[];
+  /** Enable verbose logging */
   verbose?: boolean;
-  databasePath?: string;
 }
 
 /**
- * ElectricSQL connection interface for real-time synchronization
- */
-export interface ElectricConnection {
-  streams: Map<string, ShapeStream>;
-  shapes: Map<string, Shape>;
-  isConnected: boolean;
-  connect: () => Promise<void>;
-  disconnect: () => Promise<void>;
-  sync: (table: string, options?: Partial<ShapeStreamOptions>) => Promise<void>;
-}
-
-/**
- * Create a store following the ElectricSQL + Drizzle + PGlite guide pattern.
+ * Electric SQL sync manager
  *
- * This creates:
- * - One embedded PGlite database file (or idb:// for browsers)
- * - A typed Drizzle instance sharing the same handle
- * - ElectricSQL sync integration (if enabled)
- *
- * @param pgLite Pre-created PGlite instance
- * @param sql Pre-created Drizzle instance
- * @param isEncrypted Whether encryption is enabled
- * @param options Configuration options
- * @returns Store interface with all three components
+ * Handles bidirectional synchronization between local PGlite database
+ * and remote Electric SQL server.
  */
-export async function createStore(
-  pgLite: PGlite,
-  sql: PgliteDatabase<typeof schema>,
-  isEncrypted: boolean,
-  options: StoreOptions = {}
-): Promise<Store> {
-  const { sync = false, verbose = cfg.DB_VERBOSE } = options;
+export class ElectricSync {
+  private shapes = new Map<string, Shape>();
+  private streams = new Map<string, ShapeStream>();
+  private isActive = false;
 
-  if (verbose) {
-    logger.info({ sync, encrypted: isEncrypted }, 'Creating store');
+  constructor(
+    private readonly db: PgliteDatabase<typeof schema>,
+    private readonly config: ElectricConfig = {}
+  ) {
+    this.config.tables = config.tables || ['tasks', 'context_slices'];
+    this.config.verbose = config.verbose ?? cfg.DB_VERBOSE;
   }
 
-  // Create ElectricSQL connection
-  const electric = await createElectricConnection({ verbose });
+  /**
+   * Start Electric SQL synchronization
+   */
+  async start(): Promise<void> {
+    const syncUrl = this.config.syncUrl || cfg.ELECTRIC_URL;
 
-  // Initialize sync for core tables if enabled
-  if (sync && electric.isConnected) {
+    if (!syncUrl) {
+      if (this.config.verbose) {
+        logger.info('No Electric SQL URL configured - running in local-only mode');
+      }
+      return;
+    }
+
+    logger.info({ syncUrl, tables: this.config.tables }, 'Starting Electric SQL sync');
+
     try {
-      await Promise.all([electric.sync('tasks'), electric.sync('context_slices')]);
+      // Initialize sync for each table
+      const tables = this.config.tables || [];
+      for (const table of tables) {
+        await this.initializeTableSync(table, syncUrl);
+      }
 
-      if (verbose) {
-        logger.info('Sync enabled for core tables: tasks, context_slices');
+      this.isActive = true;
+      logger.info('Electric SQL sync started successfully');
+    } catch (error) {
+      logger.error({ error }, 'Failed to start Electric SQL sync - continuing in local-only mode');
+      throw error;
+    }
+  }
+
+  /**
+   * Stop Electric SQL synchronization
+   */
+  async stop(): Promise<void> {
+    if (!this.isActive) return;
+
+    logger.info('Stopping Electric SQL sync');
+
+    // Clean up all streams
+    for (const stream of this.streams.values()) {
+      try {
+        stream.unsubscribeAll();
+      } catch (error) {
+        logger.warn({ error }, 'Error unsubscribing from stream');
+      }
+    }
+
+    this.shapes.clear();
+    this.streams.clear();
+    this.isActive = false;
+
+    logger.info('Electric SQL sync stopped');
+  }
+
+  /**
+   * Check if sync is currently active
+   */
+  get syncing(): boolean {
+    return this.isActive;
+  }
+
+  /**
+   * Initialize synchronization for a single table
+   */
+  private async initializeTableSync(tableName: string, baseUrl: string): Promise<void> {
+    logger.debug({ table: tableName }, 'Initializing table sync');
+
+    // Create shape stream for the table
+    const stream = new ShapeStream({
+      url: `${baseUrl}/v1/shape/${tableName}`,
+    });
+
+    // Wait for initial connection
+    await this.waitForConnection(stream, tableName);
+
+    // Create shape and subscribe to changes
+    // biome-ignore lint/suspicious/noExplicitAny: Electric SQL client has complex type interface issues - ShapeStream doesn't fully implement ShapeStreamInterface
+    const shape = new Shape(stream as any);
+
+    // Subscribe to shape data changes
+    // biome-ignore lint/suspicious/noExplicitAny: Shape data structure varies by table
+    shape.subscribe((shapeData: any) => {
+      this.handleShapeData(tableName, shapeData).catch((error) => {
+        logger.error({ error, table: tableName }, 'Error processing shape data');
+      });
+    });
+
+    // Store references for cleanup
+    this.shapes.set(tableName, shape);
+    this.streams.set(tableName, stream);
+
+    logger.debug({ table: tableName }, 'Table sync initialized');
+  }
+
+  /**
+   * Wait for stream connection with timeout
+   */
+  private async waitForConnection(stream: ShapeStream, tableName: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error(`Connection timeout for table ${tableName}`));
+      }, 10000);
+
+      const unsubscribe = stream.subscribe(
+        () => {
+          clearTimeout(timeout);
+          unsubscribe();
+          resolve();
+        },
+        (error) => {
+          clearTimeout(timeout);
+          unsubscribe();
+          reject(error);
+        }
+      );
+    });
+  }
+
+  /**
+   * Handle incoming shape data from Electric SQL
+   */
+  // biome-ignore lint/suspicious/noExplicitAny: Electric SQL shape data has dynamic structure
+  private async handleShapeData(tableName: string, shapeData: any): Promise<void> {
+    if (!shapeData?.rows || shapeData.rows.length === 0) {
+      return;
+    }
+
+    logger.debug(
+      {
+        table: tableName,
+        rowCount: shapeData.rows.length,
+      },
+      'Processing shape data'
+    );
+
+    // Process all changes in a transaction
+    await this.db.transaction(async (tx) => {
+      for (const row of shapeData.rows || []) {
+        await this.upsertRow(tx, tableName, row);
+      }
+    });
+  }
+
+  /**
+   * Upsert a row into the local database
+   */
+  // biome-ignore lint/suspicious/noExplicitAny: Transaction and row data types are complex from Electric SQL
+  private async upsertRow(tx: any, tableName: string, rowData: any): Promise<void> {
+    try {
+      switch (tableName) {
+        case 'tasks':
+          await tx
+            .insert(dbSchema.tasks)
+            .values(rowData)
+            .onConflictDoUpdate({
+              target: dbSchema.tasks.id,
+              set: {
+                ...rowData,
+                updatedAt: new Date(), // Update timestamp on conflict
+              },
+            });
+          break;
+
+        case 'context_slices':
+          await tx.insert(dbSchema.contextSlices).values(rowData).onConflictDoUpdate({
+            target: dbSchema.contextSlices.id,
+            set: rowData,
+          });
+          break;
+
+        default:
+          logger.warn({ table: tableName }, 'Unknown table for sync');
       }
     } catch (error) {
-      logger.warn({ error }, 'Failed to initialize sync, continuing in local-only mode');
+      logger.error({ error, table: tableName, rowId: rowData?.id }, 'Failed to upsert row');
+      throw error;
     }
   }
-
-  // Create and return the DatabaseStore instance
-  // biome-ignore lint/suspicious/noExplicitAny: Type assertion needed for Drizzle schema compatibility with exactOptionalPropertyTypes
-  return new DatabaseStore(pgLite, sql as any, electric, isEncrypted);
-}
-
-// ---------------------------------------------------------------------------
-// ElectricSQL Implementation
-// ---------------------------------------------------------------------------
-
-/**
- * Error types for ElectricSQL operations
- */
-export class ElectricError extends Error {
-  constructor(
-    message: string,
-    public cause?: Error
-  ) {
-    super(message);
-    this.name = 'ElectricError';
-  }
-}
-
-export class SyncError extends ElectricError {
-  constructor(message: string, cause?: Error) {
-    super(message, cause);
-    this.name = 'SyncError';
-  }
 }
 
 /**
- * Get ElectricSQL configuration
+ * Create Electric SQL sync instance
  */
-function getElectricConfig() {
-  return {
-    url: cfg.ELECTRIC_URL,
-    isEnabled: Boolean(cfg.ELECTRIC_URL),
-  };
-}
-
-/**
- * No-op ElectricSQL connection for local-only mode
- */
-class NoOpElectricConnection implements ElectricConnection {
-  streams = new Map<string, ShapeStream>();
-  shapes = new Map<string, Shape>();
-  isConnected = false;
-
-  async connect(): Promise<void> {
-    // No-op for local-only mode
-  }
-
-  async disconnect(): Promise<void> {
-    // No-op for local-only mode
-  }
-
-  async sync(_table: string, _options?: Partial<ShapeStreamOptions>): Promise<void> {
-    // No-op for local-only mode - data stays local
-  }
-}
-
-/**
- * Create ElectricSQL connection
- */
-export async function createElectricConnection(
-  options: {
-    verbose?: boolean;
-  } = {}
-): Promise<ElectricConnection> {
-  const { verbose = false } = options;
-  const config = getElectricConfig();
-
-  // Return no-op connection if ElectricSQL is not configured
-  if (!config.isEnabled || !config.url) {
-    if (verbose) {
-      logger.info('ElectricSQL not configured - running in local-only mode');
-    }
-    return new NoOpElectricConnection();
-  }
-
-  try {
-    const streams = new Map<string, ShapeStream>();
-    const shapes = new Map<string, Shape>();
-    let isConnected = false;
-
-    const connection: ElectricConnection = {
-      streams,
-      shapes,
-      isConnected,
-
-      async connect() {
-        try {
-          isConnected = true;
-          if (verbose) {
-            logger.info('ElectricSQL connected');
-          }
-        } catch (error) {
-          throw new ElectricError(
-            'Failed to connect to ElectricSQL',
-            error instanceof Error ? error : new Error(String(error))
-          );
-        }
-      },
-
-      async disconnect() {
-        try {
-          // Clean up all active streams
-          for (const stream of streams.values()) {
-            stream.unsubscribeAll();
-          }
-          streams.clear();
-          shapes.clear();
-          isConnected = false;
-          if (verbose) {
-            logger.info('ElectricSQL disconnected');
-          }
-        } catch (error) {
-          throw new ElectricError(
-            'Failed to disconnect from ElectricSQL',
-            error instanceof Error ? error : new Error(String(error))
-          );
-        }
-      },
-
-      async sync(table: string, options: Partial<ShapeStreamOptions> = {}) {
-        try {
-          if (!isConnected) {
-            await connection.connect();
-          }
-
-          if (!config.url) {
-            throw new SyncError('ElectricSQL URL is not configured');
-          }
-
-          // Create a shape stream for the specified table
-          const stream = new ShapeStream({
-            url: config.url,
-            params: {
-              table,
-              ...options.params,
-            },
-            ...options,
-          });
-
-          // Wait for stream to establish connection
-          await new Promise<void>((resolve, reject) => {
-            let subscribed = false;
-            stream.subscribe(
-              () => {
-                if (!subscribed && stream.shapeHandle) {
-                  subscribed = true;
-                  resolve();
-                }
-              },
-              (error) => {
-                if (!subscribed) {
-                  subscribed = true;
-                  reject(error);
-                }
-              }
-            );
-          });
-
-          if (!stream.shapeHandle) {
-            throw new SyncError(`Stream for table ${table} failed to establish shapeHandle`);
-          }
-
-          // Create the shape
-          const shape = new Shape(stream as ShapeStream & { shapeHandle: string });
-
-          // Store references
-          streams.set(table, stream);
-          shapes.set(table, shape);
-
-          if (verbose) {
-            logger.info({ table }, 'Started syncing table');
-          }
-        } catch (error) {
-          throw new SyncError(
-            `Failed to sync table ${table}`,
-            error instanceof Error ? error : new Error(String(error))
-          );
-        }
-      },
-    };
-
-    return connection;
-  } catch (error) {
-    throw new ElectricError(
-      'Failed to create ElectricSQL connection',
-      error instanceof Error ? error : new Error(String(error))
-    );
-  }
+export function createElectricSync(
+  db: PgliteDatabase<typeof schema>,
+  config?: ElectricConfig
+): ElectricSync {
+  return new ElectricSync(db, config);
 }

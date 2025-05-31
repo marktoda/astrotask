@@ -1,8 +1,8 @@
-import { Text, Box } from "ink";
-import React from "react";
 import path from "path";
 import { fileURLToPath } from "url";
 import { readdir, stat } from "fs/promises";
+import { Box, Text } from "ink";
+import React from "react";
 
 export const description = "Show help and usage information";
 
@@ -16,16 +16,16 @@ interface CommandInfo {
 async function discoverCommands(): Promise<CommandInfo[]> {
 	const commands: CommandInfo[] = [];
 	const commandsDir = path.dirname(fileURLToPath(import.meta.url));
-	
+
 	try {
 		const entries = await readdir(commandsDir);
-		
+
 		for (const entry of entries) {
-			if (entry === 'index.tsx' || entry === '_app.tsx') continue;
-			
+			if (entry === "index.tsx" || entry === "_app.tsx") continue;
+
 			const entryPath = path.join(commandsDir, entry);
 			const entryStats = await stat(entryPath);
-			
+
 			if (entryStats.isDirectory()) {
 				// This is a command group (like task/, dependency/)
 				const subcommands = await discoverSubcommands(entryPath, entry);
@@ -33,7 +33,7 @@ async function discoverCommands(): Promise<CommandInfo[]> {
 					// Try to get the group description from index.tsx
 					let groupDescription = `${entry.charAt(0).toUpperCase()}${entry.slice(1)} commands`;
 					try {
-						const groupIndexPath = path.join(entryPath, 'index.tsx');
+						const groupIndexPath = path.join(entryPath, "index.tsx");
 						const groupModule = await import(groupIndexPath);
 						if (groupModule.description) {
 							groupDescription = groupModule.description;
@@ -41,24 +41,24 @@ async function discoverCommands(): Promise<CommandInfo[]> {
 					} catch {
 						// If no index.tsx or no description, use default
 					}
-					
+
 					commands.push({
 						name: entry,
 						description: groupDescription,
 						isGroup: true,
-						subcommands
+						subcommands,
 					});
 				}
-			} else if (entry.endsWith('.tsx')) {
+			} else if (entry.endsWith(".tsx")) {
 				// This is a top-level command
-				const commandName = entry.replace('.tsx', '');
+				const commandName = entry.replace(".tsx", "");
 				try {
 					const commandPath = path.join(commandsDir, entry);
 					const commandModule = await import(commandPath);
 					commands.push({
 						name: commandName,
 						description: commandModule.description || `${commandName} command`,
-						isGroup: false
+						isGroup: false,
 					});
 				} catch {
 					// Skip if we can't load the module
@@ -66,29 +66,32 @@ async function discoverCommands(): Promise<CommandInfo[]> {
 			}
 		}
 	} catch (error) {
-		console.warn('Failed to discover commands:', error);
+		console.warn("Failed to discover commands:", error);
 	}
-	
+
 	return commands.sort((a, b) => a.name.localeCompare(b.name));
 }
 
-async function discoverSubcommands(groupPath: string, groupName: string): Promise<CommandInfo[]> {
+async function discoverSubcommands(
+	groupPath: string,
+	groupName: string,
+): Promise<CommandInfo[]> {
 	const subcommands: CommandInfo[] = [];
-	
+
 	try {
 		const entries = await readdir(groupPath);
-		
+
 		for (const entry of entries) {
-			if (entry === 'index.tsx' || !entry.endsWith('.tsx')) continue;
-			
-			const commandName = entry.replace('.tsx', '');
+			if (entry === "index.tsx" || !entry.endsWith(".tsx")) continue;
+
+			const commandName = entry.replace(".tsx", "");
 			try {
 				const commandPath = path.join(groupPath, entry);
 				const commandModule = await import(commandPath);
 				subcommands.push({
 					name: commandName,
 					description: commandModule.description || `${commandName} command`,
-					isGroup: false
+					isGroup: false,
 				});
 			} catch {
 				// Skip if we can't load the module
@@ -97,7 +100,7 @@ async function discoverSubcommands(groupPath: string, groupName: string): Promis
 	} catch (error) {
 		console.warn(`Failed to discover subcommands for ${groupName}:`, error);
 	}
-	
+
 	return subcommands.sort((a, b) => a.name.localeCompare(b.name));
 }
 
@@ -135,7 +138,10 @@ export default function Help() {
 							<Box flexDirection="column" paddingLeft={4}>
 								{cmd.subcommands.map((subcmd) => (
 									<Text key={subcmd.name} color="gray">
-										<Text color="yellow">{cmd.name} {subcmd.name}</Text> - {subcmd.description}
+										<Text color="yellow">
+											{cmd.name} {subcmd.name}
+										</Text>{" "}
+										- {subcmd.description}
 									</Text>
 								))}
 							</Box>
@@ -147,13 +153,18 @@ export default function Help() {
 			<Text bold>Usage:</Text>
 			<Box flexDirection="column" paddingLeft={2}>
 				<Text>
-					<Text color="cyan">astrolabe &lt;command&gt; [options]</Text> - Run a command
+					<Text color="cyan">astrolabe &lt;command&gt; [options]</Text> - Run a
+					command
 				</Text>
 				<Text>
-					<Text color="cyan">astrolabe &lt;group&gt; &lt;subcommand&gt; [options]</Text> - Run a subcommand
+					<Text color="cyan">
+						astrolabe &lt;group&gt; &lt;subcommand&gt; [options]
+					</Text>{" "}
+					- Run a subcommand
 				</Text>
 				<Text>
-					<Text color="cyan">astrolabe &lt;command&gt; --help</Text> - Get detailed help for a command
+					<Text color="cyan">astrolabe &lt;command&gt; --help</Text> - Get
+					detailed help for a command
 				</Text>
 			</Box>
 
@@ -163,20 +174,26 @@ export default function Help() {
 					<Text color="cyan">astrolabe task list</Text> - List all tasks
 				</Text>
 				<Text>
-					<Text color="cyan">astrolabe task add --title "My Task"</Text> - Add a new task
+					<Text color="cyan">astrolabe task add --title "My Task"</Text> - Add a
+					new task
 				</Text>
 				<Text>
-					<Text color="cyan">astrolabe dependency add --dependent task1 --dependency task2</Text> - Add dependency
+					<Text color="cyan">
+						astrolabe dependency add --dependent task1 --dependency task2
+					</Text>{" "}
+					- Add dependency
 				</Text>
 				<Text>
-					<Text color="cyan">astrolabe dashboard</Text> - Launch interactive dashboard
+					<Text color="cyan">astrolabe dashboard</Text> - Launch interactive
+					dashboard
 				</Text>
 			</Box>
 
 			<Text bold>For More Information:</Text>
 			<Box flexDirection="column" paddingLeft={2}>
 				<Text>
-					• Use <Text color="cyan">astrolabe &lt;command&gt; --help</Text> for detailed command help
+					• Use <Text color="cyan">astrolabe &lt;command&gt; --help</Text> for
+					detailed command help
 				</Text>
 				<Text>
 					• Visit the documentation or README for complete usage guide
