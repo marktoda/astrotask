@@ -1,4 +1,5 @@
 import type { Task } from "@astrolabe/core";
+import { TASK_IDENTIFIERS } from "@astrolabe/core";
 import { Box, Text } from "ink";
 import { useEffect, useState } from "react";
 import { useDatabase } from "../../context/DatabaseContext.js";
@@ -40,8 +41,10 @@ export default function List() {
 		);
 	}
 
-	const rootTasks = tasks.filter((t) => !t.parentId);
-	const subtasks = tasks.filter((t) => t.parentId);
+	// Root tasks are now children of PROJECT_ROOT
+	const rootTasks = tasks.filter((t) => t.parentId === TASK_IDENTIFIERS.PROJECT_ROOT);
+	// Subtasks are children of user tasks (not PROJECT_ROOT)
+	const subtasks = tasks.filter((t) => t.parentId && t.parentId !== TASK_IDENTIFIERS.PROJECT_ROOT);
 
 	return (
 		<Box flexDirection="column">
