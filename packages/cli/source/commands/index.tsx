@@ -1,284 +1,187 @@
-import type { Task } from "@astrolabe/core";
-import { Box, Text } from "ink";
-import { useEffect, useState } from "react";
-import { useDatabase } from "../context/DatabaseContext.js";
+import { Text, Box } from "ink";
+import React from "react";
+import path from "path";
+import { fileURLToPath } from "url";
+import { readdir, stat } from "fs/promises";
 
-export const description = "Dashboard - Task overview and status";
+export const description = "Show help and usage information";
 
-interface DashboardData {
-	allTasks: Task[];
-	rootTasks: Task[];
-	recentTasks: Task[];
+interface CommandInfo {
+	name: string;
+	description: string;
+	isGroup: boolean;
+	subcommands?: CommandInfo[];
 }
 
-interface TaskStats {
-	total: number;
-	pending: number;
-	inProgress: number;
-	done: number;
-	cancelled: number;
-	archived: number;
-	completionRate: number;
-}
-
-export default function Dashboard() {
-	const db = useDatabase();
-	const [data, setData] = useState<DashboardData | null>(null);
-	const [loading, setLoading] = useState(true);
-	const [error, setError] = useState<string | null>(null);
-
-	useEffect(() => {
-		async function loadDashboardData() {
-			try {
-				const [allTasks, rootTasks] = await Promise.all([
-					db.listTasks(),
-					db.listTasks({ parentId: null }),
-				]);
-
-				// Get recent tasks (last 10, sorted by updated date)
-				const recentTasks = [...allTasks]
-					.sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
-					.slice(0, 10);
-
-				setData({
-					allTasks,
-					rootTasks,
-					recentTasks,
-				});
-			} catch (err) {
-				setError(
-					err instanceof Error ? err.message : "Failed to load dashboard data",
-				);
-			} finally {
-				setLoading(false);
+async function discoverCommands(): Promise<CommandInfo[]> {
+	const commands: CommandInfo[] = [];
+	const commandsDir = path.dirname(fileURLToPath(import.meta.url));
+	
+	try {
+		const entries = await readdir(commandsDir);
+		
+		for (const entry of entries) {
+			if (entry === 'index.tsx' || entry === '_app.tsx') continue;
+			
+			const entryPath = path.join(commandsDir, entry);
+			const entryStats = await stat(entryPath);
+			
+			if (entryStats.isDirectory()) {
+				// This is a command group (like task/, dependency/)
+				const subcommands = await discoverSubcommands(entryPath, entry);
+				if (subcommands.length > 0) {
+					// Try to get the group description from index.tsx
+					let groupDescription = `${entry.charAt(0).toUpperCase()}${entry.slice(1)} commands`;
+					try {
+						const groupIndexPath = path.join(entryPath, 'index.tsx');
+						const groupModule = await import(groupIndexPath);
+						if (groupModule.description) {
+							groupDescription = groupModule.description;
+						}
+					} catch {
+						// If no index.tsx or no description, use default
+					}
+					
+					commands.push({
+						name: entry,
+						description: groupDescription,
+						isGroup: true,
+						subcommands
+					});
+				}
+			} else if (entry.endsWith('.tsx')) {
+				// This is a top-level command
+				const commandName = entry.replace('.tsx', '');
+				try {
+					const commandPath = path.join(commandsDir, entry);
+					const commandModule = await import(commandPath);
+					commands.push({
+						name: commandName,
+						description: commandModule.description || `${commandName} command`,
+						isGroup: false
+					});
+				} catch {
+					// Skip if we can't load the module
+				}
 			}
 		}
-		loadDashboardData();
-	}, [db]);
+	} catch (error) {
+		console.warn('Failed to discover commands:', error);
+	}
+	
+	return commands.sort((a, b) => a.name.localeCompare(b.name));
+}
 
-	if (loading) return <Text>Loading dashboard...</Text>;
-	if (error) return <Text color="red">Error: {error}</Text>;
-	if (!data) return <Text color="red">No data available</Text>;
+async function discoverSubcommands(groupPath: string, groupName: string): Promise<CommandInfo[]> {
+	const subcommands: CommandInfo[] = [];
+	
+	try {
+		const entries = await readdir(groupPath);
+		
+		for (const entry of entries) {
+			if (entry === 'index.tsx' || !entry.endsWith('.tsx')) continue;
+			
+			const commandName = entry.replace('.tsx', '');
+			try {
+				const commandPath = path.join(groupPath, entry);
+				const commandModule = await import(commandPath);
+				subcommands.push({
+					name: commandName,
+					description: commandModule.description || `${commandName} command`,
+					isGroup: false
+				});
+			} catch {
+				// Skip if we can't load the module
+			}
+		}
+	} catch (error) {
+		console.warn(`Failed to discover subcommands for ${groupName}:`, error);
+	}
+	
+	return subcommands.sort((a, b) => a.name.localeCompare(b.name));
+}
 
-	const taskStats = calculateTaskStats(data.allTasks);
-	const activeRootTasks = data.rootTasks.filter(
-		(t) =>
-			t.status !== "done" &&
-			t.status !== "cancelled" &&
-			t.status !== "archived",
-	);
-	const lastUpdate = getLastUpdateTime(data.allTasks);
+export default function Help() {
+	const [commands, setCommands] = React.useState<CommandInfo[]>([]);
+	const [loading, setLoading] = React.useState(true);
+
+	React.useEffect(() => {
+		discoverCommands()
+			.then(setCommands)
+			.finally(() => setLoading(false));
+	}, []);
+
+	if (loading) {
+		return <Text>Loading commands...</Text>;
+	}
 
 	return (
 		<Box flexDirection="column" gap={1}>
-			{/* Header */}
-			<Box flexDirection="column">
-				<Text bold color="cyan">
-					🚀 Astrolabe Dashboard
+			<Text bold color="cyan">
+				🚀 Astrolabe CLI
+			</Text>
+			<Text color="gray">
+				Local-first, MCP-compatible task-navigation platform
+			</Text>
+
+			<Text bold>Available Commands:</Text>
+			<Box flexDirection="column" paddingLeft={2}>
+				{commands.map((cmd) => (
+					<Box key={cmd.name} flexDirection="column" marginBottom={1}>
+						<Text>
+							<Text color="cyan">{cmd.name}</Text> - {cmd.description}
+						</Text>
+						{cmd.isGroup && cmd.subcommands && cmd.subcommands.length > 0 && (
+							<Box flexDirection="column" paddingLeft={4}>
+								{cmd.subcommands.map((subcmd) => (
+									<Text key={subcmd.name} color="gray">
+										<Text color="yellow">{cmd.name} {subcmd.name}</Text> - {subcmd.description}
+									</Text>
+								))}
+							</Box>
+						)}
+					</Box>
+				))}
+			</Box>
+
+			<Text bold>Usage:</Text>
+			<Box flexDirection="column" paddingLeft={2}>
+				<Text>
+					<Text color="cyan">astrolabe &lt;command&gt; [options]</Text> - Run a command
 				</Text>
-				<Text color="gray">Local-first task navigation platform</Text>
+				<Text>
+					<Text color="cyan">astrolabe &lt;group&gt; &lt;subcommand&gt; [options]</Text> - Run a subcommand
+				</Text>
+				<Text>
+					<Text color="cyan">astrolabe &lt;command&gt; --help</Text> - Get detailed help for a command
+				</Text>
 			</Box>
 
-			{/* Root Tasks Overview */}
-			<Box flexDirection="column">
-				<Text bold>🎯 Root Tasks ({data.rootTasks.length})</Text>
-				{activeRootTasks.length > 0 ? (
-					<Box flexDirection="column" paddingLeft={2}>
-						{activeRootTasks.slice(0, 5).map((task) => (
-							<Text key={task.id}>
-								{getStatusIcon(task.status)} <Text bold>{task.title}</Text>
-								{task.description && (
-									<Text color="gray"> - {task.description}</Text>
-								)}
-								<Text color="magenta"> [{task.priority}]</Text>
-							</Text>
-						))}
-						{activeRootTasks.length > 5 && (
-							<Text color="gray">
-								... and {activeRootTasks.length - 5} more
-							</Text>
-						)}
-					</Box>
-				) : (
-					<Box paddingLeft={2}>
-						<Text color="gray">No active root tasks</Text>
-					</Box>
-				)}
+			<Text bold>Examples:</Text>
+			<Box flexDirection="column" paddingLeft={2}>
+				<Text>
+					<Text color="cyan">astrolabe task list</Text> - List all tasks
+				</Text>
+				<Text>
+					<Text color="cyan">astrolabe task add --title "My Task"</Text> - Add a new task
+				</Text>
+				<Text>
+					<Text color="cyan">astrolabe dependency add --dependent task1 --dependency task2</Text> - Add dependency
+				</Text>
+				<Text>
+					<Text color="cyan">astrolabe dashboard</Text> - Launch interactive dashboard
+				</Text>
 			</Box>
 
-			{/* Task Statistics */}
-			<Box flexDirection="column">
-				<Text bold>📊 Task Statistics</Text>
-				<Box flexDirection="column" paddingLeft={2}>
-					<Text>
-						Total: <Text color="cyan">{taskStats.total}</Text>
-						{" | "}
-						Completion:{" "}
-						<Text
-							color={
-								taskStats.completionRate >= 70
-									? "green"
-									: taskStats.completionRate >= 40
-										? "yellow"
-										: "red"
-							}
-						>
-							{taskStats.completionRate.toFixed(1)}%
-						</Text>
-					</Text>
-					<Box flexDirection="row" gap={2}>
-						<Text>
-							<Text color="yellow">⏳</Text> Pending: {taskStats.pending}
-						</Text>
-						<Text>
-							<Text color="blue">🔄</Text> In Progress: {taskStats.inProgress}
-						</Text>
-						<Text>
-							<Text color="green">✅</Text> Done: {taskStats.done}
-						</Text>
-						{taskStats.cancelled > 0 && (
-							<Text>
-								<Text color="red">❌</Text> Cancelled: {taskStats.cancelled}
-							</Text>
-						)}
-						{taskStats.archived > 0 && (
-							<Text>
-								<Text color="gray">📦</Text> Archived: {taskStats.archived}
-							</Text>
-						)}
-					</Box>
-				</Box>
+			<Text bold>For More Information:</Text>
+			<Box flexDirection="column" paddingLeft={2}>
+				<Text>
+					• Use <Text color="cyan">astrolabe &lt;command&gt; --help</Text> for detailed command help
+				</Text>
+				<Text>
+					• Visit the documentation or README for complete usage guide
+				</Text>
 			</Box>
-
-			{/* All Tasks Overview */}
-			{data.allTasks.length > 0 && (
-				<Box flexDirection="column">
-					<Text bold>📋 All Tasks ({data.allTasks.length})</Text>
-					<Box flexDirection="column" paddingLeft={2}>
-						{data.allTasks.slice(0, 8).map((task) => (
-							<Text key={task.id}>
-								{getStatusIcon(task.status)} {task.title}
-								{task.description && (
-									<Text color="gray"> - {task.description}</Text>
-								)}
-								<Text color="magenta"> [{task.priority}]</Text>
-								{task.parentId && <Text color="gray"> (subtask)</Text>}
-							</Text>
-						))}
-						{data.allTasks.length > 8 && (
-							<Text color="gray">
-								... and {data.allTasks.length - 8} more tasks
-							</Text>
-						)}
-					</Box>
-				</Box>
-			)}
-
-			{/* Recent Activity */}
-			{data.recentTasks.length > 0 && (
-				<Box flexDirection="column">
-					<Text bold>🕒 Recent Activity</Text>
-					<Box flexDirection="column" paddingLeft={2}>
-						{data.recentTasks.slice(0, 5).map((task) => (
-							<Text key={task.id}>
-								{getStatusIcon(task.status)} {task.title}
-								<Text color="gray">
-									{" "}
-									- {formatRelativeTime(task.updatedAt)}
-								</Text>
-							</Text>
-						))}
-					</Box>
-				</Box>
-			)}
-
-			{/* Quick Actions */}
-			<Box flexDirection="column">
-				<Text bold>⚡ Quick Actions</Text>
-				<Box flexDirection="column" paddingLeft={2}>
-					<Text>
-						<Text color="cyan">astrolabe task list</Text> - View all tasks
-					</Text>
-					<Text>
-						<Text color="cyan">astrolabe task add --title="Task name"</Text> -
-						Create a new task
-					</Text>
-					{taskStats.pending > 0 && (
-						<Text>
-							<Text color="yellow">Next:</Text> Work on {taskStats.pending}{" "}
-							pending task{taskStats.pending === 1 ? "" : "s"}
-						</Text>
-					)}
-				</Box>
-			</Box>
-
-			{/* Footer */}
-			{lastUpdate && (
-				<Box flexDirection="column" marginTop={1}>
-					<Text color="gray">
-						Last updated: {formatRelativeTime(lastUpdate)}
-					</Text>
-				</Box>
-			)}
 		</Box>
 	);
-}
-
-function calculateTaskStats(tasks: Task[]): TaskStats {
-	const total = tasks.length;
-	const pending = tasks.filter((t) => t.status === "pending").length;
-	const inProgress = tasks.filter((t) => t.status === "in-progress").length;
-	const done = tasks.filter((t) => t.status === "done").length;
-	const cancelled = tasks.filter((t) => t.status === "cancelled").length;
-	const archived = tasks.filter((t) => t.status === "archived").length;
-
-	const completionRate = total > 0 ? (done / total) * 100 : 0;
-
-	return {
-		total,
-		pending,
-		inProgress,
-		done,
-		cancelled,
-		archived,
-		completionRate,
-	};
-}
-
-function getStatusIcon(status: string): string {
-	switch (status) {
-		case "pending":
-			return "⏳";
-		case "in-progress":
-			return "🔄";
-		case "done":
-			return "✅";
-		case "cancelled":
-			return "❌";
-		case "archived":
-			return "📦";
-		default:
-			return "❓";
-	}
-}
-
-function getLastUpdateTime(tasks: Task[]): Date | null {
-	if (tasks.length === 0) return null;
-	return tasks.reduce(
-		(latest, task) => (task.updatedAt > latest ? task.updatedAt : latest),
-		tasks[0]!.updatedAt,
-	);
-}
-
-function formatRelativeTime(date: Date): string {
-	const now = new Date();
-	const diffMs = now.getTime() - date.getTime();
-	const diffMins = Math.floor(diffMs / (1000 * 60));
-	const diffHours = Math.floor(diffMins / 60);
-	const diffDays = Math.floor(diffHours / 24);
-
-	if (diffMins < 1) return "just now";
-	if (diffMins < 60) return `${diffMins}m ago`;
-	if (diffHours < 24) return `${diffHours}h ago`;
-	return `${diffDays}d ago`;
 }
