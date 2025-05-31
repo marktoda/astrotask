@@ -192,20 +192,21 @@ export class ComplexityContextService {
   private formatComplexityDescription(complexity: TaskComplexity): string {
     const lines: string[] = [];
 
-    lines.push(`**Complexity Score:** ${complexity.complexityScore}/10`);
-    lines.push(`**Recommended Subtasks:** ${complexity.recommendedSubtasks}`);
+    // Use plain text instead of markdown to avoid blessed tag parsing issues
+    lines.push(`Complexity Score: ${complexity.complexityScore}/10`);
+    lines.push(`Recommended Subtasks: ${complexity.recommendedSubtasks}`);
     lines.push('');
-    lines.push('**Analysis:**');
+    lines.push('Analysis:');
     lines.push(complexity.reasoning);
 
     if (this.config.includeRecommendations !== false) {
       lines.push('');
-      lines.push('**Expansion Guidance:**');
+      lines.push('Expansion Guidance:');
       lines.push(complexity.expansionPrompt);
 
       if (complexity.complexityScore >= (this.config.threshold || 5)) {
         lines.push('');
-        lines.push('**⚠️ High Complexity Warning:**');
+        lines.push('⚠️ High Complexity Warning:');
         lines.push('This task is recommended for breakdown into subtasks before implementation.');
       }
     }

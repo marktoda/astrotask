@@ -16,7 +16,7 @@
 		"lint:fix": "biome check --write source/",
 		"format": "biome format source/",
 		"format:fix": "biome format --write source/",
-		"test": "vitest",
+		"test": "vitest run",
 		"test:watch": "vitest",
 		"test:coverage": "vitest run --coverage",
 		"tui": "NODE_NO_WARNINGS=1 TERM=xterm-256color node dist/cli.js tui",

@@ -7,6 +7,9 @@ export class DetailPane {
 	private box: blessed.Widgets.BoxElement;
 	private content: blessed.Widgets.TextElement;
 	private unsubscribe: () => void;
+	private lastRenderedTaskId: string | null = null;
+	private lastRenderedViewMode: string | null = null;
+	private lastContextSliceCount: number = 0;
 
 	constructor(
 		private parent: blessed.Widgets.Node,
@@ -66,6 +69,20 @@ export class DetailPane {
 
 	private render(state: DashboardStore) {
 		const { selectedTaskId, trackingTree, detailViewMode } = state;
+
+		// Skip render if nothing significant has changed
+		const contextSliceCount = selectedTaskId ? state.getContextSlices(selectedTaskId).length : 0;
+		if (
+			selectedTaskId === this.lastRenderedTaskId &&
+			detailViewMode === this.lastRenderedViewMode &&
+			contextSliceCount === this.lastContextSliceCount
+		) {
+			return; // Skip unnecessary re-renders
+		}
+
+		this.lastRenderedTaskId = selectedTaskId;
+		this.lastRenderedViewMode = detailViewMode;
+		this.lastContextSliceCount = contextSliceCount;
 
 		if (!selectedTaskId || !trackingTree) {
 			this.content.setContent("No task selected");
@@ -127,7 +144,8 @@ export class DetailPane {
 
 		// Priority with icon
 		const priorityIcon = this.getPriorityIcon(task.priority);
-		lines.push(`Priority: ${priorityIcon} ${task.priority}`);
+		const priorityDisplay = priorityIcon ? `${priorityIcon} ${task.priority}` : task.priority;
+		lines.push(`Priority: ${priorityDisplay}`);
 
 		lines.push("");
 		lines.push("{gray-fg}Press 'd' for dependency graph view{/gray-fg}");
@@ -136,7 +154,8 @@ export class DetailPane {
 		// Description
 		if (task.description) {
 			lines.push("{bold}Description:{/bold}");
-			lines.push(task.description);
+			// Escape the description to prevent blessed tag parsing issues
+			lines.push(this.escapeForBlessed(task.description));
 			lines.push("");
 		}
 
@@ -151,7 +170,9 @@ export class DetailPane {
 					const descLines = slice.description.split('\n').slice(0, 2);
 					descLines.forEach(line => {
 						if (line && line.trim()) {
-							lines.push(`    {gray-fg}${line.trim()}{/gray-fg}`);
+							// Escape the line content to prevent blessed tag parsing issues
+							const escapedLine = this.escapeForBlessed(line.trim());
+							lines.push(`    {gray-fg}${escapedLine}{/gray-fg}`);
 						}
 					});
 					if (slice.description.split('\n').length > 2) {
@@ -191,8 +212,9 @@ export class DetailPane {
 					const statusIcon = this.getDependencyStatusIcon(status);
 					const statusColor = this.getDependencyStatusColor(status);
 					const priorityIcon = this.getPriorityIcon(depTaskNode.task.priority);
+					const priorityDisplay = priorityIcon ? ` ${priorityIcon}` : "";
 					lines.push(
-						`  ${statusIcon} {${statusColor}-fg}${depTaskNode.task.title}{/${statusColor}-fg}${priorityIcon}`,
+						`  ${statusIcon} {${statusColor}-fg}${depTaskNode.task.title}{/${statusColor}-fg}${priorityDisplay}`,
 					);
 				}
 			});
@@ -214,8 +236,9 @@ export class DetailPane {
 					const priorityIcon = this.getPriorityIcon(
 						dependentTaskNode.task.priority,
 					);
+					const priorityDisplay = priorityIcon ? ` ${priorityIcon}` : "";
 					lines.push(
-						`  ${statusIcon} {${statusColor}-fg}${dependentTaskNode.task.title}{/${statusColor}-fg}${priorityIcon}`,
+						`  ${statusIcon} {${statusColor}-fg}${dependentTaskNode.task.title}{/${statusColor}-fg}${priorityDisplay}`,
 					);
 				}
 			});
@@ -238,8 +261,9 @@ export class DetailPane {
 					);
 					const status = blockingTaskNode.task.status;
 					const statusIcon = this.getStatusIcon(status);
+					const priorityDisplay = priorityIcon ? ` ${priorityIcon}` : "";
 					lines.push(
-						`  ${statusIcon} {yellow-fg}${blockingTaskNode.task.title}{/yellow-fg}${priorityIcon}`,
+						`  ${statusIcon} {yellow-fg}${blockingTaskNode.task.title}{/yellow-fg}${priorityDisplay}`,
 					);
 				}
 			});
@@ -281,10 +305,11 @@ export class DetailPane {
 		const statusIcon = this.getDependencyStatusIcon(task.status);
 		const statusColor = this.getDependencyStatusColor(task.status);
 		const priorityIcon = this.getPriorityIcon(task.priority);
+		const priorityDisplay = priorityIcon ? ` ${priorityIcon}` : "";
 		const blockIcon = isBlocked ? " 🚫" : "";
 		lines.push(`{bold}📍 CURRENT TASK:{/bold}`);
 		lines.push(
-			`   ${statusIcon} {${statusColor}-fg}${task.title}{/${statusColor}-fg} ${priorityIcon}${blockIcon}`,
+			`   ${statusIcon} {${statusColor}-fg}${task.title}{/${statusColor}-fg}${priorityDisplay}${blockIcon}`,
 		);
 		lines.push("");
 
@@ -345,9 +370,10 @@ export class DetailPane {
 				const statusIcon = this.getDependencyStatusIcon(status);
 				const statusColor = this.getDependencyStatusColor(status);
 				const priorityIcon = this.getPriorityIcon(taskNode.task.priority);
+				const priorityDisplay = priorityIcon ? ` ${priorityIcon}` : "";
 
 				lines.push(
-					`${indent}${connector}${statusIcon} {${statusColor}-fg}${taskNode.task.title}{/${statusColor}-fg} ${priorityIcon}`,
+					`${indent}${connector}${statusIcon} {${statusColor}-fg}${taskNode.task.title}{/${statusColor}-fg}${priorityDisplay}`,
 				);
 
 				// Show nested dependencies/dependents (limited depth)
@@ -442,13 +468,13 @@ export class DetailPane {
 	private getPriorityIcon(priority: Task["priority"]): string {
 		switch (priority) {
 			case "high":
-				return "🔴";
+				return "!";
 			case "medium":
-				return "🟡";
+				return "";
 			case "low":
-				return "🟢";
+				return "~";
 			default:
-				return "⚪";
+				return "";
 		}
 	}
 
@@ -480,6 +506,17 @@ export class DetailPane {
 		
 		// Default
 		return { icon: "💡", color: "white" };
+	}
+
+	// Helper method to escape content that might interfere with blessed tags
+	private escapeForBlessed(text: string): string {
+		// Escape curly braces and markdown characters that might be interpreted as blessed tags
+		return text
+			.replace(/{/g, '\\{')
+			.replace(/}/g, '\\}')
+			.replace(/\*\*/g, '')  // Remove markdown bold markers
+			.replace(/\*/g, '')    // Remove markdown italic markers
+			.replace(/_/g, '\\_'); // Escape underscores
 	}
 
 	destroy() {

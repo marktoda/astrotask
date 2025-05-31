@@ -703,9 +703,9 @@ export class TaskTreeComponent {
 	private getPriorityIcon(priority: Task["priority"]): string {
 		switch (priority) {
 			case "high":
-				return " !"; // Changed back to exclamation mark to avoid emoji rendering issues
+				return " !"; // Keep consistent with detail-pane
 			case "low":
-				return " ↓";
+				return " ~"; // Change to match detail-pane
 			case "medium":
 			default:
 				return "";

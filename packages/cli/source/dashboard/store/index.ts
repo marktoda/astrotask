@@ -251,14 +251,20 @@ export function createDashboardStore(
 		},
 
 		selectTask: (taskId) => {
+			const previousTaskId = get().selectedTaskId;
 			set({ selectedTaskId: taskId });
 			
 			// Automatically load context slices for the selected task if not already loaded or loading
-			if (taskId) {
+			if (taskId && taskId !== previousTaskId) {
 				const { contextSlicesByTaskId, loadingContextSlices } = get();
 				if (!contextSlicesByTaskId.has(taskId) && !loadingContextSlices.has(taskId)) {
+					// Load context slices asynchronously without blocking
 					get().loadContextSlices(taskId).catch(error => {
 						console.error('Failed to load context slices for task:', taskId, error);
+						// Remove from loading state on error to allow retry
+						const finalLoadingSet = new Set(get().loadingContextSlices);
+						finalLoadingSet.delete(taskId);
+						set({ loadingContextSlices: finalLoadingSet });
 					});
 				}
 			}
@@ -1307,8 +1313,9 @@ export function createDashboardStore(
 				slice.title.toLowerCase().includes('complexity')
 			);
 			if (complexitySlice && complexitySlice.description) {
-				// Try to extract complexity number from description
-				const match = complexitySlice.description.match(/complexity[:\s]*(\d+(?:\.\d+)?)/i);
+				// Updated regex to match both old and new formats
+				// Matches patterns like "Complexity Score: 8/10" or "complexity: 8"
+				const match = complexitySlice.description.match(/complexity\s*(?:score\s*:)?\s*(\d+(?:\.\d+)?)/i);
 				return match && match[1] ? parseFloat(match[1]) : null;
 			}
 			return null;
