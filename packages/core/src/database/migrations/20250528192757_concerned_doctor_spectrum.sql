@@ -1,2 +1,0 @@
-ALTER TABLE "tasks" ADD CONSTRAINT "status_check" CHECK ("tasks"."status" IN ('pending', 'in-progress', 'done', 'cancelled', 'archived'));--> statement-breakpoint
-ALTER TABLE "tasks" ADD CONSTRAINT "priority_check" CHECK ("tasks"."priority" IN ('low', 'medium', 'high'));

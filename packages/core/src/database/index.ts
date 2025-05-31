@@ -21,7 +21,7 @@ const logger = createModuleLogger('database');
 
 // Get the directory of this file
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const MIGRATIONS_DIR = join(__dirname, 'migrations');
+const MIGRATIONS_DIR = join(__dirname, '..', '..', 'drizzle');
 
 export interface DatabaseOptions {
   /** Database file path or connection string */

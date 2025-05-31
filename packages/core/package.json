@@ -8,7 +8,7 @@
     "doc": "docs"
   },
   "scripts": {
-    "build": "tsc && cp -r src/database/migrations dist/database/",
+    "build": "tsc && cp -r drizzle dist/",
     "start": "tsx src/index.ts",
     "dev": "tsx watch src/index.ts",
     "type-check": "tsc --noEmit",
@@ -20,9 +20,11 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate",
-    "db:push": "drizzle-kit push",
-    "db:studio": "drizzle-kit studio"
+    "db:electrify": "node scripts/patch-electrify.js",
+    "db:migrate:remote": "drizzle-kit push",
+    "db:studio": "drizzle-kit studio",
+    "db:setup": "pnpm db:generate && pnpm db:electrify",
+    "db:deploy": "pnpm db:setup && pnpm db:migrate:remote"
   },
   "keywords": [
     "task-management",
