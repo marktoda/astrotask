@@ -6,7 +6,8 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { createDatabase, TaskService, DependencyService } from '../src/database/index.js';
+import { createDatabase } from '../src/database/index.js';
+import { TaskService } from '../src/services/TaskService.js';
 import { createTaskExpansionService, type TaskExpansionService } from '../src/services/TaskExpansionService.js';
 import { createModuleLogger } from '../src/utils/logger.js';
 import type { Store } from '../src/database/store.js';
@@ -20,7 +21,7 @@ describe('TaskExpansionService', () => {
 
   beforeEach(async () => {
     // Create in-memory database for testing
-    store = await createDatabase({ dbPath: ':memory:' });
+    store = await createDatabase({ dataDir: ':memory:' });
     taskService = new TaskService(store);
     
     // Create expansion service with test configuration

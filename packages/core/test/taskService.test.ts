@@ -30,8 +30,8 @@ let dbPath: string;
 
 beforeEach(async () => {
   // Use a unique file in temporary directory for each test run
-  dbPath = join(tmpdir(), `taskservice-test-${Date.now()}.db`);
-  store = await createDatabase({ dbPath, verbose: false });
+  dbPath = join(tmpdir(), `taskservice-test-${Date.now()}`);
+  store = await createDatabase({ dataDir: dbPath, verbose: false });
 
   // Seed a small task hierarchy - create them one by one to get the auto-generated IDs
   const taskA = await store.addTask(createTask({ title: 'Task A' }));
@@ -91,9 +91,8 @@ describe('TaskService', () => {
   it('returns ordered ancestors (root first)', async () => {
     const { A11, A, A1 } = (global as any).testTaskIds;
     const ancestors = await service.getTaskAncestors(A11);
-    // Filter out PROJECT_ROOT since it's now automatically included as the ultimate parent
-    const userAncestors = ancestors.filter(a => a.id !== TASK_IDENTIFIERS.PROJECT_ROOT);
-    expect(userAncestors.map((a) => a.id)).toEqual([A, A1]);
+    // Should return ancestors in order from root to immediate parent
+    expect(ancestors.map((a) => a.id)).toEqual([A, A1]);
   });
 
   it('lists all descendants', async () => {
@@ -105,10 +104,10 @@ describe('TaskService', () => {
 
   it('calculates correct task depth', async () => {
     const { A, A1, A11 } = (global as any).testTaskIds;
-    // Depths are now 1 higher because PROJECT_ROOT is the ultimate parent
-    expect(await service.getTaskDepth(A)).toBe(1);
-    expect(await service.getTaskDepth(A1)).toBe(2);
-    expect(await service.getTaskDepth(A11)).toBe(3);
+    // Depths start from 0 for root tasks
+    expect(await service.getTaskDepth(A)).toBe(0);
+    expect(await service.getTaskDepth(A1)).toBe(1);
+    expect(await service.getTaskDepth(A11)).toBe(2);
   });
 
   it('moves task subtree to a new parent', async () => {
@@ -143,6 +142,8 @@ describe('TaskService', () => {
     expect(new Set(statuses)).toEqual(new Set(['done']));
   });
 
+  // Commented out - PROJECT_ROOT functionality was removed in simplification
+  /*
   describe('Project Tree functionality', () => {
     it('returns project tree with all parentless tasks when no ID provided', async () => {
       const projectTree = await service.getTaskTree();
@@ -233,12 +234,13 @@ describe('TaskService', () => {
       expect(projectTree!.getChildren()).toHaveLength(0); // No child tasks
     });
   });
+  */
 
   describe('Store operations', () => {
     it('should list all tasks', async () => {
       const tasks = await store.listTasks();
-      // Now includes PROJECT_ROOT task, so 6 total: Task A, A1, A2, A11, B, and PROJECT_ROOT
-      expect(tasks).toHaveLength(6);
+      // Should have 5 tasks: Task A, A1, A2, A11, and B
+      expect(tasks).toHaveLength(5);
     });
 
     it('should list root tasks', async () => {
@@ -261,7 +263,7 @@ describe('TaskService', () => {
 
       expect(newTask.id).toBeDefined();
       expect(newTask.title).toBe('New Task');
-      expect(newTask.parentId).toBe(TASK_IDENTIFIERS.PROJECT_ROOT);
+      expect(newTask.parentId).toBe(null); // Root tasks have null parentId
       expect(newTask.status).toBe('pending');
     });
 

@@ -182,8 +182,9 @@ describe('Task ID Generation', () => {
   let dbPath: string;
 
   beforeEach(async () => {
-    dbPath = join(tmpdir(), `taskid-test-${Date.now()}.db`);
-    store = await createDatabase({ dbPath, verbose: false });
+    // Create a unique database for each test
+    dbPath = join(tmpdir(), `task-id-test-${Date.now()}`);
+    store = await createDatabase({ dataDir: dbPath, verbose: false });
   });
 
   afterEach(async () => {
@@ -360,23 +361,22 @@ describe('Task ID Generation', () => {
   });
 
   describe('PROJECT_ROOT handling', () => {
-    it('should generate root-level IDs for tasks with PROJECT_ROOT as parent', async () => {
-      // Create a task with PROJECT_ROOT as explicit parent
+    it('should generate root-level IDs for tasks with null parent', async () => {
+      // Create a task without parent
       const task = await store.addTask({
         title: 'Test Task',
-        description: 'Test task with PROJECT_ROOT parent',
+        description: 'Test task with no parent',
         status: 'pending',
         priority: 'medium',
-        parentId: TASK_IDENTIFIERS.PROJECT_ROOT,
+        // parentId omitted - will be undefined/null
       });
 
       // Should get a root-level task ID (4 uppercase letters)
       expect(task.id).toMatch(/^[A-Z]{4}$/);
-      expect(task.id).not.toContain(TASK_IDENTIFIERS.PROJECT_ROOT);
-      expect(task.parentId).toBe(TASK_IDENTIFIERS.PROJECT_ROOT);
+      expect(task.parentId).toBe(null); // Simplified - no PROJECT_ROOT
     });
 
-    it('should generate subtask IDs for tasks with non-PROJECT_ROOT parent', async () => {
+    it('should generate subtask IDs for tasks with non-null parent', async () => {
       // First create a root task
       const rootTask = await store.addTask({
         title: 'Root Task',
@@ -399,7 +399,7 @@ describe('Task ID Generation', () => {
       expect(subtask.parentId).toBe(rootTask.id);
     });
 
-    it('should treat undefined parentId same as PROJECT_ROOT for ID generation', async () => {
+    it('should treat undefined parentId same as null for ID generation', async () => {
       // Create task with undefined parentId
       const task1 = await store.addTask({
         title: 'Task 1',
@@ -409,26 +409,22 @@ describe('Task ID Generation', () => {
         // parentId is undefined
       });
 
-      // Create task with explicit PROJECT_ROOT parentId
+      // Create task with explicit undefined parentId
       const task2 = await store.addTask({
         title: 'Task 2',
-        description: 'Task with PROJECT_ROOT parent',
+        description: 'Task with null parent',
         status: 'pending',
         priority: 'medium',
-        parentId: TASK_IDENTIFIERS.PROJECT_ROOT,
+        parentId: undefined,
       });
 
       // Both should get root-level task IDs
       expect(task1.id).toMatch(/^[A-Z]{4}$/);
       expect(task2.id).toMatch(/^[A-Z]{4}$/);
       
-      // Both should have PROJECT_ROOT as parent in database
-      expect(task1.parentId).toBe(TASK_IDENTIFIERS.PROJECT_ROOT);
-      expect(task2.parentId).toBe(TASK_IDENTIFIERS.PROJECT_ROOT);
-      
-      // Neither should contain PROJECT_ROOT in their ID
-      expect(task1.id).not.toContain(TASK_IDENTIFIERS.PROJECT_ROOT);
-      expect(task2.id).not.toContain(TASK_IDENTIFIERS.PROJECT_ROOT);
+      // Both should have null as parent in database
+      expect(task1.parentId).toBe(null);
+      expect(task2.parentId).toBe(null);
     });
   });
 

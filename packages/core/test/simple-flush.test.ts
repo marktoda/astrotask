@@ -16,8 +16,8 @@ describe('Simple Flush Test', () => {
   let dbPath: string;
 
   beforeAll(async () => {
-    dbPath = join(tmpdir(), `simple-flush-test-${Date.now()}.db`);
-    store = await createDatabase({ dbPath, verbose: false });
+    dbPath = join(tmpdir(), `simple-flush-test-${Date.now()}`);
+    store = await createDatabase({ dataDir: dbPath, verbose: false });
     taskService = new TaskService(store);
   });
 
@@ -31,12 +31,10 @@ describe('Simple Flush Test', () => {
   });
 
   beforeEach(async () => {
-    // Clear all tasks except PROJECT_ROOT
+    // Clear all tasks - no more PROJECT_ROOT to filter
     const allTasks = await store.listTasks({});
     for (const task of allTasks) {
-      if (task.id !== TASK_IDENTIFIERS.PROJECT_ROOT) {
-        await store.deleteTask(task.id);
-      }
+      await store.deleteTask(task.id);
     }
   });
 

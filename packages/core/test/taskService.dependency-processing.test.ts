@@ -19,8 +19,8 @@ describe('TaskService Dependency Processing', () => {
   let dbPath: string;
 
   beforeAll(async () => {
-    dbPath = join(tmpdir(), `dependency-test-${Date.now()}.db`);
-    store = await createDatabase({ dbPath, verbose: false });
+    dbPath = join(tmpdir(), `dependency-test-${Date.now()}`);
+    store = await createDatabase({ dataDir: dbPath, verbose: false });
     taskService = new TaskService(store);
     dependencyService = new DependencyService(store);
   });
@@ -35,12 +35,10 @@ describe('TaskService Dependency Processing', () => {
   });
 
   beforeEach(async () => {
-    // Clear all tasks and dependencies except PROJECT_ROOT
+    // Clear all tasks and dependencies - no more PROJECT_ROOT to filter
     const allTasks = await store.listTasks({});
     for (const task of allTasks) {
-      if (task.id !== TASK_IDENTIFIERS.PROJECT_ROOT) {
-        await store.deleteTask(task.id);
-      }
+      await store.deleteTask(task.id);
     }
   });
 
