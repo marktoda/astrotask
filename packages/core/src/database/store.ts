@@ -8,7 +8,6 @@ import type {
 } from '../schemas/contextSlice.js';
 import type { CreateTask as NewTask, Task, TaskStatus } from '../schemas/task.js';
 import { generateNextTaskId } from '../utils/taskId.js';
-import type { ElectricSync } from './electric.js';
 import * as schema from './schema.js';
 
 /**
@@ -24,8 +23,6 @@ export interface Store {
   readonly pgLite: PGlite;
   /** Type-safe Drizzle ORM instance */
   readonly sql: PgliteDatabase<typeof schema>;
-  /** Electric SQL sync integration (optional) */
-  readonly electric: ElectricSync | undefined;
   /** Whether encryption is enabled */
   readonly isEncrypted: boolean;
   /** Whether sync is currently active */
@@ -62,23 +59,19 @@ export interface Store {
 export class DatabaseStore implements Store {
   public readonly pgLite: PGlite;
   public readonly sql: PgliteDatabase<typeof schema>;
-  public readonly electric: ElectricSync | undefined;
   public readonly isEncrypted: boolean;
+  public readonly isSyncing: boolean;
 
   constructor(
     pgLite: PGlite,
     sql: PgliteDatabase<typeof schema>,
-    electric?: ElectricSync,
+    isSyncing = false,
     isEncrypted = false
   ) {
     this.pgLite = pgLite;
     this.sql = sql;
-    this.electric = electric;
+    this.isSyncing = isSyncing;
     this.isEncrypted = isEncrypted;
-  }
-
-  get isSyncing(): boolean {
-    return this.electric?.syncing ?? false;
   }
 
   // Task operations
@@ -212,11 +205,6 @@ export class DatabaseStore implements Store {
 
   // System operations
   async close(): Promise<void> {
-    // Stop Electric SQL sync if active
-    if (this.electric) {
-      await this.electric.stop();
-    }
-
     // Close PGlite connection
     await this.pgLite.close();
   }

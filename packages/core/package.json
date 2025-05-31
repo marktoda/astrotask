@@ -8,7 +8,7 @@
     "doc": "docs"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && cp -r src/database/migrations dist/database/",
     "start": "tsx src/index.ts",
     "dev": "tsx watch src/index.ts",
     "type-check": "tsc --noEmit",
@@ -49,9 +49,10 @@
   "dependencies": {
     "@electric-sql/client": "^1.0.4",
     "@electric-sql/pglite": "^0.3.2",
+    "@electric-sql/pglite-sync": "^0.3.5",
+    "@langchain/community": "^0.3.19",
     "@langchain/core": "^0.3.57",
     "@langchain/openai": "^0.5.11",
-    "@langchain/community": "^0.3.19",
     "@modelcontextprotocol/sdk": "^1.12.0",
     "@prisma/client": "6.7.0",
     "clipanion": "4.0.0-rc.4",

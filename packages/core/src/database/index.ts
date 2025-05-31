@@ -2,18 +2,18 @@
  * Database initialization and factory functions
  *
  * This module provides simplified database creation with optional Electric SQL sync.
- * The approach prioritizes simplicity and reliability over complex features.
+ * Uses the official @electric-sql/pglite-sync plugin for automatic sync management.
  */
 
 import { mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PGlite } from '@electric-sql/pglite';
+import { electricSync } from '@electric-sql/pglite-sync';
 import { drizzle } from 'drizzle-orm/pglite';
 import { migrate } from 'drizzle-orm/pglite/migrator';
 import { cfg } from '../utils/config.js';
 import { createModuleLogger } from '../utils/logger.js';
-import { type ElectricConfig, type ElectricSync, createElectricSync } from './electric.js';
 import * as schema from './schema.js';
 import { DatabaseStore, type Store } from './store.js';
 
@@ -28,8 +28,10 @@ export interface DatabaseOptions {
   dataDir?: string;
   /** Enable Electric SQL synchronization */
   enableSync?: boolean;
-  /** Electric SQL configuration */
-  electricConfig?: ElectricConfig;
+  /** Electric SQL server URL */
+  electricUrl?: string;
+  /** Tables to sync */
+  syncTables?: string[];
   /** Enable encryption */
   enableEncryption?: boolean;
   /** Verbose logging */
@@ -60,7 +62,8 @@ export async function createDatabase(options: DatabaseOptions = {}): Promise<Sto
   const {
     dataDir = cfg.DATA_DIR,
     enableSync = true,
-    electricConfig = {},
+    electricUrl = cfg.ELECTRIC_URL,
+    syncTables = ['tasks', 'context_slices'],
     enableEncryption = false,
     verbose = cfg.DB_VERBOSE,
   } = options;
@@ -73,9 +76,11 @@ export async function createDatabase(options: DatabaseOptions = {}): Promise<Sto
     // Ensure data directory exists
     ensureDataDir(dataDir);
 
-    // Initialize PGlite
-    const pgLite = new PGlite(dataDir, {
+    // Initialize PGlite with Electric sync extension if enabled
+    const pgLite = await PGlite.create({
+      dataDir,
       debug: verbose ? 1 : 0,
+      extensions: enableSync && electricUrl ? { electric: electricSync() } : {},
     });
 
     // Initialize Drizzle ORM
@@ -84,27 +89,61 @@ export async function createDatabase(options: DatabaseOptions = {}): Promise<Sto
     // Run migrations
     await migrate(db, { migrationsFolder: MIGRATIONS_DIR });
 
-    // Initialize Electric SQL sync if enabled
-    let electricSync: ElectricSync | undefined;
-    if (enableSync) {
-      const syncUrl = electricConfig.syncUrl || cfg.ELECTRIC_URL;
-      const syncConfig: ElectricConfig = {
-        ...(syncUrl && { syncUrl }),
-        tables: electricConfig.tables || ['tasks', 'context_slices'],
-        verbose: electricConfig.verbose ?? verbose,
-      };
-
-      electricSync = createElectricSync(db, syncConfig);
-
+    // Start Electric SQL sync if enabled
+    let isSyncing = false;
+    if (enableSync && electricUrl && 'electric' in pgLite) {
       try {
-        await electricSync.start();
+        // Sync each configured table
+        for (const tableName of syncTables) {
+          logger.debug({ table: tableName }, 'Starting sync for table');
+
+          // Map database column names to shape column names
+          const columnMap =
+            tableName === 'tasks'
+              ? {
+                  id: 'id',
+                  title: 'title',
+                  description: 'description',
+                  status: 'status',
+                  priority: 'priority',
+                  prd: 'prd',
+                  contextDigest: 'context_digest',
+                  parentId: 'parent_id',
+                  createdAt: 'created_at',
+                  updatedAt: 'updated_at',
+                }
+              : tableName === 'context_slices'
+                ? {
+                    id: 'id',
+                    title: 'title',
+                    description: 'description',
+                    taskId: 'task_id',
+                    contextDigest: 'context_digest',
+                    createdAt: 'created_at',
+                    updatedAt: 'updated_at',
+                  }
+                : {};
+
+          await pgLite.electric.syncShapeToTable({
+            shape: {
+              url: `${electricUrl}/v1/shape/${tableName}`,
+            },
+            shapeKey: tableName,
+            table: tableName,
+            primaryKey: ['id'],
+            mapColumns: columnMap,
+          });
+        }
+
+        isSyncing = true;
+        logger.info({ tables: syncTables }, 'Electric SQL sync started successfully');
       } catch (error) {
         logger.warn({ error }, 'Failed to start Electric SQL sync - continuing in local-only mode');
       }
     }
 
     // Create store
-    const store = new DatabaseStore(pgLite, db, electricSync, enableEncryption);
+    const store = new DatabaseStore(pgLite, db, isSyncing, enableEncryption);
 
     if (verbose) {
       logger.info(
@@ -137,20 +176,22 @@ export async function createLocalDatabase(dataDir?: string): Promise<Store> {
 /**
  * Create a synced database with Electric SQL
  */
-export async function createSyncedDatabase(
-  dataDir?: string,
-  electricConfig?: ElectricConfig
-): Promise<Store> {
+export async function createSyncedDatabase(dataDir?: string, electricUrl?: string): Promise<Store> {
+  const url = electricUrl || cfg.ELECTRIC_URL;
+  if (!url) {
+    logger.warn('No Electric URL provided, creating local-only database');
+    return createLocalDatabase(dataDir);
+  }
+
   return createDatabase({
     dataDir: dataDir ?? cfg.DATA_DIR,
     enableSync: true,
-    electricConfig: electricConfig ?? {},
+    electricUrl: url,
     verbose: cfg.DB_VERBOSE,
   });
 }
 
 // Re-export types and utilities
 export type { Store } from './store.js';
-export type { ElectricConfig } from './electric.js';
 export { DatabaseStore } from './store.js';
 export * from './schema.js';
