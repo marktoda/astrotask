@@ -7,6 +7,8 @@ import {
   MinimalHandlers,
   parsePRDSchema,
   expandTaskSchema,
+  expandTasksBatchSchema,
+  expandHighComplexityTasksSchema,
   addDependencySchema,
   getNextTaskSchema,
   analyzeNodeComplexitySchema,
@@ -29,7 +31,7 @@ async function main() {
   });
 
   // Initialize database and services
-  const dbOptions: DatabaseOptions = { dbPath: 'mcp.db' };
+  const dbOptions: DatabaseOptions = { dbPath: process.env.DATABASE_PATH || 'astrolabe.db' };
   const store = await createDatabase(dbOptions);
   const taskService = new TaskService(store);
   const dependencyService = new DependencyService(store);
@@ -58,6 +60,20 @@ async function main() {
     expandTaskSchema.shape,
     wrapMCPHandler(async (args) => {
       return handlers.expandTask(args);
+    })
+  );
+
+  server.tool('expandTasksBatch',
+    expandTasksBatchSchema.shape,
+    wrapMCPHandler(async (args) => {
+      return handlers.expandTasksBatch(args);
+    })
+  );
+
+  server.tool('expandHighComplexityTasks',
+    expandHighComplexityTasksSchema.shape,
+    wrapMCPHandler(async (args) => {
+      return handlers.expandHighComplexityTasks(args);
     })
   );
 
@@ -100,7 +116,7 @@ async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
 
-  logger.info('Astrolabe MCP Server started with 7 tools: parsePRD, expandTask, addDependency, getNextTask, analyze_node_complexity, analyze_project_complexity, complexity_report');
+  logger.info('Astrolabe MCP Server started with 9 tools: parsePRD, expandTask, expandTasksBatch, expandHighComplexityTasks, addDependency, getNextTask, analyze_node_complexity, analyze_project_complexity, complexity_report');
 }
 
 // Handle cleanup on process termination

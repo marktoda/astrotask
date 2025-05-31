@@ -64,6 +64,38 @@ export const expandTaskSchema = z.object({
   context: z.string().optional(),
   /** Number of subtasks to create */
   numSubtasks: z.number().min(1).max(20).optional(),
+  /** Whether to use research mode for expansion */
+  research: z.boolean().optional().default(false),
+  /** Whether to force replace existing subtasks */
+  force: z.boolean().optional().default(false),
+});
+
+/**
+ * Schema for batch task expansion
+ */
+export const expandTasksBatchSchema = z.object({
+  /** Array of task IDs to expand */
+  taskIds: z.array(z.string()).min(1, "At least one task ID required"),
+  /** Optional context or instructions for expansion */
+  context: z.string().optional(),
+  /** Number of subtasks to create per task */
+  numSubtasks: z.number().min(1).max(20).optional(),
+  /** Whether to use research mode for expansion */
+  research: z.boolean().optional().default(false),
+  /** Whether to force replace existing subtasks */
+  force: z.boolean().optional().default(false),
+});
+
+/**
+ * Schema for automatically expanding high-complexity tasks
+ */
+export const expandHighComplexityTasksSchema = z.object({
+  /** Complexity threshold for automatic expansion */
+  complexityThreshold: z.number().min(1).max(10).optional().default(5),
+  /** Whether to use research mode for expansion */
+  research: z.boolean().optional().default(false),
+  /** Whether to force replace existing subtasks */
+  force: z.boolean().optional().default(false),
 });
 
 /**
@@ -122,6 +154,8 @@ export const complexityReportSchema = z.object({
  */
 export type ParsePRDInput = z.infer<typeof parsePRDSchema>;
 export type ExpandTaskInput = z.infer<typeof expandTaskSchema>;
+export type ExpandTasksBatchInput = z.infer<typeof expandTasksBatchSchema>;
+export type ExpandHighComplexityTasksInput = z.infer<typeof expandHighComplexityTasksSchema>;
 export type AddDependencyInput = z.infer<typeof addDependencySchema>;
 export type GetNextTaskInput = z.infer<typeof getNextTaskSchema>;
 export type AnalyzeNodeComplexityInput = z.infer<typeof analyzeNodeComplexitySchema>;

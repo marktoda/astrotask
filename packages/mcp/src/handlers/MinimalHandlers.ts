@@ -19,19 +19,22 @@ import {
   TrackingTaskTree,
 } from '@astrolabe/core';
 import type {
+  ParsePRDInput,
+  ExpandTaskInput,
+  ExpandTasksBatchInput,
+  ExpandHighComplexityTasksInput,
   AddDependencyInput,
+  GetNextTaskInput,
   AnalyzeComplexityInput,
   AnalyzeNodeComplexityInput,
   ComplexityReportInput,
-  ExpandTaskInput,
-  GetNextTaskInput,
   HandlerContext,
   MCPHandler,
-  ParsePRDInput,
 } from './types.js';
 import type { Task, TaskDependency, TaskTree, ContextSlice } from '@astrolabe/core';
 import { 
   createPRDTaskGenerator, 
+  createTaskExpansionService
 } from '@astrolabe/core';
 
 export class MinimalHandlers implements MCPHandler {
@@ -101,46 +104,49 @@ export class MinimalHandlers implements MCPHandler {
     parentTask: Task;
     subtasks: Task[];
     message: string;
+    usedComplexityAnalysis?: boolean;
+    contextSlicesCreated?: number;
+    metadata?: {
+      expansionMethod: 'complexity-guided' | 'manual' | 'default';
+      recommendedSubtasks?: number;
+      actualSubtasks: number;
+      researchEnabled: boolean;
+      forcedReplacement: boolean;
+    };
   }> {
     try {
-      // Get the parent task
-      const parentTask = await this.context.store.getTask(args.taskId);
-      if (!parentTask) {
-        throw new Error(`Task ${args.taskId} not found`);
-      }
+      // Create task expansion service with configuration
+      const expansionService = createTaskExpansionService(
+        this.logger,
+        this.context.store,
+        this.context.taskService,
+        {
+          useComplexityAnalysis: true,
+          research: false, // Default to false, will be overridden by args
+          complexityThreshold: 5,
+          defaultSubtasks: 3,
+          maxSubtasks: 20,
+          forceReplace: false,
+          createContextSlices: true,
+        }
+      );
 
-      // Create a simple expansion prompt
-      const expansionContent = `
-Expand this task into ${args.numSubtasks || 3} concrete subtasks:
-
-Title: ${parentTask.title}
-Description: ${parentTask.description || 'No description'}
-
-${args.context ? `Additional context: ${args.context}` : ''}
-
-Each subtask should be specific and actionable.
-`;
-
-      // Use PRD generator to create subtasks
-      const prdGenerator = createPRDTaskGenerator(this.logger, this.context.store);
-      const result = await prdGenerator.generate({
-        content: expansionContent,
-        context: {
-          parentTaskId: args.taskId,
-        },
-        metadata: {
-          maxTasks: args.numSubtasks || 3,
-        },
+      // Use the enhanced expansion service
+      const result = await expansionService.expandTask({
+        taskId: args.taskId,
+        numSubtasks: args.numSubtasks,
+        context: args.context,
+        research: args.research ?? false,
+        force: args.force ?? false,
       });
 
-      // Apply the generated subtasks
-      const { updatedTree } = await result.tree.flush(this.context.taskService);
-      const subtasks = updatedTree.getChildren().map(child => child.task);
-
       return {
-        parentTask,
-        subtasks,
-        message: `Successfully expanded task ${args.taskId} into ${subtasks.length} subtasks`
+        parentTask: result.parentTask,
+        subtasks: result.subtasks,
+        message: result.message,
+        usedComplexityAnalysis: result.usedComplexityAnalysis,
+        contextSlicesCreated: result.contextSlicesCreated,
+        metadata: result.metadata,
       };
     } catch (error) {
       this.logger.error('Task expansion failed', {
@@ -473,6 +479,164 @@ Each subtask should be specific and actionable.
     } catch (error) {
       this.logger.error('Loading complexity data from database failed', {
         error: error instanceof Error ? error.message : String(error),
+        requestId: this.context.requestId,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Expand multiple tasks in batch
+   */
+  async expandTasksBatch(args: ExpandTasksBatchInput): Promise<{
+    results: Array<{
+      parentTask: Task;
+      subtasks: Task[];
+      message: string;
+      usedComplexityAnalysis: boolean;
+      contextSlicesCreated: number;
+      metadata: {
+        expansionMethod: 'complexity-guided' | 'manual' | 'default';
+        recommendedSubtasks?: number;
+        actualSubtasks: number;
+        researchEnabled: boolean;
+        forcedReplacement: boolean;
+      };
+    }>;
+    summary: {
+      totalTasks: number;
+      successfulExpansions: number;
+      failedExpansions: number;
+      totalSubtasksCreated: number;
+    };
+    message: string;
+  }> {
+    try {
+      // Create task expansion service
+      const expansionService = createTaskExpansionService(
+        this.logger,
+        this.context.store,
+        this.context.taskService,
+        {
+          useComplexityAnalysis: true,
+          research: args.research ?? false,
+          complexityThreshold: 5,
+          defaultSubtasks: 3,
+          maxSubtasks: 20,
+          forceReplace: args.force ?? false,
+          createContextSlices: true,
+        }
+      );
+
+      // Expand tasks in batch
+      const results = await expansionService.expandTasksBatch(args.taskIds, {
+        numSubtasks: args.numSubtasks,
+        context: args.context,
+        research: args.research,
+        force: args.force,
+      });
+
+      const summary = {
+        totalTasks: args.taskIds.length,
+        successfulExpansions: results.length,
+        failedExpansions: args.taskIds.length - results.length,
+        totalSubtasksCreated: results.reduce((sum, result) => sum + result.subtasks.length, 0),
+      };
+
+      const message = `Batch expansion completed: ${summary.successfulExpansions}/${summary.totalTasks} tasks expanded, ${summary.totalSubtasksCreated} subtasks created`;
+
+      return {
+        results,
+        summary,
+        message,
+      };
+    } catch (error) {
+      this.logger.error('Batch task expansion failed', {
+        error: error instanceof Error ? error.message : String(error),
+        taskIds: args.taskIds,
+        requestId: this.context.requestId,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Automatically expand high-complexity tasks
+   */
+  async expandHighComplexityTasks(args: ExpandHighComplexityTasksInput): Promise<{
+    complexityReport: {
+      meta: {
+        generatedAt: string;
+        tasksAnalyzed: number;
+        totalTasks: number;
+        analysisCount: number;
+        thresholdScore: number;
+        projectName?: string;
+        usedResearch: boolean;
+      };
+      complexityAnalysis: Array<{
+        taskId: string;
+        taskTitle: string;
+        complexityScore: number;
+        recommendedSubtasks: number;
+        expansionPrompt: string;
+        reasoning: string;
+      }>;
+    };
+    expansionResults: Array<{
+      parentTask: Task;
+      subtasks: Task[];
+      message: string;
+      usedComplexityAnalysis: boolean;
+      contextSlicesCreated: number;
+      metadata: {
+        expansionMethod: 'complexity-guided' | 'manual' | 'default';
+        recommendedSubtasks?: number;
+        actualSubtasks: number;
+        researchEnabled: boolean;
+        forcedReplacement: boolean;
+      };
+    }>;
+    summary: {
+      tasksAnalyzed: number;
+      highComplexityTasks: number;
+      tasksExpanded: number;
+      totalSubtasksCreated: number;
+    };
+    message: string;
+  }> {
+    try {
+      // Create task expansion service
+      const expansionService = createTaskExpansionService(
+        this.logger,
+        this.context.store,
+        this.context.taskService,
+        {
+          useComplexityAnalysis: true,
+          research: args.research ?? false,
+          complexityThreshold: args.complexityThreshold ?? 5,
+          defaultSubtasks: 3,
+          maxSubtasks: 20,
+          forceReplace: args.force ?? false,
+          createContextSlices: true,
+        }
+      );
+
+      // Analyze and expand high-complexity tasks
+      const result = await expansionService.expandHighComplexityTasks(args.complexityThreshold);
+
+      const message = `High-complexity task expansion completed: ${result.summary.tasksExpanded}/${result.summary.highComplexityTasks} high-complexity tasks expanded, ${result.summary.totalSubtasksCreated} subtasks created`;
+
+      return {
+        complexityReport: result.complexityReport,
+        expansionResults: result.expansionResults,
+        summary: result.summary,
+        message,
+      };
+    } catch (error) {
+      this.logger.error('High-complexity task expansion failed', {
+        error: error instanceof Error ? error.message : String(error),
+        complexityThreshold: args.complexityThreshold,
         requestId: this.context.requestId,
       });
       throw error;

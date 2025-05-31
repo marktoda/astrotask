@@ -12,6 +12,8 @@ export { MinimalHandlers } from './MinimalHandlers.js';
 export { 
   parsePRDSchema,
   expandTaskSchema,
+  expandTasksBatchSchema,
+  expandHighComplexityTasksSchema,
   addDependencySchema,
   getNextTaskSchema,
   analyzeNodeComplexitySchema,
@@ -19,6 +21,8 @@ export {
   complexityReportSchema,
   type ParsePRDInput,
   type ExpandTaskInput,
+  type ExpandTasksBatchInput,
+  type ExpandHighComplexityTasksInput,
   type AddDependencyInput,
   type GetNextTaskInput,
   type AnalyzeNodeComplexityInput,

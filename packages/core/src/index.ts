@@ -152,6 +152,15 @@ export {
   type ComplexityContextConfig,
 } from './services/ComplexityContextService.js';
 
+// Task expansion exports
+export {
+  TaskExpansionService,
+  createTaskExpansionService,
+  type TaskExpansionConfig,
+  type TaskExpansionInput,
+  type TaskExpansionResult,
+} from './services/TaskExpansionService.js';
+
 // Configuration and models
 export * from './utils/config.js';
 export * from './utils/models.js';
