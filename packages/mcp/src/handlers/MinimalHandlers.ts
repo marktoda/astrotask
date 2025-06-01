@@ -9,7 +9,7 @@
  * - listTasks: List tasks with optional filters
  */
 
-import { createModuleLogger } from '@astrolabe/core';
+import { createModuleLogger, TASK_IDENTIFIERS, validateTaskId } from '@astrolabe/core';
 import { TrackingTaskTree } from '@astrolabe/core';
 import type {
   GetNextTaskInput,
@@ -38,8 +38,8 @@ export class MinimalHandlers implements MCPHandler {
     message: string;
     context?: {
       ancestors: Task[];
-      descendants: TaskTree[];
-      root: TaskTree | null;
+      descendants: { task: Task; children: any[] }[]; // TaskTreeData[]
+      root: { task: Task; children: any[] } | null; // TaskTreeData | null
       dependencies: Task[];
       dependents: Task[];
       isBlocked: boolean;
@@ -115,8 +115,8 @@ export class MinimalHandlers implements MCPHandler {
           
           context = {
             ancestors: taskWithContext.ancestors,
-            descendants: taskWithContext.descendants,
-            root: taskWithContext.root,
+            descendants: taskWithContext.descendants.map(tree => tree.toPlainObject()), // Convert to plain objects
+            root: taskWithContext.root ? taskWithContext.root.toPlainObject() : null, // Convert to plain object
             dependencies: taskWithContext.dependencies,
             dependents: taskWithContext.dependents,
             isBlocked: taskWithContext.isBlocked,
@@ -160,6 +160,37 @@ export class MinimalHandlers implements MCPHandler {
     try {
       const createdTasks: Task[] = [];
       const dependenciesCreated: TaskDependency[] = [];
+
+      // Validate all tasks before creating any
+      for (let i = 0; i < args.tasks.length; i++) {
+        const taskInput = args.tasks[i];
+        
+        // Validate that parentTaskId doesn't contain __PROJECT_ROOT__
+        if (taskInput.parentTaskId) {
+          // If parent is literally __PROJECT_ROOT__, treat it as null (root task)
+          if (taskInput.parentTaskId === TASK_IDENTIFIERS.PROJECT_ROOT) {
+            this.logger.warn(`Task ${i} has PROJECT_ROOT as parent, treating as root task`);
+            taskInput.parentTaskId = undefined;
+          } else if (taskInput.parentTaskId.includes(TASK_IDENTIFIERS.PROJECT_ROOT)) {
+            throw new Error(`Task ${i} has invalid parent ID containing PROJECT_ROOT: ${taskInput.parentTaskId}. PROJECT_ROOT should not be part of task IDs.`);
+          } else if (!validateTaskId(taskInput.parentTaskId)) {
+            throw new Error(`Task ${i} has invalid parent ID format: ${taskInput.parentTaskId}`);
+          }
+        }
+        
+        // Validate title and description
+        if (!taskInput.title || taskInput.title.trim().length === 0) {
+          throw new Error(`Task ${i} has empty or missing title`);
+        }
+        
+        if (taskInput.title.length > 200) {
+          throw new Error(`Task ${i} title is too long (${taskInput.title.length} chars, max 200)`);
+        }
+        
+        if (taskInput.description && taskInput.description.length > 1000) {
+          throw new Error(`Task ${i} description is too long (${taskInput.description.length} chars, max 1000)`);
+        }
+      }
 
       // First pass: Create all tasks
       for (let i = 0; i < args.tasks.length; i++) {

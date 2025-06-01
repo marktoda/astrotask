@@ -246,3 +246,14 @@ if (isEntrypoint) {
 
 // Re-export logger utilities
 export { createModuleLogger, logError, logShutdown, startTimer } from './utils/logger.js';
+
+// Re-export task ID utilities
+export { 
+  generateNextTaskId,
+  generateNextRootTaskId,
+  generateNextSubtaskId,
+  validateTaskId,
+  validateSubtaskId,
+  parseTaskId,
+  TaskIdGenerationError
+} from './utils/taskId.js';

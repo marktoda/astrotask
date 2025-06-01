@@ -16,6 +16,7 @@ export default function App({ Component, commandProps }: AppProps) {
 	React.useEffect(() => {
 		createDatabase()
 			.then((store) => {
+				console.log(`Initialized database at: ${store.pgLite.dataDir}`);
 				const taskService = new TaskService(store);
 				setContext({ store, taskService });
 			})
