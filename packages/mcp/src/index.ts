@@ -9,7 +9,8 @@ import {
   addTasksSchema,
   listTasksSchema,
   addTaskContextSchema,
-  addDependencySchema
+  addDependencySchema,
+  updateStatusSchema
 } from './handlers/index.js';
 import { wrapMCPHandler } from './utils/response.js';
 
@@ -84,11 +85,18 @@ async function main() {
     })
   );
 
+  server.tool('updateStatus',
+    updateStatusSchema.shape,
+    wrapMCPHandler(async (args) => {
+      return handlers.updateStatus(args);
+    })
+  );
+
   // Begin listening on stdio
   const transport = new StdioServerTransport();
   await server.connect(transport);
 
-  logger.info('Astrolabe MCP Server started with 5 enhanced tools: getNextTask, addTasks, listTasks, addTaskContext, addDependency');
+  logger.info('Astrolabe MCP Server started with 6 enhanced tools: getNextTask, addTasks, listTasks, addTaskContext, addDependency, updateStatus');
 }
 
 // Handle cleanup on process termination

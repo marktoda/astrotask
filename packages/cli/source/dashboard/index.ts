@@ -27,8 +27,12 @@ async function main() {
 			process.env["TERM"] = originalTerm;
 		}
 
-		// Initialize database
-		const db = await createDatabase();
+		// Initialize database with consistent configuration
+		const dbOptions = { 
+			dataDir: process.env['DATABASE_PATH'] || './data/astrolabe.db',
+			verbose: process.env['DB_VERBOSE'] === 'true'
+		};
+		const db = await createDatabase(dbOptions);
 
 		// Function to create and initialize the dashboard
 		async function createDashboard() {

@@ -2,7 +2,7 @@
  * @fileoverview Ultra-minimal type definitions for MCP handler system
  *
  * This module defines only the essential types and schemas needed for
- * the 5 core MCP tools: getNextTask, addTasks, addTaskContext, addDependency, listTasks
+ * the 6 core MCP tools: getNextTask, addTasks, addTaskContext, addDependency, updateStatus, listTasks
  *
  * @module handlers/types
  * @since 3.0.0
@@ -176,6 +176,18 @@ export const addDependencySchema = z.object({
 }).describe("Create a dependency relationship where one task must complete before another can begin");
 
 /**
+ * Schema for updating the status of an existing task.
+ * Provides a simple way to change task status with validation and proper error handling.
+ */
+export const updateStatusSchema = z.object({
+  taskId: z
+    .string()
+    .describe("ID of the existing task to update. The task must already exist in the system."),
+  status: taskStatus
+    .describe("New status for the task. Options: 'pending' (not started), 'in-progress' (currently active), 'done' (completed), 'cancelled' (abandoned), 'archived' (stored).")
+}).describe("Update the status of an existing task, commonly used to mark tasks as done or in-progress");
+
+/**
  * TypeScript types inferred from the schemas
  */
 export type GetNextTaskInput = z.infer<typeof getNextTaskSchema>;
@@ -184,3 +196,4 @@ export type AddTasksInput = z.infer<typeof addTasksSchema>;
 export type ListTasksInput = z.infer<typeof listTasksSchema>;
 export type AddTaskContextInput = z.infer<typeof addTaskContextSchema>;
 export type AddDependencyInput = z.infer<typeof addDependencySchema>;
+export type UpdateStatusInput = z.infer<typeof updateStatusSchema>;

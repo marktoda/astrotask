@@ -14,7 +14,13 @@ export default function App({ Component, commandProps }: AppProps) {
 
 	// Run once; when the promise resolves we have the real Store and TaskService
 	React.useEffect(() => {
-		createDatabase()
+		// Use the same configuration approach as the MCP server
+		const dbOptions = { 
+			dataDir: process.env['DATABASE_PATH'] || './data/astrolabe.db',
+			verbose: process.env['DB_VERBOSE'] === 'true'
+		};
+		
+		createDatabase(dbOptions)
 			.then((store) => {
 				console.log(`Initialized database at: ${store.pgLite.dataDir}`);
 				const taskService = new TaskService(store);

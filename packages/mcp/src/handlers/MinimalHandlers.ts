@@ -1,11 +1,12 @@
 /**
  * Ultra-Minimal MCP Handlers
  * 
- * Implements only the 5 essential tools for AI agent task management:
+ * Implements only the 6 essential tools for AI agent task management:
  * - getNextTask: Get next available task to work on (with optional parent)
  * - addTasks: Create tasks in batch (with dependencies and hierarchies)
  * - addTaskContext: Add context slice to a task
  * - addDependency: Add dependency relationships
+ * - updateStatus: Update task status (pending, in-progress, done, etc.)
  * - listTasks: List tasks with optional filters
  */
 
@@ -18,6 +19,7 @@ import type {
   ListTasksInput,
   AddTaskContextInput,
   AddDependencyInput,
+  UpdateStatusInput,
   HandlerContext,
   MCPHandler,
 } from './types.js';
@@ -355,13 +357,25 @@ export class MinimalHandlers implements MCPHandler {
   }
 
   /**
-   * Add a dependency between two tasks
+   * Add a dependency relationship between tasks
    */
   async addDependency(args: AddDependencyInput): Promise<{
     dependency: TaskDependency;
     message: string;
   }> {
     try {
+      // Validate that both tasks exist
+      const dependentTask = await this.context.store.getTask(args.dependentTaskId);
+      if (!dependentTask) {
+        throw new Error(`Dependent task ${args.dependentTaskId} not found`);
+      }
+
+      const dependencyTask = await this.context.store.getTask(args.dependencyTaskId);
+      if (!dependencyTask) {
+        throw new Error(`Dependency task ${args.dependencyTaskId} not found`);
+      }
+
+      // Create the dependency
       const dependency = await this.context.taskService.addTaskDependency(
         args.dependentTaskId,
         args.dependencyTaskId
@@ -369,13 +383,44 @@ export class MinimalHandlers implements MCPHandler {
 
       return {
         dependency,
-        message: `Successfully added dependency: ${args.dependentTaskId} depends on ${args.dependencyTaskId}`
+        message: `Added dependency: ${args.dependentTaskId} depends on ${args.dependencyTaskId}`
       };
     } catch (error) {
       this.logger.error('Adding dependency failed', {
         error: error instanceof Error ? error.message : String(error),
-        dependentTaskId: args.dependentTaskId,
-        dependencyTaskId: args.dependencyTaskId,
+        requestId: this.context.requestId,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Update the status of an existing task
+   */
+  async updateStatus(args: UpdateStatusInput): Promise<{
+    task: Task;
+    message: string;
+  }> {
+    try {
+      // Validate that the task exists
+      const existingTask = await this.context.store.getTask(args.taskId);
+      if (!existingTask) {
+        throw new Error(`Task ${args.taskId} not found`);
+      }
+
+      // Update the task status
+      const updatedTask = await this.context.store.updateTaskStatus(args.taskId, args.status);
+      if (!updatedTask) {
+        throw new Error(`Failed to update task ${args.taskId} status`);
+      }
+
+      return {
+        task: updatedTask,
+        message: `Updated task ${args.taskId} status to ${args.status}`
+      };
+    } catch (error) {
+      this.logger.error('Updating task status failed', {
+        error: error instanceof Error ? error.message : String(error),
         requestId: this.context.requestId,
       });
       throw error;
