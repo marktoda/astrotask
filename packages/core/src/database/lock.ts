@@ -124,11 +124,19 @@ export class DatabaseLock {
                 await unlink(this.lockPath);
                 // Continue to next iteration to try acquiring lock
                 attempt--;
-              } catch (unlinkError) {
-                logger.warn('Failed to remove stale lock', { 
-                  error: unlinkError,
-                  lockPath: this.lockPath 
-                });
+              } catch (unlinkError: any) {
+                // Check if the file was already removed (race condition)
+                if (unlinkError.code === 'ENOENT') {
+                  logger.debug('Stale lock file already removed by another process', {
+                    lockPath: this.lockPath
+                  });
+                  attempt--; // Still retry to acquire the lock
+                } else {
+                  logger.warn('Failed to remove stale lock', { 
+                    error: unlinkError,
+                    lockPath: this.lockPath 
+                  });
+                }
               }
             } else {
               // Lock is not stale, wait and retry
@@ -149,11 +157,19 @@ export class DatabaseLock {
             try {
               await unlink(this.lockPath);
               attempt--; // Don't count this as a retry attempt
-            } catch (unlinkError) {
-              logger.warn('Failed to remove invalid lock file', {
-                unlinkError,
-                lockPath: this.lockPath
-              });
+            } catch (unlinkError: any) {
+              // Check if the file was already removed (race condition)
+              if (unlinkError.code === 'ENOENT') {
+                logger.debug('Invalid lock file already removed by another process', {
+                  lockPath: this.lockPath
+                });
+                attempt--; // Still retry to acquire the lock
+              } else {
+                logger.warn('Failed to remove invalid lock file', {
+                  unlinkError,
+                  lockPath: this.lockPath
+                });
+              }
             }
           }
           
