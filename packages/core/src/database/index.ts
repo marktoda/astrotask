@@ -86,7 +86,7 @@ async function ensureProjectRoot(db: ReturnType<typeof drizzle>): Promise<void> 
  */
 export async function createDatabase(options: DatabaseOptions = {}): Promise<Store> {
   const {
-    dataDir = cfg.DATA_DIR,
+    dataDir = cfg.DATABASE_PATH,
     enableEncryption = false,
     verbose = cfg.DB_VERBOSE,
   } = options;
@@ -133,7 +133,7 @@ export async function createDatabase(options: DatabaseOptions = {}): Promise<Sto
  */
 export async function createLocalDatabase(dataDir?: string): Promise<Store> {
   return createDatabase({
-    dataDir: dataDir ?? cfg.DATA_DIR,
+    dataDir: dataDir ?? cfg.DATABASE_PATH,
     enableEncryption: false,
   });
 }

@@ -20,7 +20,7 @@ describe('TaskService - Dependency Integration', () => {
   beforeEach(async () => {
     // Initialize in-memory database for testing
     store = await createDatabase({ 
-      dataDir: ':memory:',
+      dataDir: 'memory://',
       enableSync: false,
       verbose: false
     });

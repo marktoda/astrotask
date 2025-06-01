@@ -19,34 +19,13 @@ export const configSchema = z.object({
   // Log verbosity
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
 
-  // Database connection string (SQLite file path or URL)
-  DATABASE_URL: z.string().default('./dev.db'),
+  // Database configuration (PGLite)
+  // Primary database location - used consistently across all components
+  DATABASE_PATH: z.string().default('./data/astrolabe.db'),
 
-  // Database encryption key (used with SQLCipher)
-  ASTROLABE_DB_KEY: z.string().default('TEST'),
-
-  // Database configuration
-  DB_ENCRYPTED: z.coerce.boolean().default(true),
+  // Database performance and behavior settings
   DB_VERBOSE: z.coerce.boolean().default(false),
   DB_TIMEOUT: z.coerce.number().int().min(1000).default(5000),
-
-  // SQLCipher encryption settings
-  DB_CIPHER: z.string().default('aes-256-cbc'),
-  DB_KDF_ITER: z.coerce.number().int().min(1000).default(4000),
-  DB_PAGE_SIZE: z.coerce.number().int().min(512).default(4096),
-
-  // SQLite performance settings
-  DB_CACHE_SIZE: z.coerce.number().int().default(-2000), // 2MB cache (negative = KB)
-  DB_MMAP_SIZE: z.coerce.number().int().min(0).default(268435456), // 256MB
-  DB_JOURNAL_MODE: z.enum(['DELETE', 'TRUNCATE', 'PERSIST', 'MEMORY', 'WAL', 'OFF']).default('WAL'),
-  DB_SYNCHRONOUS: z.enum(['OFF', 'NORMAL', 'FULL', 'EXTRA']).default('NORMAL'),
-
-  // Database directory and filename defaults
-  DB_DEFAULT_DIR: z.string().default('~/.astrolabe'),
-  DB_DEFAULT_NAME: z.string().default('astrolabe.db'),
-
-  // Data directory for PGLite database
-  DATA_DIR: z.string().default('./data/astrolabe.db'),
 
   // LLM/AI Configuration
   OPENAI_API_KEY: z.string().default(''),

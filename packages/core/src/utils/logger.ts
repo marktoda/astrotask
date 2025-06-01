@@ -42,6 +42,7 @@ function createLoggerOptions(): LoggerOptions {
           translateTime: 'yyyy-mm-dd HH:MM:ss',
           ignore: 'pid,hostname',
           singleLine: false,
+          destination: 2, // stderr
         },
       },
     };
@@ -53,8 +54,9 @@ function createLoggerOptions(): LoggerOptions {
 
 /**
  * Main application logger instance
+ * Always outputs to stderr to avoid polluting stdout (important for MCP servers)
  */
-export const logger = pino.default(createLoggerOptions());
+export const logger = pino.default(createLoggerOptions(), process.stderr);
 
 /**
  * Create a module-specific logger

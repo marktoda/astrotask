@@ -283,10 +283,9 @@ describe('Database Configuration', () => {
 
   describe('Database Configuration Constants', () => {
     it('should have correct default configuration', () => {
-      expect(cfg.DB_DEFAULT_NAME).toBe('astrolabe.db');
-      expect(cfg.DB_JOURNAL_MODE).toBe('WAL');
-      expect(cfg.DB_SYNCHRONOUS).toBe('NORMAL');
-      expect(cfg.DATA_DIR).toBe('./data/astrolabe.db');
+      expect(cfg.DATABASE_PATH).toBe('./data/astrolabe.db');
+      expect(cfg.DB_VERBOSE).toBe(false);
+      expect(cfg.DB_TIMEOUT).toBe(5000);
     });
   });
 });

@@ -28,7 +28,7 @@ async function main() {
 
   // Initialize database and services
   const dbOptions: DatabaseOptions = { 
-    dataDir: process.env.DATABASE_PATH || 'astrolabe.db',
+    dataDir: process.env.DATABASE_PATH || './data/astrolabe.db',
     verbose: process.env.DB_VERBOSE === 'true'
   };
   const store = await createDatabase(dbOptions);

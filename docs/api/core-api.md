@@ -488,9 +488,7 @@ The core library reads configuration from environment variables:
 
 ```bash
 # Database configuration
-DATABASE_URL=file:./tasks.db
-DATABASE_ENCRYPTED=true
-DATABASE_KEY=your-encryption-key
+DATABASE_PATH=./tasks.db
 
 # Logging configuration
 LOG_LEVEL=info          # debug, info, warn, error
@@ -510,6 +508,7 @@ import { cfg } from '@astrolabe/core';
 console.log(cfg.LOG_LEVEL);    // Current log level
 console.log(cfg.NODE_ENV);     // Current environment
 console.log(cfg.PORT);         // Application port
+console.log(cfg.DATABASE_PATH); // Database location
 ```
 
 ### Configuration Schema
@@ -519,9 +518,9 @@ interface Config {
   LOG_LEVEL: 'debug' | 'info' | 'warn' | 'error';
   NODE_ENV: 'development' | 'production' | 'test';
   PORT: number;
-  DATABASE_URL?: string;
-  DATABASE_ENCRYPTED?: boolean;
-  DATABASE_KEY?: string;
+  DATABASE_PATH: string;
+  DB_VERBOSE: boolean;
+  DB_TIMEOUT: number;
 }
 ```
 
