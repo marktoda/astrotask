@@ -36,13 +36,48 @@ export class ConnectionManager {
   }
 
   /**
+   * Check if the current store connection is still valid
+   */
+  private async isConnectionValid(store: Store): Promise<boolean> {
+    try {
+      // Try a simple query to check if the connection is still alive
+      await store.pgLite.query('SELECT 1');
+      return true;
+    } catch (error) {
+      // If the query fails, the connection is likely closed
+      logger.debug('Connection validation failed', {
+        error: error instanceof Error ? error.message : String(error)
+      });
+      return false;
+    }
+  }
+
+  /**
    * Get or create a database connection
    */
   async getConnection(): Promise<Store> {
-    if (!this.store) {
-      logger.debug('Creating new database connection with locking support');
-      this.store = await createDatabase(this.options.dbOptions);
+    // Check if we have an existing store and if it's still valid
+    if (this.store) {
+      const isValid = await this.isConnectionValid(this.store);
+      if (isValid) {
+        logger.debug('Reusing existing valid database connection');
+        // Clear any existing idle timer since we're using the connection
+        if (this.idleTimer) {
+          clearTimeout(this.idleTimer);
+          this.idleTimer = null;
+        }
+        this.lastOperationTime = Date.now();
+        return this.store;
+      } else {
+        logger.debug('Existing connection is invalid, creating new one');
+        // Connection is invalid, clear it and create a new one
+        this.store = null;
+      }
     }
+
+    // Create a fresh connection
+    logger.debug('Creating new database connection with locking support');
+    this.store = await createDatabase(this.options.dbOptions);
     
     // Clear any existing idle timer
     if (this.idleTimer) {
@@ -87,8 +122,13 @@ export class ConnectionManager {
         error: error instanceof Error ? error.message : String(error)
       });
       
-      // Force cleanup on error to ensure clean state
-      await this.forceClose();
+      // Don't force close on operational errors - let normal cleanup handle it
+      // Only force close if it's a critical database connection error
+      if (error instanceof Error && error.message.includes('PGLite is closed')) {
+        logger.warn('Database connection appears closed, forcing cleanup');
+        await this.forceClose();
+      }
+      
       throw error;
     }
   }
@@ -189,10 +229,10 @@ export class ConnectionManager {
 export function createConnectionManager(dbOptions: DatabaseOptions): ConnectionManager {
   return new ConnectionManager({
     dbOptions,
-    // For MCP servers, we can be more aggressive about closing connections
-    // since operations are typically infrequent and independent
+    // For MCP servers, we should be less aggressive about closing connections
+    // since the server should stay alive and handle multiple requests
     closeAfterOperation: process.env.MCP_AGGRESSIVE_CONNECTION_CLEANUP === 'true',
-    idleTimeout: parseInt(process.env.MCP_IDLE_TIMEOUT || '5000', 10), // 5 seconds default
+    idleTimeout: parseInt(process.env.MCP_IDLE_TIMEOUT || '30000', 10), // 30 seconds default - less aggressive
     forceUnlockOnClose: process.env.MCP_FORCE_UNLOCK_ON_CLOSE === 'true',
   });
 } 

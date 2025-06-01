@@ -46,38 +46,25 @@ async function main() {
   // Create connection manager for smart resource management
   const connectionManager = createConnectionManager(dbOptions);
 
-  // Create services that will use the connection manager
-  let taskService: TaskService;
-  let dependencyService: DependencyService;
-
-  // Initialize services with initial connection
-  const initialStore = await connectionManager.getConnection();
-  taskService = new TaskService(initialStore);
-  dependencyService = new DependencyService(initialStore);
-
-  // Create handler context factory that uses connection manager
-  const createHandlerContext = () => ({
-    store: initialStore, // This will be replaced by connection manager in handlers
-    taskService,
-    dependencyService,
+  // Create handler context factory that creates fresh services with each connection
+  const createHandlerContext = (store: any) => ({
+    store,
+    taskService: new TaskService(store),
+    dependencyService: new DependencyService(store),
     requestId: 'main',
     timestamp: new Date().toISOString(),
-    connectionManager, // Add connection manager to context
+    connectionManager,
   });
 
-  // Create minimal handlers
-  const handlers = new MinimalHandlers(createHandlerContext());
-
-  // Register the 5 essential tools with enhanced schema documentation
+  // Register the 6 essential tools with enhanced schema documentation
   // The schemas now include comprehensive .describe() calls for better AI agent understanding
   server.tool('getNextTask',
     getNextTaskSchema.shape,
     wrapMCPHandler(async (args) => {
       return connectionManager.withConnection(async (store) => {
-        const context = createHandlerContext();
-        context.store = store;
-        const handlersWithContext = new MinimalHandlers(context);
-        return handlersWithContext.getNextTask(args);
+        const context = createHandlerContext(store);
+        const handlers = new MinimalHandlers(context);
+        return handlers.getNextTask(args);
       });
     })
   );
@@ -86,10 +73,9 @@ async function main() {
     addTasksSchema.shape,
     wrapMCPHandler(async (args) => {
       return connectionManager.withConnection(async (store) => {
-        const context = createHandlerContext();
-        context.store = store;
-        const handlersWithContext = new MinimalHandlers(context);
-        return handlersWithContext.addTasks(args);
+        const context = createHandlerContext(store);
+        const handlers = new MinimalHandlers(context);
+        return handlers.addTasks(args);
       });
     })
   );
@@ -98,10 +84,9 @@ async function main() {
     listTasksSchema.shape,
     wrapMCPHandler(async (args) => {
       return connectionManager.withConnection(async (store) => {
-        const context = createHandlerContext();
-        context.store = store;
-        const handlersWithContext = new MinimalHandlers(context);
-        return handlersWithContext.listTasks(args);
+        const context = createHandlerContext(store);
+        const handlers = new MinimalHandlers(context);
+        return handlers.listTasks(args);
       });
     })
   );
@@ -110,10 +95,9 @@ async function main() {
     addTaskContextSchema.shape,
     wrapMCPHandler(async (args) => {
       return connectionManager.withConnection(async (store) => {
-        const context = createHandlerContext();
-        context.store = store;
-        const handlersWithContext = new MinimalHandlers(context);
-        return handlersWithContext.addTaskContext(args);
+        const context = createHandlerContext(store);
+        const handlers = new MinimalHandlers(context);
+        return handlers.addTaskContext(args);
       });
     })
   );
@@ -122,10 +106,9 @@ async function main() {
     addDependencySchema.shape,
     wrapMCPHandler(async (args) => {
       return connectionManager.withConnection(async (store) => {
-        const context = createHandlerContext();
-        context.store = store;
-        const handlersWithContext = new MinimalHandlers(context);
-        return handlersWithContext.addDependency(args);
+        const context = createHandlerContext(store);
+        const handlers = new MinimalHandlers(context);
+        return handlers.addDependency(args);
       });
     })
   );
@@ -134,10 +117,9 @@ async function main() {
     updateStatusSchema.shape,
     wrapMCPHandler(async (args) => {
       return connectionManager.withConnection(async (store) => {
-        const context = createHandlerContext();
-        context.store = store;
-        const handlersWithContext = new MinimalHandlers(context);
-        return handlersWithContext.updateStatus(args);
+        const context = createHandlerContext(store);
+        const handlers = new MinimalHandlers(context);
+        return handlers.updateStatus(args);
       });
     })
   );
