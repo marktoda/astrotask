@@ -1,3 +1,2 @@
-- add updateStatus MCP
 - acceptance criteria
 - astrolabe -> astrotask

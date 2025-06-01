@@ -18,7 +18,7 @@ const logger = createModuleLogger('mcp-server');
 
 /**
  * Ultra-Minimal Astrolabe MCP Server
- * Provides only 5 essential tools for AI agent task management
+ * Provides only 6 essential tools for AI agent task management
  */
 async function main() {
   // Create the high-level MCP server instance
@@ -97,18 +97,38 @@ async function main() {
   await server.connect(transport);
 
   logger.info('Astrolabe MCP Server started with 6 enhanced tools: getNextTask, addTasks, listTasks, addTaskContext, addDependency, updateStatus');
+
+  // Set up graceful shutdown with database cleanup
+  const setupShutdownHandlers = () => {
+    const handleShutdown = async (signal: string) => {
+      await logShutdown(logger, signal, async () => {
+        logger.info('Closing database connection...');
+        try {
+          await store.close();
+          logger.info('Database connection closed successfully');
+        } catch (error) {
+          logger.error('Failed to close database connection', { 
+            error: error instanceof Error ? error.message : String(error) 
+          });
+        }
+      });
+      process.exit(0);
+    };
+
+    process.on('SIGINT', () => handleShutdown('SIGINT'));
+    process.on('SIGTERM', () => handleShutdown('SIGTERM'));
+    process.on('uncaughtException', (error) => {
+      logger.fatal({ error: error.message, stack: error.stack }, 'Uncaught exception, shutting down');
+      handleShutdown('uncaughtException');
+    });
+    process.on('unhandledRejection', (reason) => {
+      logger.fatal({ reason }, 'Unhandled rejection, shutting down');
+      handleShutdown('unhandledRejection');
+    });
+  };
+
+  setupShutdownHandlers();
 }
-
-// Handle cleanup on process termination
-process.on('SIGINT', async () => {
-  await logShutdown(logger, 'SIGINT');
-  process.exit(0);
-});
-
-process.on('SIGTERM', async () => {
-  await logShutdown(logger, 'SIGTERM');
-  process.exit(0);
-});
 
 // Start the server
 main().catch((error) => {
