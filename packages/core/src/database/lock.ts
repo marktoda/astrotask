@@ -6,7 +6,7 @@
  * retry logic and stale lock detection.
  */
 
-import { writeFile, unlink, readFile } from 'node:fs/promises';
+import { writeFile, unlink, readFile, mkdir } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { hostname } from 'node:os';
 import { createModuleLogger } from '../utils/logger.js';
@@ -61,10 +61,29 @@ export class DatabaseLock {
   }
 
   /**
+   * Ensure lock directory exists
+   */
+  private async ensureLockDir(): Promise<void> {
+    try {
+      await mkdir(dirname(this.lockPath), { recursive: true });
+    } catch (error: any) {
+      if (error.code !== 'EEXIST') {
+        logger.warn('Failed to create lock directory', {
+          error,
+          lockDir: dirname(this.lockPath)
+        });
+      }
+    }
+  }
+
+  /**
    * Acquire the database lock with retry logic
    * @throws {DatabaseLockError} If lock cannot be acquired within timeout
    */
   async acquire(): Promise<void> {
+    // Ensure lock directory exists first
+    await this.ensureLockDir();
+
     const lockInfo: LockInfo = {
       pid: process.pid,
       timestamp: Date.now(),
@@ -142,6 +161,10 @@ export class DatabaseLock {
           if (attempt < this.options.maxRetries) {
             await new Promise(resolve => setTimeout(resolve, this.options.retryDelay));
           }
+        } else if (error.code === 'ENOENT') {
+          // Directory doesn't exist, ensure it and retry
+          await this.ensureLockDir();
+          // Don't increment attempt for this case
         } else {
           // Unexpected error
           throw new DatabaseLockError(`Failed to acquire database lock: ${error.message}`);
