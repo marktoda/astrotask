@@ -368,6 +368,10 @@ export default function Init({ options }: Props) {
 				const store = await createDatabase({
 					dataDir: databasePath,
 					verbose: true,
+					enableLocking: true,
+					lockOptions: {
+						processType: 'cli-init'  // Identify this as CLI init process
+					}
 				});
 
 				// Step 4: Create initial tasks

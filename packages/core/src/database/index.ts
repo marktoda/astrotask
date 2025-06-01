@@ -17,8 +17,15 @@ import { cfg } from '../utils/config.js';
 import { createModuleLogger } from '../utils/logger.js';
 import * as schema from './schema.js';
 import { DatabaseStore, type Store } from './store.js';
+import type { LockOptions } from './lock.js';
+import { LockingStore } from './lockingStore.js';
+import { DatabaseLock, DatabaseLockError, withDatabaseLock } from './lock.js';
 
 const logger = createModuleLogger('database');
+
+// Used for re-exports below
+// @ts-ignore - used for re-exports
+const _exportedSymbols = { DatabaseLock, DatabaseLockError, withDatabaseLock };
 
 // Get the directory of this file
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -31,6 +38,10 @@ export interface DatabaseOptions {
   enableEncryption?: boolean;
   /** Verbose logging */
   verbose?: boolean;
+  /** Enable cooperative locking (wraps store with LockingStore) */
+  enableLocking?: boolean;
+  /** Lock options (only used when enableLocking is true) */
+  lockOptions?: LockOptions;
 }
 
 /**
@@ -82,13 +93,75 @@ async function ensureProjectRoot(db: ReturnType<typeof drizzle>): Promise<void> 
 }
 
 /**
- * Create a local-only database store with plain PGlite
+ * Create a local-only database (alias for createDatabase for backward compatibility)
+ */
+export async function createLocalDatabase(dataDir?: string): Promise<Store> {
+  return createDatabase({
+    dataDir: dataDir ?? cfg.DATABASE_PATH,
+    enableEncryption: false,
+  });
+}
+
+/**
+ * Create a local-only database with cooperative locking enabled
+ */
+export async function createLockedDatabase(
+  dataDir?: string, 
+  lockOptions?: LockOptions
+): Promise<Store> {
+  const dbOptions: DatabaseOptions = {
+    dataDir: dataDir ?? cfg.DATABASE_PATH,
+    enableEncryption: false,
+    enableLocking: true,
+  };
+  
+  if (lockOptions) {
+    dbOptions.lockOptions = lockOptions;
+  }
+  
+  return createDatabase(dbOptions);
+}
+
+/**
+ * Create a database with locking enabled using process type detection
+ */
+export async function createDatabaseWithLocking(
+  options: Omit<DatabaseOptions, 'enableLocking'> & {
+    /** Process type for lock identification (auto-detected if not provided) */
+    processType?: string;
+  } = {}
+): Promise<Store> {
+  const { processType, ...dbOptions } = options;
+  
+  // Auto-detect process type if not provided
+  const detectedProcessType = processType ?? (
+    process.env.NODE_ENV === 'test' ? 'test' :
+    typeof process !== 'undefined' && process.title?.includes('node') ? 'cli' :
+    'unknown'
+  );
+
+  const finalOptions: DatabaseOptions = {
+    ...dbOptions,
+    enableLocking: true,
+    lockOptions: {
+      processType: detectedProcessType,
+      ...(options.lockOptions || {}),
+    },
+  };
+
+  return createDatabase(finalOptions);
+}
+
+/**
+ * Create a local-only database with plain PGlite
  */
 export async function createDatabase(options: DatabaseOptions = {}): Promise<Store> {
   const {
     dataDir = cfg.DATABASE_PATH,
     enableEncryption = false,
     verbose = cfg.DB_VERBOSE,
+    enableLocking = false,
+    lockOptions,
   } = options;
 
   try {
@@ -110,11 +183,19 @@ export async function createDatabase(options: DatabaseOptions = {}): Promise<Sto
     // Ensure PROJECT_ROOT task exists
     await ensureProjectRoot(db);
 
-    // Create store
-    const store = new DatabaseStore(pgLite, db, false, enableEncryption);
+    // Create base store
+    const baseStore = new DatabaseStore(pgLite, db, false, enableEncryption);
+
+    // Wrap with locking if requested
+    const store = enableLocking 
+      ? new LockingStore(baseStore, dataDir, lockOptions)
+      : baseStore;
 
     if (verbose) {
-      logger.info('Local PGlite database initialized successfully');
+      logger.info(`Local PGlite database initialized successfully${enableLocking ? ' with locking' : ''}`, {
+        dataDir,
+        locking: enableLocking
+      });
     }
 
     return store;
@@ -122,16 +203,6 @@ export async function createDatabase(options: DatabaseOptions = {}): Promise<Sto
     logger.error({ error, dataDir }, 'Failed to initialize database');
     throw error;
   }
-}
-
-/**
- * Create a local-only database (alias for createDatabase for backward compatibility)
- */
-export async function createLocalDatabase(dataDir?: string): Promise<Store> {
-  return createDatabase({
-    dataDir: dataDir ?? cfg.DATABASE_PATH,
-    enableEncryption: false,
-  });
 }
 
 /**
@@ -149,4 +220,8 @@ export async function createSyncedDatabase(
 // Re-export types and utilities
 export type { Store } from './store.js';
 export { DatabaseStore } from './store.js';
+export { LockingStore } from './lockingStore.js';
+export { DatabaseLock, DatabaseLockError, withDatabaseLock } from './lock.js';
+export type { LockOptions } from './lock.js';
+
 export * from './schema.js';

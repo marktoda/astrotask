@@ -3,6 +3,7 @@
  * 
  * Provides utilities for better connection lifecycle management,
  * particularly useful for PGLite which has single connection limitations.
+ * Now enhanced with cooperative locking support for better concurrency.
  */
 
 import { createDatabase, type DatabaseOptions, type Store, createModuleLogger } from '@astrolabe/core';
@@ -16,16 +17,19 @@ export interface ConnectionManagerOptions {
   closeAfterOperation?: boolean;
   /** Timeout before closing idle connections (in ms) */
   idleTimeout?: number;
+  /** Whether to force unlock locks when closing connections */
+  forceUnlockOnClose?: boolean;
 }
 
 /**
- * Enhanced connection manager for better PGLite lifecycle management
+ * Enhanced connection manager for better PGLite lifecycle management with cooperative locking
  */
 export class ConnectionManager {
   private store: Store | null = null;
   private options: ConnectionManagerOptions;
   private idleTimer: NodeJS.Timeout | null = null;
   private operationCount = 0;
+  private lastOperationTime = 0;
 
   constructor(options: ConnectionManagerOptions) {
     this.options = options;
@@ -36,7 +40,7 @@ export class ConnectionManager {
    */
   async getConnection(): Promise<Store> {
     if (!this.store) {
-      logger.debug('Creating new database connection');
+      logger.debug('Creating new database connection with locking support');
       this.store = await createDatabase(this.options.dbOptions);
     }
     
@@ -46,32 +50,33 @@ export class ConnectionManager {
       this.idleTimer = null;
     }
     
+    this.lastOperationTime = Date.now();
     return this.store;
   }
 
   /**
-   * Execute an operation with connection management
+   * Execute an operation with connection management and smart locking
    */
   async withConnection<T>(operation: (store: Store) => Promise<T>): Promise<T> {
     const startTime = Date.now();
     this.operationCount++;
     const opId = this.operationCount;
     
-    logger.debug('Starting operation', { operationId: opId });
+    logger.debug('Starting operation with cooperative locking', { operationId: opId });
     
     try {
       const store = await this.getConnection();
       const result = await operation(store);
       
       const duration = Date.now() - startTime;
-      logger.debug('Operation completed', { 
+      logger.debug('Operation completed successfully', { 
         operationId: opId, 
         duration: `${duration}ms`,
-        success: true 
+        lockingEnabled: !!(store as any).isLocked
       });
       
-      // Schedule connection cleanup if configured
-      this.scheduleCleanup();
+      // Schedule smart cleanup
+      this.scheduleSmartCleanup();
       
       return result;
     } catch (error) {
@@ -89,23 +94,34 @@ export class ConnectionManager {
   }
 
   /**
-   * Schedule connection cleanup based on configuration
+   * Schedule smart cleanup that considers MCP server usage patterns
    */
-  private scheduleCleanup(): void {
+  private scheduleSmartCleanup(): void {
     if (this.options.closeAfterOperation) {
-      // Close immediately after operation
+      // Close immediately after operation (most aggressive)
       setImmediate(() => this.forceClose());
     } else if (this.options.idleTimeout && this.options.idleTimeout > 0) {
-      // Schedule cleanup after idle timeout
+      // Schedule cleanup after idle timeout with smart detection
       this.idleTimer = setTimeout(() => {
-        logger.debug('Closing idle connection');
-        this.forceClose();
+        const timeSinceLastOp = Date.now() - this.lastOperationTime;
+        if (timeSinceLastOp >= this.options.idleTimeout!) {
+          logger.debug('Closing idle connection and releasing locks', {
+            idleTime: `${timeSinceLastOp}ms`,
+            threshold: `${this.options.idleTimeout}ms`
+          });
+          this.forceClose();
+        } else {
+          // Reschedule for the remaining time
+          const remainingTime = this.options.idleTimeout! - timeSinceLastOp;
+          logger.debug('Rescheduling cleanup', { remainingTime: `${remainingTime}ms` });
+          this.scheduleSmartCleanup();
+        }
       }, this.options.idleTimeout);
     }
   }
 
   /**
-   * Force close the current connection
+   * Force close the current connection and release any locks
    */
   async forceClose(): Promise<void> {
     if (this.idleTimer) {
@@ -115,7 +131,20 @@ export class ConnectionManager {
     
     if (this.store) {
       try {
-        logger.debug('Closing database connection');
+        logger.debug('Closing database connection and releasing locks');
+        
+        // If the store supports lock management, try to release locks
+        if (this.options.forceUnlockOnClose && 'forceUnlock' in this.store) {
+          try {
+            await (this.store as any).forceUnlock();
+            logger.debug('Force unlocked database before closing');
+          } catch (unlockError) {
+            logger.warn('Failed to force unlock before closing', {
+              error: unlockError instanceof Error ? unlockError.message : String(unlockError)
+            });
+          }
+        }
+        
         await this.store.close();
         logger.debug('Database connection closed successfully');
       } catch (error) {
@@ -129,18 +158,28 @@ export class ConnectionManager {
   }
 
   /**
-   * Get connection status information
+   * Get connection statistics for monitoring
    */
-  getStatus(): {
+  getStats(): {
     connected: boolean;
     operationCount: number;
-    hasIdleTimer: boolean;
+    lastOperationTime: number;
+    idleTime: number;
   } {
     return {
       connected: this.store !== null,
       operationCount: this.operationCount,
-      hasIdleTimer: this.idleTimer !== null,
+      lastOperationTime: this.lastOperationTime,
+      idleTime: this.lastOperationTime ? Date.now() - this.lastOperationTime : 0,
     };
+  }
+
+  /**
+   * Check if the connection has been idle for longer than the threshold
+   */
+  isIdle(thresholdMs: number = 5000): boolean {
+    if (!this.lastOperationTime) return true;
+    return (Date.now() - this.lastOperationTime) > thresholdMs;
   }
 }
 
@@ -154,5 +193,6 @@ export function createConnectionManager(dbOptions: DatabaseOptions): ConnectionM
     // since operations are typically infrequent and independent
     closeAfterOperation: process.env.MCP_AGGRESSIVE_CONNECTION_CLEANUP === 'true',
     idleTimeout: parseInt(process.env.MCP_IDLE_TIMEOUT || '5000', 10), // 5 seconds default
+    forceUnlockOnClose: process.env.MCP_FORCE_UNLOCK_ON_CLOSE === 'true',
   });
 } 
