@@ -19,7 +19,7 @@ import { electricSync } from '@electric-sql/pglite-sync';
 import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/pglite';
 import { migrate } from 'drizzle-orm/pglite/migrator';
-import { TASK_IDENTIFIERS } from '../utils/TaskTreeConstants.js';
+import { TASK_IDENTIFIERS } from '../entities/TaskTreeConstants.js';
 import { cfg } from '../utils/config.js';
 import { createModuleLogger } from '../utils/logger.js';
 import * as schema from './schema.js';

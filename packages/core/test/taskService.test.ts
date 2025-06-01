@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { rmSync, existsSync } from 'node:fs';
 import type { Task, CreateTask as NewTask } from '../src/schemas/task.js';
 import type { Store } from '../src/database/store.js';
-import { TASK_IDENTIFIERS } from '../src/utils/TaskTreeConstants.js';
+import { TASK_IDENTIFIERS } from '../src/entities/TaskTreeConstants.js';
 
 /**
  * Helper to create a NewTask object for insertion during tests.

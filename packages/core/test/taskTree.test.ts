@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { TaskTree, type TaskTreeData } from '../src/utils/TaskTree.js';
+import { TaskTree, type TaskTreeData } from '../src/entities/TaskTree.js';
 import type { Task } from '../src/schemas/task.js';
 
 describe('TaskTree', () => {

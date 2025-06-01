@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { TrackingTaskTree, type PendingOperation, serializeTrackingState, deserializeTrackingState } from '../src/utils/TrackingTaskTree.js';
-import { TaskTree } from '../src/utils/TaskTree.js';
+import { TrackingTaskTree, type PendingOperation, serializeTrackingState, deserializeTrackingState } from '../src/entities/TrackingTaskTree.js';
+import { TaskTree } from '../src/entities/TaskTree.js';
 import type { Task } from '../src/schemas/task.js';
 
 describe('TrackingTaskTree', () => {

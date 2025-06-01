@@ -1,16 +1,16 @@
 import type { Store } from '../database/store.js';
 import type { TaskDependencyGraph, TaskWithDependencies } from '../schemas/dependency.js';
 import type { CreateTask, Task, TaskStatus } from '../schemas/task.js';
-import { TaskTree, type TaskTreeData } from '../utils/TaskTree.js';
-import { CachedTaskTreeOperations, TaskTreeCache } from '../utils/TaskTreeCache.js';
-import { TASK_IDENTIFIERS } from '../utils/TaskTreeConstants.js';
+import { TaskTree, type TaskTreeData } from '../entities/TaskTree.js';
+import { CachedTaskTreeOperations, TaskTreeCache } from '../entities/TaskTreeCache.js';
+import { TASK_IDENTIFIERS } from '../entities/TaskTreeConstants.js';
 import {
   type ValidationResult,
   validateMoveOperation,
   validateTaskTree,
-} from '../utils/TaskTreeValidation.js';
-import type { ReconciliationPlan } from '../utils/TrackingTaskTree.js';
-import type { ITaskReconciliationService } from '../utils/TrackingTypes.js';
+} from '../entities/TaskTreeValidation.js';
+import type { ReconciliationPlan } from '../entities/TrackingTaskTree.js';
+import type { ITaskReconciliationService } from '../entities/TrackingTypes.js';
 import {
   type StatusTransitionResult,
   validateStatusTransition,

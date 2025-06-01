@@ -10,7 +10,7 @@
  */
 
 import type { Store } from '../database/store.js';
-import { TASK_IDENTIFIERS } from './TaskTreeConstants.js';
+import { TASK_IDENTIFIERS } from '../entities/TaskTreeConstants.js';
 
 /**
  * Error thrown when a unique task ID cannot be generated after reasonable attempts.

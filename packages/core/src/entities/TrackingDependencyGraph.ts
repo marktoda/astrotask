@@ -5,7 +5,7 @@
  * It provides a mutable interface for dependency operations while tracking changes that
  * can be applied to a store in batches.
  *
- * @module utils/TrackingDependencyGraph
+ * @module entities/TrackingDependencyGraph
  * @since 1.0.0
  */
 

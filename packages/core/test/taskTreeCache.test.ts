@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { LRUCache, TaskTreeCache } from '../src/utils/TaskTreeCache.js';
-import { TaskTree } from '../src/utils/TaskTree.js';
+import { LRUCache, TaskTreeCache } from '../src/entities/TaskTreeCache.js';
+import { TaskTree } from '../src/entities/TaskTree.js';
 import type { Task } from '../src/schemas/task.js';
 
 function createMockTask(id: string, title: string): Task {

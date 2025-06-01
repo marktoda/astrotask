@@ -6,7 +6,7 @@
  * to how TaskTree works with TaskService, allowing complex graph operations
  * without repeated database queries.
  *
- * @module utils/DependencyGraph
+ * @module entities/DependencyGraph
  * @since 1.0.0
  */
 

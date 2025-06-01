@@ -3,14 +3,14 @@ import { createDatabase } from '../src/database/index.js';
 import type { Store } from '../src/database/store.js';
 import { TaskService } from '../src/services/TaskService.js';
 import { DependencyService } from '../src/services/DependencyService.js';
-import { TrackingTaskTree, type PendingOperation } from '../src/utils/TrackingTaskTree.js';
-import { TASK_IDENTIFIERS } from '../src/utils/TaskTreeConstants.js';
+import { TrackingTaskTree, type PendingOperation } from '../src/entities/TrackingTaskTree.js';
+import { TASK_IDENTIFIERS } from '../src/entities/TaskTreeConstants.js';
 import type { Task } from '../src/schemas/task.js';
-import type { TaskTreeData } from '../src/utils/TaskTree.js';
+import type { TaskTreeData } from '../src/entities/TaskTree.js';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { rmSync, existsSync } from 'node:fs';
-import { TrackingDependencyGraph } from '../src/utils/TrackingDependencyGraph.js';
+import { TrackingDependencyGraph } from '../src/entities/TrackingDependencyGraph.js';
 
 describe('TaskService Dependency Processing', () => {
   let store: Store;

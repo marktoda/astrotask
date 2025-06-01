@@ -8,8 +8,8 @@
  * @since 1.0.0
  */
 
-import type { TrackingDependencyGraph } from '../../utils/TrackingDependencyGraph.js';
-import type { TrackingTaskTree } from '../../utils/TrackingTaskTree.js';
+import type { TrackingDependencyGraph } from '../../entities/TrackingDependencyGraph.js';
+import type { TrackingTaskTree } from '../../entities/TrackingTaskTree.js';
 import type { GenerationInput, ValidationResult } from './schemas.js';
 
 /**
