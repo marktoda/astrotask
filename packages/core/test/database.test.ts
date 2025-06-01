@@ -3,6 +3,7 @@ import { join } from 'path';
 import { existsSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
 import { createDatabase, createLocalDatabase, createSyncedDatabase } from '../src/database/index';
+import { TASK_IDENTIFIERS } from '../src/entities/TaskTreeConstants';
 import { cfg } from '../src/utils/config';
 
 describe('Database Configuration', () => {
@@ -30,9 +31,7 @@ describe('Database Configuration', () => {
       expect(store).toBeDefined();
       expect(store.pgLite).toBeDefined();
       expect(store.sql).toBeDefined();
-      expect(store.electricSyncActive).toBe(false);
       expect(store.isEncrypted).toBe(false);
-      expect(store.isSyncing).toBe(false);
       expect(typeof store.close).toBe('function');
 
       // Test basic database operation
@@ -42,38 +41,49 @@ describe('Database Configuration', () => {
       await store.close();
     });
 
-    it('should create database with Electric SQL sync disabled', async () => {
+    it('should create database with custom options', async () => {
       const store = await createDatabase({
         dataDir: testDbPath,
-        enableSync: false,
         verbose: false,
       });
 
       expect(store).toBeDefined();
-      expect(store.electricSyncActive).toBe(false);
-      expect(store.isSyncing).toBe(false);
 
       await store.close();
     });
 
-    it('should create database with Electric SQL sync configuration', async () => {
-      // Don't set ELECTRIC_URL so sync won't actually connect
-      const originalUrl = process.env.ELECTRIC_URL;
-      delete process.env.ELECTRIC_URL;
-
+    it('should create database with encryption disabled', async () => {
       const store = await createDatabase({
         dataDir: testDbPath,
-        enableSync: true,
+        enableEncryption: false,
         verbose: false,
       });
 
       expect(store).toBeDefined();
-      expect(store.electricSyncActive).toBe(false); // Not syncing because no URL
 
       await store.close();
+    });
 
-      // Restore env
-      if (originalUrl) process.env.ELECTRIC_URL = originalUrl;
+    it('should create database with local-only configuration', async () => {
+      const store = await createDatabase({
+        dataDir: testDbPath,
+        verbose: false,
+      });
+
+      expect(store).toBeDefined();
+
+      await store.close();
+    });
+
+    it('should create database with local configuration', async () => {
+      const store = await createDatabase({
+        dataDir: testDbPath,
+        verbose: false,
+      });
+
+      expect(store).toBeDefined();
+
+      await store.close();
     });
 
     it('should handle database directory creation', async () => {
@@ -94,7 +104,6 @@ describe('Database Configuration', () => {
     it('should create database store with all features', async () => {
       const store = await createDatabase({
         dataDir: testDbPath,
-        enableSync: false,
         verbose: false,
       });
 
@@ -114,7 +123,6 @@ describe('Database Configuration', () => {
     it('should auto-migrate on database creation', async () => {
       const store = await createDatabase({
         dataDir: testDbPath,
-        enableSync: false,
         verbose: false,
       });
 
@@ -138,7 +146,6 @@ describe('Database Configuration', () => {
     it('should provide business methods for tasks', async () => {
       const store = await createDatabase({
         dataDir: testDbPath,
-        enableSync: false,
         verbose: false,
       });
 
@@ -172,7 +179,7 @@ describe('Database Configuration', () => {
       // Test root tasks filtering
       const rootTasks = await store.listRootTasks();
       expect(rootTasks).toHaveLength(1);
-      expect(rootTasks[0].parentId).toBe('__PROJECT_ROOT__');
+      expect(rootTasks[0].parentId).toBe(TASK_IDENTIFIERS.PROJECT_ROOT);
 
       // Test delete
       const deleted = await store.deleteTask(newTask.id);
@@ -187,7 +194,6 @@ describe('Database Configuration', () => {
     it('should provide business methods for task hierarchy', async () => {
       const store = await createDatabase({
         dataDir: testDbPath,
-        enableSync: false,
         verbose: false,
       });
 
@@ -226,7 +232,6 @@ describe('Database Configuration', () => {
     it('should provide context slice methods', async () => {
       const store = await createDatabase({
         dataDir: testDbPath,
-        enableSync: false,
         verbose: false,
       });
 
@@ -262,17 +267,15 @@ describe('Database Configuration', () => {
     it('should create local database with createLocalDatabase', async () => {
       const store = await createLocalDatabase(testDbPath);
       
-      expect(store.electricSyncActive).toBe(false);
-      expect(store.isSyncing).toBe(false);
+      expect(store).toBeDefined();
       
       await store.close();
     });
 
-    it('should create synced database with createSyncedDatabase', async () => {
+    it('should create local database with createSyncedDatabase (deprecated)', async () => {
       const store = await createSyncedDatabase(testDbPath, '');
       
-      expect(store.electricSyncActive).toBe(false); // False because empty URL
-      expect(store.isSyncing).toBe(false);
+      expect(store).toBeDefined();
       
       await store.close();
     });

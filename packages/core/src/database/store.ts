@@ -14,10 +14,10 @@ import * as schema from './schema.js';
 /**
  * Store interface for local-first database operations
  *
- * Combines PGlite, Drizzle ORM, and optional Electric SQL sync for:
+ * Uses PGlite and Drizzle ORM for:
  * - Type-safe database operations
- * - Real-time sync capabilities (when enabled)
  * - Local-first architecture
+ * - Embedded SQLite database
  */
 export interface Store {
   /** Raw PGlite client for direct SQL operations */
@@ -26,8 +26,6 @@ export interface Store {
   readonly sql: PgliteDatabase<typeof schema>;
   /** Whether encryption is enabled */
   readonly isEncrypted: boolean;
-  /** Whether sync is currently active */
-  readonly isSyncing: boolean;
 
   // Task operations
   listTasks(filters?: {
@@ -62,17 +60,15 @@ export class DatabaseStore implements Store {
   public readonly pgLite: PGlite;
   public readonly sql: PgliteDatabase<typeof schema>;
   public readonly isEncrypted: boolean;
-  public readonly isSyncing: boolean;
 
   constructor(
     pgLite: PGlite,
     sql: PgliteDatabase<typeof schema>,
-    isSyncing = false,
+    _isSyncing = false,
     isEncrypted = false
   ) {
     this.pgLite = pgLite;
     this.sql = sql;
-    this.isSyncing = isSyncing;
     this.isEncrypted = isEncrypted;
   }
 

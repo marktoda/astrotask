@@ -1,21 +1,14 @@
 /**
  * Database initialization and factory functions
  *
- * This module provides simplified database creation with optional Electric SQL sync.
- * Uses the official @electric-sql/pglite-sync plugin for automatic sync management.
- *
- * Implements Electric Schema Sync design doc requirements using the SDK's built-in features:
- * - Client bootstrap logic with automatic migration handling
- * - Built-in retry logic and error handling
- * - Status monitoring through shape subscriptions
- * - Offline mode support
+ * This module provides simplified database creation with plain PGlite.
+ * Removed Electric SQL sync - now uses local-only PGlite database.
  */
 
 import { mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PGlite } from '@electric-sql/pglite';
-import { electricSync } from '@electric-sql/pglite-sync';
 import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/pglite';
 import { migrate } from 'drizzle-orm/pglite/migrator';
@@ -34,185 +27,82 @@ const MIGRATIONS_DIR = join(__dirname, '..', '..', 'migrations', 'drizzle');
 export interface DatabaseOptions {
   /** Database file path or connection string */
   dataDir?: string;
-  /** Enable Electric SQL synchronization */
-  enableSync?: boolean;
-  /** Electric SQL server URL */
-  electricUrl?: string;
-  /** Tables to sync */
-  syncTables?: string[];
   /** Enable encryption */
   enableEncryption?: boolean;
   /** Verbose logging */
   verbose?: boolean;
-  /** Enable debug logging for Electric sync */
-  electricDebug?: boolean;
-}
-
-export interface ElectricShape {
-  isUpToDate: boolean;
-  shapeId: string;
-  subscribe: (onUpdate: () => void, onError: (err: Error) => void) => void;
-  unsubscribe: () => void;
-}
-
-export interface ElectricMultiShape {
-  isUpToDate: boolean;
-  unsubscribe: () => void;
-}
-
-interface ElectricShapeConfig {
-  shape: {
-    url: string;
-    params: { table: string };
-  };
-  table: string;
-  primaryKey: string[];
-}
-
-interface ElectricEnabledPGlite extends PGlite {
-  electric: {
-    syncShapesToTables: (config: {
-      shapes: Record<string, ElectricShapeConfig>;
-      key: string;
-      onInitialSync?: () => void;
-    }) => Promise<ElectricMultiShape>;
-  };
 }
 
 /**
- * Ensure the directory for the database exists
+ * Ensure the data directory exists
  */
 function ensureDataDir(dataDir: string): void {
-  // Skip for special PGlite protocols
-  if (dataDir.startsWith('memory://') || dataDir === ':memory:' || dataDir.startsWith('idb://')) {
-    return;
+  if (dataDir.startsWith('memory://') || dataDir.startsWith('idb://')) {
+    return; // In-memory databases don't need directory creation
   }
 
-  // Create parent directories if needed
   try {
-    mkdirSync(dirname(dataDir), { recursive: true });
-  } catch (_error) {
-    // Ignore errors if directory already exists
+    const dir = dirname(dataDir);
+    mkdirSync(dir, { recursive: true });
+  } catch (error) {
+    logger.warn({ error, dataDir }, 'Failed to create data directory');
   }
 }
 
 /**
- * Ensure PROJECT_ROOT task exists in the database
+ * Ensure PROJECT_ROOT task exists
  */
 async function ensureProjectRoot(db: ReturnType<typeof drizzle>): Promise<void> {
-  // Check if PROJECT_ROOT already exists
-  const existingProjectRoot = await db
-    .select()
-    .from(schema.tasks)
-    .where(eq(schema.tasks.id, TASK_IDENTIFIERS.PROJECT_ROOT))
-    .limit(1);
+  try {
+    const existingRoot = await db
+      .select()
+      .from(schema.tasks)
+      .where(eq(schema.tasks.id, TASK_IDENTIFIERS.PROJECT_ROOT))
+      .limit(1);
 
-  if (existingProjectRoot.length === 0) {
-    // Create PROJECT_ROOT task
-    const now = new Date();
-    await db.insert(schema.tasks).values({
-      id: TASK_IDENTIFIERS.PROJECT_ROOT,
-      parentId: null,
-      title: 'Project Tasks',
-      description: 'Project root containing all task hierarchies',
-      status: 'pending',
-      priority: 'medium',
-      prd: null,
-      contextDigest: null,
-      createdAt: now,
-      updatedAt: now,
-    });
+    if (existingRoot.length === 0) {
+      await db.insert(schema.tasks).values({
+        id: TASK_IDENTIFIERS.PROJECT_ROOT,
+        title: 'Project Root',
+        description: 'Root container for all project tasks',
+        status: 'done',
+        priority: 'low',
+        prd: null,
+        contextDigest: null,
+        parentId: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
 
-    logger.debug('Created PROJECT_ROOT task');
-  }
-}
-
-/**
- * Extended Store interface with Electric sync capabilities
- */
-export interface ElectricStore extends Store {
-  /** Active shape subscriptions for single table sync */
-  shapes?: Record<string, ElectricShape> | undefined;
-  /** Active multi-table sync subscription */
-  multiTableSync?: ElectricMultiShape | undefined;
-  /** Stop all Electric sync subscriptions */
-  stopSync: () => Promise<void>;
-  /** Whether Electric sync is active (mutable version for sync management) */
-  electricSyncActive: boolean;
-}
-
-/**
- * Enhanced database store with Electric sync management
- */
-class ElectricDatabaseStore extends DatabaseStore implements ElectricStore {
-  shapes?: Record<string, ElectricShape> | undefined;
-  multiTableSync?: ElectricMultiShape | undefined;
-  electricSyncActive = false;
-
-  async stopSync(): Promise<void> {
-    // Unsubscribe from all single table shapes
-    if (this.shapes) {
-      for (const shape of Object.values(this.shapes)) {
-        shape.unsubscribe();
-      }
-      this.shapes = undefined;
+      logger.info('Created PROJECT_ROOT task');
     }
-
-    // Unsubscribe from multi-table sync
-    if (this.multiTableSync) {
-      this.multiTableSync.unsubscribe();
-      this.multiTableSync = undefined;
-    }
-
-    this.electricSyncActive = false;
-  }
-
-  override async close(): Promise<void> {
-    await this.stopSync();
-    await super.close();
+  } catch (error) {
+    logger.warn({ error }, 'Failed to ensure PROJECT_ROOT task exists');
   }
 }
 
 /**
- * Create a database store with optional Electric SQL sync
- *
- * Leverages the built-in features of @electric-sql/pglite-sync:
- * - Automatic migration handling and schema sync
- * - Built-in retry logic with exponential backoff
- * - Persistent sync state for resuming between sessions
- * - Transactional consistency for multi-table sync
+ * Create a local-only database store with plain PGlite
  */
-export async function createDatabase(options: DatabaseOptions = {}): Promise<ElectricStore> {
+export async function createDatabase(options: DatabaseOptions = {}): Promise<Store> {
   const {
     dataDir = cfg.DATA_DIR,
-    enableSync = true,
-    electricUrl = cfg.ELECTRIC_URL,
-    syncTables = ['tasks', 'context_slices', 'task_dependencies'],
     enableEncryption = false,
     verbose = cfg.DB_VERBOSE,
-    electricDebug = false,
   } = options;
 
   if (verbose) {
-    logger.info({ dataDir, enableSync, enableEncryption }, 'Initializing database');
+    logger.info({ dataDir, enableEncryption }, 'Initializing local PGlite database');
   }
 
   try {
     // Ensure data directory exists
     ensureDataDir(dataDir);
 
-    // Initialize PGlite with Electric sync extension if enabled
+    // Initialize plain PGlite without any extensions
     const pgLite = await PGlite.create({
       dataDir,
       debug: verbose ? 1 : 0,
-      extensions:
-        enableSync && electricUrl
-          ? {
-              electric: electricSync({
-                debug: electricDebug,
-              }),
-            }
-          : {},
     });
 
     // Initialize Drizzle ORM
@@ -225,56 +115,10 @@ export async function createDatabase(options: DatabaseOptions = {}): Promise<Ele
     await ensureProjectRoot(db);
 
     // Create store
-    const store = new ElectricDatabaseStore(pgLite, db, false, enableEncryption);
-
-    // Start Electric SQL sync if enabled
-    if (enableSync && electricUrl && 'electric' in pgLite) {
-      try {
-        // Use multi-table sync for transactional consistency
-        const shapes: Record<string, ElectricShapeConfig> = {};
-
-        for (const tableName of syncTables) {
-          shapes[tableName] = {
-            shape: {
-              url: `${electricUrl}/v1/shape`,
-              params: { table: tableName },
-            },
-            table: tableName,
-            primaryKey: ['id'],
-          };
-        }
-
-        if (verbose) {
-          logger.info({ tables: syncTables }, 'Starting Electric SQL sync');
-        }
-
-        const sync = await (pgLite as ElectricEnabledPGlite).electric.syncShapesToTables({
-          shapes,
-          key: 'astrolabe-sync',
-          onInitialSync: () => {
-            logger.info('Electric SQL initial sync complete');
-          },
-        });
-
-        store.multiTableSync = sync;
-        store.electricSyncActive = true;
-
-        if (verbose) {
-          logger.info({ tables: syncTables }, 'Electric SQL sync started successfully');
-        }
-      } catch (error) {
-        logger.warn({ error }, 'Failed to start Electric SQL sync - continuing in local-only mode');
-      }
-    }
+    const store = new DatabaseStore(pgLite, db, false, enableEncryption);
 
     if (verbose) {
-      logger.info(
-        {
-          syncing: store.electricSyncActive,
-          encrypted: enableEncryption,
-        },
-        'Database initialized successfully'
-      );
+      logger.info('Local PGlite database initialized successfully');
     }
 
     return store;
@@ -285,33 +129,25 @@ export async function createDatabase(options: DatabaseOptions = {}): Promise<Ele
 }
 
 /**
- * Create a local-only database without sync
+ * Create a local-only database (alias for createDatabase for backward compatibility)
  */
-export async function createLocalDatabase(dataDir?: string): Promise<ElectricStore> {
+export async function createLocalDatabase(dataDir?: string): Promise<Store> {
   return createDatabase({
     dataDir: dataDir ?? cfg.DATA_DIR,
-    enableSync: false,
+    enableEncryption: false,
   });
 }
 
 /**
- * Create a database with Electric SQL sync enabled
+ * Create a synced database (now just creates local database since sync is removed)
+ * @deprecated Electric SQL sync has been removed. This now creates a local-only database.
  */
 export async function createSyncedDatabase(
   dataDir?: string,
-  electricUrl?: string
-): Promise<ElectricStore> {
-  const url = electricUrl ?? cfg.ELECTRIC_URL;
-  if (!url) {
-    logger.warn('No Electric URL provided, creating local-only database');
-    return createLocalDatabase(dataDir);
-  }
-
-  return createDatabase({
-    dataDir: dataDir ?? cfg.DATA_DIR,
-    enableSync: true,
-    electricUrl: url,
-  });
+  _electricUrl?: string
+): Promise<Store> {
+  logger.warn('Electric SQL sync has been removed. Creating local-only database instead.');
+  return createLocalDatabase(dataDir);
 }
 
 // Re-export types and utilities
