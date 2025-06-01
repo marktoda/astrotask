@@ -4,7 +4,7 @@ import { cfg } from '../src/utils/config.js';
 describe('Configuration System', () => {
   it('should load config with default values', () => {
     expect(cfg).toBeDefined();
-    expect(cfg.NODE_ENV).toBe('development'); // default from schema
+    expect(cfg.NODE_ENV).toBe('test'); // vitest sets NODE_ENV to 'test' in test environment
     expect(cfg.PORT).toBe(3000); // default from schema
     expect(cfg.LOG_LEVEL).toBe('info'); // default from schema
     expect(cfg.DATABASE_PATH).toBe('./data/astrolabe.db'); // unified database path

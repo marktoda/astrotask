@@ -12,22 +12,8 @@ import {
   addDependencySchema
 } from './handlers/index.js';
 import { wrapMCPHandler } from './utils/response.js';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { dirname } from 'node:path';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
 
 const logger = createModuleLogger('mcp-server');
-
-// Load documentation for each tool
-const getNextTaskDocs = readFileSync(join(__dirname, '../docs/getNextTask.md'), 'utf8');
-const addTasksDocs = readFileSync(join(__dirname, '../docs/addTasks.md'), 'utf8');
-const listTasksDocs = readFileSync(join(__dirname, '../docs/listTasks.md'), 'utf8');
-const addTaskContextDocs = readFileSync(join(__dirname, '../docs/addTaskContext.md'), 'utf8');
-const addDependencyDocs = readFileSync(join(__dirname, '../docs/addDependency.md'), 'utf8');
 
 /**
  * Ultra-Minimal Astrolabe MCP Server
@@ -61,57 +47,48 @@ async function main() {
   // Create minimal handlers
   const handlers = new MinimalHandlers(handlerContext);
 
-  // Register the 5 essential tools with enhanced documentation
-  server.tool('getNextTask', {
-    description: 'Get the next available task to work on with optional parent, status, and priority filters',
-    docs: getNextTaskDocs,
-    parameters: getNextTaskSchema
-  }, wrapMCPHandler(async (args) => {
-    const parsedArgs = getNextTaskSchema.parse(args);
-    return handlers.getNextTask(parsedArgs);
-  }));
+  // Register the 5 essential tools with enhanced schema documentation
+  // The schemas now include comprehensive .describe() calls for better AI agent understanding
+  server.tool('getNextTask',
+    getNextTaskSchema.shape,
+    wrapMCPHandler(async (args) => {
+      return handlers.getNextTask(args);
+    })
+  );
 
-  server.tool('addTasks', {
-    description: 'Create multiple tasks in batch with support for parent-child relationships and dependencies',
-    docs: addTasksDocs,
-    parameters: addTasksSchema
-  }, wrapMCPHandler(async (args) => {
-    const parsedArgs = addTasksSchema.parse(args);
-    return handlers.addTasks(parsedArgs);
-  }));
+  server.tool('addTasks',
+    addTasksSchema.shape,
+    wrapMCPHandler(async (args) => {
+      return handlers.addTasks(args);
+    })
+  );
 
-  server.tool('listTasks', {
-    description: 'Return tasks that match optional status, parent, and other filters',
-    docs: listTasksDocs,
-    parameters: listTasksSchema
-  }, wrapMCPHandler(async (args) => {
-    const parsedArgs = listTasksSchema.parse(args);
-    return handlers.listTasks(parsedArgs);
-  }));
+  server.tool('listTasks',
+    listTasksSchema.shape,
+    wrapMCPHandler(async (args) => {
+      return handlers.listTasks(args);
+    })
+  );
 
-  server.tool('addTaskContext', {
-    description: 'Add a context slice to an existing task with title, description, and optional type',
-    docs: addTaskContextDocs,
-    parameters: addTaskContextSchema
-  }, wrapMCPHandler(async (args) => {
-    const parsedArgs = addTaskContextSchema.parse(args);
-    return handlers.addTaskContext(parsedArgs);
-  }));
+  server.tool('addTaskContext',
+    addTaskContextSchema.shape,
+    wrapMCPHandler(async (args) => {
+      return handlers.addTaskContext(args);
+    })
+  );
 
-  server.tool('addDependency', {
-    description: 'Create a dependency relationship between two tasks for proper work sequencing',
-    docs: addDependencyDocs,
-    parameters: addDependencySchema
-  }, wrapMCPHandler(async (args) => {
-    const parsedArgs = addDependencySchema.parse(args);
-    return handlers.addDependency(parsedArgs);
-  }));
+  server.tool('addDependency',
+    addDependencySchema.shape,
+    wrapMCPHandler(async (args) => {
+      return handlers.addDependency(args);
+    })
+  );
 
   // Begin listening on stdio
   const transport = new StdioServerTransport();
   await server.connect(transport);
 
-  logger.info('Astrolabe MCP Server started with 5 tools: getNextTask, addTasks, listTasks, addTaskContext, addDependency');
+  logger.info('Astrolabe MCP Server started with 5 enhanced tools: getNextTask, addTasks, listTasks, addTaskContext, addDependency');
 }
 
 // Handle cleanup on process termination

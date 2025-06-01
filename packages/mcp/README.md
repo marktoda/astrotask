@@ -435,3 +435,46 @@ MIT License - see [LICENSE](../../LICENSE) for details.
 - [GitHub Issues](https://github.com/astrolabe/astrolabe/issues) - Bug reports and feature requests
 - [Documentation](../../docs/) - Comprehensive guides and API reference
 - [Examples](../../docs/examples/) - Usage examples and tutorials
+
+## Enhanced MCP Tool Documentation
+
+This MCP server uses an enhanced documentation approach that provides both brief descriptions and comprehensive documentation for each tool. Instead of the simple one-liner schema registration, we use the object form that supports:
+
+### Documentation Structure
+
+Each MCP tool is registered with:
+- **description**: One-sentence summary that appears in tooltips and quick help
+- **docs**: Full Markdown documentation loaded from external files
+- **parameters**: Complete Zod schema for argument validation
+
+### Documentation Files
+
+The `docs/` directory contains comprehensive Markdown documentation for each tool:
+
+- `docs/getNextTask.md` - Get next available task with filtering options
+- `docs/addTasks.md` - Batch task creation with hierarchies and dependencies  
+- `docs/listTasks.md` - Query tasks with various filters
+- `docs/addTaskContext.md` - Add context slices to existing tasks
+- `docs/addDependency.md` - Create task dependency relationships
+
+### Implementation Pattern
+
+```typescript
+server.tool('toolName', {
+  description: 'Brief one-sentence description for tooltips',
+  docs: docsMarkdown,              // Full documentation from .md file
+  parameters: zodSchema            // Complete Zod schema for validation
+}, wrapMCPHandler(async (args) => {
+  const parsedArgs = zodSchema.parse(args);  // Parse and validate
+  return handlers.toolMethod(parsedArgs);
+}));
+```
+
+### Benefits
+
+- **Rich documentation**: LLMs and IDEs can access comprehensive usage examples
+- **Type safety**: Zod schemas provide runtime validation and TypeScript types
+- **Maintainable**: Documentation is separated into focused, version-controlled files
+- **Consistent**: All tools follow the same documentation pattern
+
+This approach ensures that AI agents have access to both quick summaries and detailed usage information, improving their ability to effectively use the MCP tools.

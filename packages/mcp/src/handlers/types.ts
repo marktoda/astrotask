@@ -1,17 +1,17 @@
 /**
  * @fileoverview Ultra-minimal type definitions for MCP handler system
- * 
+ *
  * This module defines only the essential types and schemas needed for
  * the 5 core MCP tools: getNextTask, addTasks, addTaskContext, addDependency, listTasks
- * 
+ *
  * @module handlers/types
  * @since 3.0.0
  */
 
 import { z } from 'zod';
-import { 
-  taskStatus, 
-  taskPriority, 
+import {
+  taskStatus,
+  taskPriority,
   type TaskStatus,
   type TaskPriority
 } from '@astrolabe/core';
@@ -43,85 +43,137 @@ export interface MCPHandler {
 }
 
 /**
- * Schema for getting the next available task
+ * Schema for getting the next available task to work on.
+ * This tool intelligently filters for dependency-free tasks that are ready for execution.
  */
 export const getNextTaskSchema = z.object({
-  /** Optional parent task ID to get next subtask within */
-  parentTaskId: z.string().optional(),
-  /** Optional status filter */
-  status: taskStatus.optional(),
-  /** Optional priority filter */
-  priority: taskPriority.optional(),
-});
+  parentTaskId: z
+    .string()
+    .optional()
+    .describe("Optional parent task ID to limit search to direct children of this task. Use this to focus on a specific project or feature area."),
+  status: taskStatus
+    .optional()
+    .describe("Filter by task status. Options: 'pending' (not started), 'in-progress' (currently active), 'done' (completed), 'cancelled' (abandoned), 'archived' (stored). Most commonly used with 'pending' to find unstarted work."),
+  priority: taskPriority
+    .optional()
+    .describe("Filter by task priority level. Options: 'low', 'medium', 'high'. Higher priority tasks are automatically preferred when multiple options exist.")
+}).describe("Get the next available task that is ready to work on, automatically excluding tasks with unresolved dependencies");
 
 /**
- * Schema for adding a single task (used in batch operations)
+ * Schema for a single task object used in batch operations.
+ * Defines the core properties needed to create a well-structured task.
  */
 export const addTaskSchema = z.object({
-  /** Task title */
-  title: z.string().min(1, "Title cannot be empty"),
-  /** Task description */
-  description: z.string().optional(),
-  /** Optional parent task ID for creating subtasks */
-  parentTaskId: z.string().optional(),
-  /** Task priority */
-  priority: taskPriority.optional().default('medium'),
-  /** Task status */
-  status: taskStatus.optional().default('pending'),
-  /** Task details/instructions */
-  details: z.string().optional(),
-});
+  title: z
+    .string()
+    .min(1, "Title cannot be empty")
+    .max(200, "Title cannot exceed 200 characters")
+    .describe("Brief, descriptive title for the task. Should clearly convey what needs to be accomplished."),
+  description: z
+    .string()
+    .max(1000, "Description cannot exceed 1000 characters")
+    .optional()
+    .describe("Detailed description of the task, including context, requirements, or implementation notes. Optional but recommended for complex tasks."),
+  parentTaskId: z
+    .string()
+    .optional()
+    .describe("ID of an existing parent task to create this as a subtask. Use this to organize tasks hierarchically under projects or features."),
+  priority: taskPriority
+    .optional()
+    .default('medium')
+    .describe("Task priority level affecting execution order. Options: 'low', 'medium' (default), 'high'. Higher priority tasks are worked on first."),
+  status: taskStatus
+    .optional()
+    .default('pending')
+    .describe("Initial task status. Options: 'pending' (default, not started), 'in-progress' (currently active), 'done' (completed). Usually left as default 'pending'."),
+  details: z
+    .string()
+    .optional()
+    .describe("Additional implementation details, technical notes, or specific instructions for completing this task.")
+}).describe("Individual task specification with all properties needed for creation");
 
 /**
- * Schema for batch task creation with local referencing
+ * Schema for batch task creation with support for hierarchies and cross-references.
+ * Enables creating multiple related tasks in a single atomic operation.
  */
 export const addTasksSchema = z.object({
-  /** Array of tasks to create */
-  tasks: z.array(
-    addTaskSchema.extend({
-      /** Reference to parent by array index */
-      parentIndex: z.number().int().min(0).optional(),
-      /** Array of indices this task depends on */
-      dependsOn: z.array(z.number().int().min(0)).optional(),
-    })
-  ).min(1, "At least one task required"),
-});
+  tasks: z
+    .array(
+      addTaskSchema.extend({
+        parentIndex: z
+          .number()
+          .int()
+          .min(0)
+          .optional()
+          .describe("Zero-based array index of the parent task within this same batch. Use this instead of parentTaskId when the parent is being created in the same operation."),
+        dependsOn: z
+          .array(z.number().int().min(0))
+          .optional()
+          .describe("Array of zero-based indices of tasks within this batch that must be completed before this task can begin. Creates dependency relationships.")
+      })
+    )
+    .min(1, "At least one task required")
+    .max(50, "Cannot create more than 50 tasks in a single batch")
+    .describe("Array of task specifications to create. Tasks are processed in order, allowing later tasks to reference earlier ones by index.")
+}).describe("Create multiple tasks in a single operation with support for parent-child relationships and dependencies");
 
 /**
- * Schema for listing tasks with filters
+ * Schema for listing tasks with various filtering options.
+ * Provides flexible querying capabilities for project oversight and task discovery.
  */
 export const listTasksSchema = z.object({
-  /** Optional status filter */
-  status: z.string().optional(),
-  /** Optional parent ID filter */
-  parentId: z.string().optional(),
-  /** Whether to include project root task */
-  includeProjectRoot: z.boolean().optional(),
-});
+  status: z
+    .string()
+    .optional()
+    .describe("Filter tasks by status. Common values: 'pending' (unstarted), 'in-progress' (active), 'done' (completed), 'cancelled' (abandoned). Leave empty to include all statuses."),
+  parentId: z
+    .string()
+    .optional()
+    .describe("Filter to show only direct children of this parent task ID. Use this to explore a specific project or feature branch. Leave empty to include tasks at all levels."),
+  includeProjectRoot: z
+    .boolean()
+    .optional()
+    .default(false)
+    .describe("Whether to include project root tasks in the results. Set to true when you want to see top-level project containers.")
+}).describe("List tasks with optional filtering by status, hierarchy, and project scope");
 
 /**
- * Schema for adding a context slice to a task
+ * Schema for adding contextual information to an existing task.
+ * Enables incremental enrichment of tasks with research, implementation notes, or clarifications.
  */
 export const addTaskContextSchema = z.object({
-  /** Task ID to add context to */
-  taskId: z.string(),
-  /** Context slice title */
-  title: z.string().min(1, "Title cannot be empty"),
-  /** Context slice description/content */
-  description: z.string().min(1, "Description cannot be empty"),
-  /** Context type (e.g., 'implementation', 'research', 'complexity') */
-  contextType: z.string().optional().default('general'),
-});
+  taskId: z
+    .string()
+    .describe("ID of the existing task to add context information to. The task must already exist in the system."),
+  title: z
+    .string()
+    .min(1, "Title cannot be empty")
+    .max(100, "Title cannot exceed 100 characters")
+    .describe("Brief title for this context slice that summarizes the type of information being added (e.g., 'Implementation Approach', 'Research Findings')."),
+  description: z
+    .string()
+    .min(1, "Description cannot be empty")
+    .max(2000, "Description cannot exceed 2000 characters")
+    .describe("Detailed content of the context slice. Can include research findings, implementation notes, complexity assessments, links, or any relevant information."),
+  contextType: z
+    .string()
+    .optional()
+    .default('general')
+    .describe("Category of context being added. Common types: 'implementation' (technical details), 'research' (findings/links), 'complexity' (assessment/risks), 'requirements' (clarifications), 'testing' (strategies), 'general' (miscellaneous notes).")
+}).describe("Add a context slice to an existing task, providing additional information or clarifications");
 
 /**
- * Schema for adding a dependency between tasks
+ * Schema for creating dependency relationships between tasks.
+ * Establishes execution order by specifying which tasks must complete before others can begin.
  */
 export const addDependencySchema = z.object({
-  /** Task that depends on another */
-  dependentTaskId: z.string(),
-  /** Task that must be completed first */
-  dependencyTaskId: z.string(),
-});
+  dependentTaskId: z
+    .string()
+    .describe("ID of the task that depends on another task. This task will be blocked until its dependency is completed."),
+  dependencyTaskId: z
+    .string()
+    .describe("ID of the task that must be completed first. This task must finish before the dependent task can begin.")
+}).describe("Create a dependency relationship where one task must complete before another can begin");
 
 /**
  * TypeScript types inferred from the schemas

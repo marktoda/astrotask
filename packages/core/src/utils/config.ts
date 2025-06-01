@@ -20,7 +20,6 @@ export const configSchema = z.object({
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
 
   // Database configuration (PGLite)
-  // Primary database location - used consistently across all components
   DATABASE_PATH: z.string().default('./data/astrolabe.db'),
 
   // Database performance and behavior settings
@@ -44,4 +43,4 @@ export const cfg = (await loadConfig({
     dotEnvAdapter({ path: '.env', silent: true }), // .env file
     envAdapter(), // process.env
   ],
-})) as AppConfig;
+})) as unknown as AppConfig;

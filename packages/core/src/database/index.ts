@@ -91,10 +91,6 @@ export async function createDatabase(options: DatabaseOptions = {}): Promise<Sto
     verbose = cfg.DB_VERBOSE,
   } = options;
 
-  if (verbose) {
-    logger.info({ dataDir, enableEncryption }, 'Initializing local PGlite database');
-  }
-
   try {
     // Ensure data directory exists
     ensureDataDir(dataDir);

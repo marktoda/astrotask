@@ -135,15 +135,9 @@ importers:
 
   packages/core:
     dependencies:
-      '@electric-sql/client':
-        specifier: ^1.0.4
-        version: 1.0.4
       '@electric-sql/pglite':
         specifier: ^0.3.2
         version: 0.3.2
-      '@electric-sql/pglite-sync':
-        specifier: ^0.3.5
-        version: 0.3.5(@electric-sql/pglite@0.3.2)
       '@langchain/community':
         specifier: ^0.3.19
         version: 0.3.44(@browserbasehq/sdk@2.6.0)(@browserbasehq/stagehand@1.14.0(@playwright/test@1.52.0)(deepmerge@4.3.1)(dotenv@16.5.0)(openai@4.103.0(ws@8.18.2)(zod@3.25.28))(zod@3.25.28))(@ibm-cloud/watsonx-ai@1.6.6)(@langchain/core@0.3.57(openai@4.103.0(ws@8.18.2)(zod@3.25.28)))(axios@1.9.0)(ibm-cloud-sdk-core@5.3.2)(ignore@5.3.2)(jsonwebtoken@9.0.2)(lodash@4.17.21)(openai@4.103.0(ws@8.18.2)(zod@3.25.28))(pg@8.16.0)(playwright@1.52.0)(weaviate-client@3.5.5)(ws@8.18.2)
@@ -190,8 +184,8 @@ importers:
         specifier: ^3.25.28
         version: 3.25.28
       zod-config:
-        specifier: ^1.0.0
-        version: 1.0.0(dotenv@16.5.0)(yaml@2.8.0)(zod@3.25.28)
+        specifier: ^1.0.2
+        version: 1.0.2(dotenv@16.5.0)(yaml@2.8.0)(zod@3.25.28)
     devDependencies:
       '@biomejs/biome':
         specifier: ^1.9.4
@@ -337,22 +331,6 @@ packages:
 
   '@drizzle-team/brocli@0.10.2':
     resolution: {integrity: sha512-z33Il7l5dKjUgGULTqBsQBQwckHh5AbIuxhdsIxDDiZAzBOrZO6q9ogcWC65kU382AfynTfgNumVcNIjuIua6w==}
-
-  '@electric-sql/client@1.0.0':
-    resolution: {integrity: sha512-kGiVbBIlMqc/CeJpWZuLjxNkm0836NWxeMtIWH2w5IUK8pUL13hyxg3ZkR7+FlTGhpKuZRiCP5nPOH9D6wbhPw==}
-
-  '@electric-sql/client@1.0.4':
-    resolution: {integrity: sha512-kyywKJNYvbzuAXfykPm537axuFjvpCxGWCKfOLeziNNMEM5LY81UfpEV450gKqPN2Fws51VL0tLgRTTYEPOzrg==}
-
-  '@electric-sql/experimental@1.0.0':
-    resolution: {integrity: sha512-wOKZyph3cvJ4J5fDwqDpR7nilPOHEFwAtbAM5X/PhV3JZCSzmkbosaQRWsxbHQ80MJv7gNFP960+TyqGAjqouQ==}
-    peerDependencies:
-      '@electric-sql/client': 1.0.0
-
-  '@electric-sql/pglite-sync@0.3.5':
-    resolution: {integrity: sha512-YXoGNiZ0qK9PrwiD5bf0zpQGbUZP3ZfOeRMSmlBWYylHgCFjC2PGvk2mgbSi+Cg6JNiT9mAD75Sg/+lQv8aHVg==}
-    peerDependencies:
-      '@electric-sql/pglite': 0.3.2
 
   '@electric-sql/pglite@0.3.2':
     resolution: {integrity: sha512-zfWWa+V2ViDCY/cmUfRqeWY1yLto+EpxjXnZzenB1TyxsTiXaTWeZFIZw6mac52BsuQm0RjCnisjBtdBaXOI6w==}
@@ -5591,8 +5569,8 @@ packages:
   yoga-wasm-web@0.3.3:
     resolution: {integrity: sha512-N+d4UJSJbt/R3wqY7Coqs5pcV0aUj2j9IaQ3rNj9bVCLld8tTGKRa2USARjnvZJWVx1NDmQev8EknoczaOQDOA==}
 
-  zod-config@1.0.0:
-    resolution: {integrity: sha512-n/LgEbW7LTpg9C+mbYDnko2AvrtuaPONLwoSI+1m0+6lIPJvqIXt/nwTCBs6S6Jrc9iD/ZbYcnKQ1ubNzV2K/g==}
+  zod-config@1.0.2:
+    resolution: {integrity: sha512-jGrpkW57MLMG9hEug2bz6YG1BYKTReP9UvYVV4ghE7qXfiU2RxERpu9eL4cG7U8EFm3whziQesgpOG9B+IBQOQ==}
     engines: {node: '>=14.0.0'}
     peerDependencies:
       dotenv: '>=15'
@@ -5733,26 +5711,6 @@ snapshots:
       '@jridgewell/trace-mapping': 0.3.9
 
   '@drizzle-team/brocli@0.10.2': {}
-
-  '@electric-sql/client@1.0.0':
-    optionalDependencies:
-      '@rollup/rollup-darwin-arm64': 4.41.1
-
-  '@electric-sql/client@1.0.4':
-    optionalDependencies:
-      '@rollup/rollup-darwin-arm64': 4.41.1
-
-  '@electric-sql/experimental@1.0.0(@electric-sql/client@1.0.0)':
-    dependencies:
-      '@electric-sql/client': 1.0.0
-    optionalDependencies:
-      '@rollup/rollup-darwin-arm64': 4.41.1
-
-  '@electric-sql/pglite-sync@0.3.5(@electric-sql/pglite@0.3.2)':
-    dependencies:
-      '@electric-sql/client': 1.0.0
-      '@electric-sql/experimental': 1.0.0(@electric-sql/client@1.0.0)
-      '@electric-sql/pglite': 0.3.2
 
   '@electric-sql/pglite@0.3.2': {}
 
@@ -7621,7 +7579,7 @@ snapshots:
     dependencies:
       debug: 3.2.7
       enhanced-resolve: 0.9.1
-      eslint-plugin-import: 2.31.0(@typescript-eslint/parser@5.62.0(eslint@8.57.1)(typescript@5.8.3))(eslint-import-resolver-webpack@0.13.10)(eslint@8.57.1)
+      eslint-plugin-import: 2.31.0(@typescript-eslint/parser@5.62.0(eslint@8.57.1)(typescript@5.8.3))(eslint-import-resolver-webpack@0.13.10(eslint-plugin-import@2.31.0(@typescript-eslint/parser@5.62.0(eslint@8.57.1)(typescript@5.8.3))(eslint@8.57.1))(webpack@5.99.9))(eslint@8.57.1)
       find-root: 1.1.0
       hasown: 2.0.2
       interpret: 1.4.0
@@ -7669,7 +7627,7 @@ snapshots:
       eslint: 8.57.1
       ignore: 5.3.2
 
-  eslint-plugin-import@2.31.0(@typescript-eslint/parser@5.62.0(eslint@8.57.1)(typescript@5.8.3))(eslint-import-resolver-webpack@0.13.10)(eslint@8.57.1):
+  eslint-plugin-import@2.31.0(@typescript-eslint/parser@5.62.0(eslint@8.57.1)(typescript@5.8.3))(eslint-import-resolver-webpack@0.13.10(eslint-plugin-import@2.31.0(@typescript-eslint/parser@5.62.0(eslint@8.57.1)(typescript@5.8.3))(eslint@8.57.1))(webpack@5.99.9))(eslint@8.57.1):
     dependencies:
       '@rtsao/scc': 1.1.0
       array-includes: 3.1.8
@@ -8339,7 +8297,7 @@ snapshots:
       isstream: 0.1.2
       jsonwebtoken: 9.0.2
       mime-types: 2.1.35
-      retry-axios: 2.6.0(axios@1.9.0(debug@4.4.1))
+      retry-axios: 2.6.0(axios@1.9.0)
       tough-cookie: 4.1.4
     transitivePeerDependencies:
       - supports-color
@@ -9774,7 +9732,7 @@ snapshots:
       onetime: 7.0.0
       signal-exit: 4.1.0
 
-  retry-axios@2.6.0(axios@1.9.0(debug@4.4.1)):
+  retry-axios@2.6.0(axios@1.9.0):
     dependencies:
       axios: 1.9.0(debug@4.4.1)
 
@@ -10750,7 +10708,7 @@ snapshots:
       eslint-import-resolver-webpack: 0.13.10(eslint-plugin-import@2.31.0(@typescript-eslint/parser@5.62.0(eslint@8.57.1)(typescript@5.8.3))(eslint@8.57.1))(webpack@5.99.9)
       eslint-plugin-ava: 14.0.0(eslint@8.57.1)
       eslint-plugin-eslint-comments: 3.2.0(eslint@8.57.1)
-      eslint-plugin-import: 2.31.0(@typescript-eslint/parser@5.62.0(eslint@8.57.1)(typescript@5.8.3))(eslint-import-resolver-webpack@0.13.10)(eslint@8.57.1)
+      eslint-plugin-import: 2.31.0(@typescript-eslint/parser@5.62.0(eslint@8.57.1)(typescript@5.8.3))(eslint-import-resolver-webpack@0.13.10(eslint-plugin-import@2.31.0(@typescript-eslint/parser@5.62.0(eslint@8.57.1)(typescript@5.8.3))(eslint@8.57.1))(webpack@5.99.9))(eslint@8.57.1)
       eslint-plugin-n: 15.7.0(eslint@8.57.1)
       eslint-plugin-no-use-extend-native: 0.5.0
       eslint-plugin-prettier: 4.2.1(eslint-config-prettier@8.10.0(eslint@8.57.1))(eslint@8.57.1)(prettier@2.8.8)
@@ -10807,7 +10765,7 @@ snapshots:
 
   yoga-wasm-web@0.3.3: {}
 
-  zod-config@1.0.0(dotenv@16.5.0)(yaml@2.8.0)(zod@3.25.28):
+  zod-config@1.0.2(dotenv@16.5.0)(yaml@2.8.0)(zod@3.25.28):
     dependencies:
       zod: 3.25.28
     optionalDependencies:
