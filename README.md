@@ -42,6 +42,8 @@ Whether you're a developer managing complex projects, a team coordinating work, 
 
 - TypeScript-first with full type safety
 - Multiple interfaces: CLI, API, MCP server
+- Intelligent task filtering (hides completed tasks by default)
+- Interactive dashboard with real-time status updates
 - Comprehensive testing and documentation
 - Hot-reload development environment
 
@@ -63,7 +65,10 @@ pnpm cli --help
 
 # Example commands (in development)
 pnpm cli task add "Implement user authentication"
-pnpm cli task list
+pnpm cli task list                    # Shows only pending and in-progress tasks by default
+pnpm cli task list --show-all         # Shows all tasks including completed and archived
+pnpm cli task list --status done      # Shows only completed tasks
+pnpm cli dashboard                    # Launch interactive dashboard (press 'c' to toggle completed tasks)
 ```
 
 ### For Developers (API)

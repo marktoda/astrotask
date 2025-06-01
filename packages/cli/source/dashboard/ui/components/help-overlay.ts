@@ -89,6 +89,7 @@ export class HelpOverlay {
 					},
 					{ keys: ["?"], description: "Show/hide this help" },
 					{ keys: [":"], description: "Open command palette" },
+					{ keys: ["c"], description: "Toggle completed tasks visibility" },
 					{ keys: ["Tab"], description: "Focus next panel" },
 					{ keys: ["Shift+Tab"], description: "Focus previous panel" },
 				],

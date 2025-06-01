@@ -15,11 +15,11 @@ import { migrate } from 'drizzle-orm/pglite/migrator';
 import { TASK_IDENTIFIERS } from '../entities/TaskTreeConstants.js';
 import { cfg } from '../utils/config.js';
 import { createModuleLogger } from '../utils/logger.js';
+import type { LockOptions } from './lock.js';
+import { DatabaseLock, DatabaseLockError, withDatabaseLock } from './lock.js';
+import { LockingStore } from './lockingStore.js';
 import * as schema from './schema.js';
 import { DatabaseStore, type Store } from './store.js';
-import type { LockOptions } from './lock.js';
-import { LockingStore } from './lockingStore.js';
-import { DatabaseLock, DatabaseLockError, withDatabaseLock } from './lock.js';
 
 const logger = createModuleLogger('database');
 
@@ -106,7 +106,7 @@ export async function createLocalDatabase(dataDir?: string): Promise<Store> {
  * Create a local-only database with cooperative locking enabled
  */
 export async function createLockedDatabase(
-  dataDir?: string, 
+  dataDir?: string,
   lockOptions?: LockOptions
 ): Promise<Store> {
   const dbOptions: DatabaseOptions = {
@@ -114,11 +114,11 @@ export async function createLockedDatabase(
     enableEncryption: false,
     enableLocking: true,
   };
-  
+
   if (lockOptions) {
     dbOptions.lockOptions = lockOptions;
   }
-  
+
   return createDatabase(dbOptions);
 }
 
@@ -132,13 +132,15 @@ export async function createDatabaseWithLocking(
   } = {}
 ): Promise<Store> {
   const { processType, ...dbOptions } = options;
-  
+
   // Auto-detect process type if not provided
-  const detectedProcessType = processType ?? (
-    process.env.NODE_ENV === 'test' ? 'test' :
-    typeof process !== 'undefined' && process.title?.includes('node') ? 'cli' :
-    'unknown'
-  );
+  const detectedProcessType =
+    processType ??
+    (process.env.NODE_ENV === 'test'
+      ? 'test'
+      : typeof process !== 'undefined' && process.title?.includes('node')
+        ? 'cli'
+        : 'unknown');
 
   const finalOptions: DatabaseOptions = {
     ...dbOptions,
@@ -187,20 +189,21 @@ export async function createDatabase(options: DatabaseOptions = {}): Promise<Sto
     const baseStore = new DatabaseStore(pgLite, db, false, enableEncryption);
 
     // Wrap with locking if requested
-    const store = enableLocking 
-      ? new LockingStore(baseStore, dataDir, lockOptions)
-      : baseStore;
+    const store = enableLocking ? new LockingStore(baseStore, dataDir, lockOptions) : baseStore;
 
     if (verbose) {
-      logger.info(`Local PGlite database initialized successfully${enableLocking ? ' with locking' : ''}`, {
-        dataDir,
-        locking: enableLocking
-      });
+      logger.info(
+        `Local PGlite database initialized successfully${enableLocking ? ' with locking' : ''}`,
+        {
+          dataDir,
+          locking: enableLocking,
+        }
+      );
     }
 
     return store;
   } catch (error) {
-    logger.error({ error, dataDir }, 'Failed to initialize database');
+    logger.error({ error, dataDir }, `Failed to initialize database, ${(error as Error).message}`);
     throw error;
   }
 }

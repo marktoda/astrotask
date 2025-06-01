@@ -532,7 +532,12 @@ export class TaskTreeComponent {
 	}
 
 	private buildHierarchyTreeItems(state: DashboardStore): TaskTreeItem[] {
-		const { trackingTree, expandedTaskIds, selectedProjectId } = state;
+		const {
+			trackingTree,
+			expandedTaskIds,
+			selectedProjectId,
+			showCompletedTasks,
+		} = state;
 
 		if (!trackingTree) {
 			return [];
@@ -541,22 +546,40 @@ export class TaskTreeComponent {
 		const items: TaskTreeItem[] = [];
 
 		const addTreeNode = (node: TaskTree | TrackingTaskTree, depth: number) => {
-			const hasChildren = node.getChildren().length > 0;
-			const isExpanded = expandedTaskIds.has(node.task.id);
+			// Apply status filtering: skip completed tasks if showCompletedTasks is false
+			const isCompleted =
+				node.task.status === "done" || node.task.status === "archived";
+			const shouldSkipTask = !showCompletedTasks && isCompleted;
 
-			items.push({
-				taskId: node.task.id,
-				label: this.formatTaskLabel(node.task, depth, hasChildren, isExpanded),
-				depth,
-				isExpanded,
-				hasChildren,
-				task: node.task,
-			});
+			if (!shouldSkipTask) {
+				const hasChildren = node.getChildren().length > 0;
+				const isExpanded = expandedTaskIds.has(node.task.id);
 
-			// Add children if expanded
-			if (isExpanded && hasChildren) {
+				items.push({
+					taskId: node.task.id,
+					label: this.formatTaskLabel(
+						node.task,
+						depth,
+						hasChildren,
+						isExpanded,
+					),
+					depth,
+					isExpanded,
+					hasChildren,
+					task: node.task,
+				});
+
+				// Add children if expanded
+				if (isExpanded && hasChildren) {
+					for (const child of node.getChildren()) {
+						addTreeNode(child, depth + 1);
+					}
+				}
+			} else if (node.getChildren().length > 0) {
+				// Even if we skip the parent task, we still need to process children
+				// in case they should be visible (e.g., incomplete children of completed parent)
 				for (const child of node.getChildren()) {
-					addTreeNode(child, depth + 1);
+					addTreeNode(child, depth); // Keep same depth since parent is hidden
 				}
 			}
 		};
@@ -581,7 +604,12 @@ export class TaskTreeComponent {
 	}
 
 	private buildDependencyTreeItems(state: DashboardStore): TaskTreeItem[] {
-		const { trackingTree, trackingDependencyGraph, expandedTaskIds } = state;
+		const {
+			trackingTree,
+			trackingDependencyGraph,
+			expandedTaskIds,
+			showCompletedTasks,
+		} = state;
 
 		if (!trackingTree || !trackingDependencyGraph) {
 			return [];
@@ -603,28 +631,42 @@ export class TaskTreeComponent {
 				return;
 			}
 
-			const dependents = trackingDependencyGraph.getDependents(taskId);
-			const hasChildren = dependents.length > 0;
-			const isExpanded = expandedTaskIds.has(taskId);
+			// Apply status filtering: skip completed tasks if showCompletedTasks is false
+			const isCompleted =
+				taskNode.task.status === "done" || taskNode.task.status === "archived";
+			const shouldSkipTask = !showCompletedTasks && isCompleted;
 
-			items.push({
-				taskId: taskId,
-				label: this.formatTaskLabel(
-					taskNode.task,
-					depth,
-					hasChildren,
-					isExpanded,
-				),
-				depth: depth,
-				isExpanded: isExpanded,
-				hasChildren: hasChildren,
-				task: taskNode.task,
-			});
+			if (!shouldSkipTask) {
+				const dependents = trackingDependencyGraph.getDependents(taskId);
+				const hasChildren = dependents.length > 0;
+				const isExpanded = expandedTaskIds.has(taskId);
 
-			// Add dependents if expanded
-			if (isExpanded && hasChildren) {
+				items.push({
+					taskId: taskId,
+					label: this.formatTaskLabel(
+						taskNode.task,
+						depth,
+						hasChildren,
+						isExpanded,
+					),
+					depth: depth,
+					isExpanded: isExpanded,
+					hasChildren: hasChildren,
+					task: taskNode.task,
+				});
+
+				// Add dependents if expanded
+				if (isExpanded && hasChildren) {
+					for (const dependentId of dependents) {
+						addDependencyNode(dependentId, depth + 1);
+					}
+				}
+			} else {
+				// Even if we skip the task, we still need to process its dependents
+				// in case they should be visible
+				const dependents = trackingDependencyGraph.getDependents(taskId);
 				for (const dependentId of dependents) {
-					addDependencyNode(dependentId, depth + 1);
+					addDependencyNode(dependentId, depth); // Keep same depth since parent is hidden
 				}
 			}
 		};

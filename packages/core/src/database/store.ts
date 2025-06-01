@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { PGlite } from '@electric-sql/pglite';
-import { and, desc, eq, isNull, ne } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull, ne } from 'drizzle-orm';
 import type { PgliteDatabase } from 'drizzle-orm/pglite';
 import { TASK_IDENTIFIERS } from '../entities/TaskTreeConstants.js';
 import type {
@@ -29,7 +29,7 @@ export interface Store {
 
   // Task operations
   listTasks(filters?: {
-    status?: TaskStatus;
+    statuses?: TaskStatus[];
     parentId?: string | null;
     includeProjectRoot?: boolean;
   }): Promise<Task[]>;
@@ -75,15 +75,27 @@ export class DatabaseStore implements Store {
   // Task operations
   async listTasks(
     filters: {
-      status?: TaskStatus;
+      statuses?: TaskStatus[];
       parentId?: string | null;
       includeProjectRoot?: boolean;
     } = {}
   ): Promise<Task[]> {
     const conditions = [];
 
-    if (filters.status) {
-      conditions.push(eq(schema.tasks.status, filters.status));
+    // Apply status filtering if statuses are provided
+    if (filters.statuses !== undefined) {
+      if (filters.statuses.length === 1) {
+        const status = filters.statuses[0];
+        if (status) {
+          conditions.push(eq(schema.tasks.status, status));
+        }
+      } else if (filters.statuses.length > 1) {
+        conditions.push(inArray(schema.tasks.status, filters.statuses));
+      }
+      // If statuses is an empty array, don't add any status filter (show all)
+    } else {
+      // Default behavior when no statuses parameter is provided: show pending and in-progress
+      conditions.push(inArray(schema.tasks.status, ['pending', 'in-progress']));
     }
 
     if (filters.parentId !== undefined) {
@@ -167,15 +179,15 @@ export class DatabaseStore implements Store {
 
   // Convenience methods
   async listTasksByStatus(status: TaskStatus): Promise<Task[]> {
-    return this.listTasks({ status });
+    return this.listTasks({ statuses: [status] });
   }
 
   async listRootTasks(): Promise<Task[]> {
-    return this.listTasks({ parentId: TASK_IDENTIFIERS.PROJECT_ROOT });
+    return this.listTasks({ parentId: TASK_IDENTIFIERS.PROJECT_ROOT, statuses: [] });
   }
 
   async listSubtasks(parentId: string): Promise<Task[]> {
-    return this.listTasks({ parentId });
+    return this.listTasks({ parentId, statuses: [] });
   }
 
   async updateTaskStatus(id: string, status: TaskStatus): Promise<Task | null> {

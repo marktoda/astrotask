@@ -370,8 +370,8 @@ export default function Init({ options }: Props) {
 					verbose: true,
 					enableLocking: true,
 					lockOptions: {
-						processType: 'cli-init'  // Identify this as CLI init process
-					}
+						processType: "cli-init", // Identify this as CLI init process
+					},
 				});
 
 				// Step 4: Create initial tasks

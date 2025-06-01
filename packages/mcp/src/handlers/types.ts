@@ -122,10 +122,10 @@ export const addTasksSchema = z.object({
  * Provides flexible querying capabilities for project oversight and task discovery.
  */
 export const listTasksSchema = z.object({
-  status: z
-    .string()
+  statuses: z
+    .array(taskStatus)
     .optional()
-    .describe("Filter tasks by status. Common values: 'pending' (unstarted), 'in-progress' (active), 'done' (completed), 'cancelled' (abandoned). Leave empty to include all statuses."),
+    .describe("Filter tasks by status array. Common values: 'pending' (unstarted), 'in-progress' (active), 'done' (completed), 'cancelled' (abandoned), 'archived' (stored). Leave empty to show pending and in-progress tasks only."),
   parentId: z
     .string()
     .optional()

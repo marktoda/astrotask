@@ -280,7 +280,7 @@ export class MinimalHandlers implements MCPHandler {
    * List tasks with optional filters
    */
   async listTasks(args: {
-    status?: string;
+    statuses?: string[];
     parentId?: string;
     includeProjectRoot?: boolean;
   } = {}): Promise<{
@@ -291,8 +291,8 @@ export class MinimalHandlers implements MCPHandler {
     try {
       const filters: any = {};
       
-      if (args.status) {
-        filters.status = args.status;
+      if (args.statuses) {
+        filters.statuses = args.statuses;
       }
       
       if (args.parentId !== undefined) {

@@ -41,17 +41,21 @@ export class TaskService implements ITaskReconciliationService {
    * Get TaskTree instance with ergonomic tree operations (cached)
    * If no rootId provided, returns project tree containing all parentless tasks
    */
-  async getTaskTree(rootId?: string, maxDepth?: number): Promise<TaskTree | null> {
+  async getTaskTree(
+    rootId?: string,
+    maxDepth?: number,
+    statusFilters?: { statuses?: TaskStatus[] }
+  ): Promise<TaskTree | null> {
     // Special case: project tree for entire task forest
     if (rootId === undefined) {
       return this.cachedOps.getOrBuildTree(TASK_IDENTIFIERS.PROJECT_ROOT, maxDepth, async () => {
-        const treeData = await this.buildProjectTreeData(maxDepth);
+        const treeData = await this.buildProjectTreeData(maxDepth, statusFilters);
         return treeData ? new TaskTree(treeData) : null;
       });
     }
 
     return this.cachedOps.getOrBuildTree(rootId, maxDepth, async () => {
-      const treeData = await this.buildTaskTreeData(rootId, maxDepth);
+      const treeData = await this.buildTaskTreeData(rootId, maxDepth, statusFilters);
       return treeData ? new TaskTree(treeData) : null;
     });
   }
@@ -59,9 +63,15 @@ export class TaskService implements ITaskReconciliationService {
   /**
    * Internal method to build project tree containing all parentless tasks
    */
-  private async buildProjectTreeData(maxDepth?: number): Promise<TaskTreeData | null> {
+  private async buildProjectTreeData(
+    maxDepth?: number,
+    statusFilters?: { statuses?: TaskStatus[] }
+  ): Promise<TaskTreeData | null> {
     // Get all tasks with PROJECT_ROOT as parent (root tasks)
-    const rootTasks = await this.store.listTasks({ parentId: TASK_IDENTIFIERS.PROJECT_ROOT });
+    const rootTasks = await this.store.listTasks({
+      parentId: TASK_IDENTIFIERS.PROJECT_ROOT,
+      ...statusFilters,
+    });
 
     // Create project root task - always return this even if no child tasks exist
     const projectRoot: Task = {
@@ -83,7 +93,11 @@ export class TaskService implements ITaskReconciliationService {
       const adjustedMaxDepth = maxDepth === undefined ? undefined : maxDepth - 1;
 
       for (const rootTask of rootTasks) {
-        const childData = await this.buildTaskTreeData(rootTask.id, adjustedMaxDepth);
+        const childData = await this.buildTaskTreeData(
+          rootTask.id,
+          adjustedMaxDepth,
+          statusFilters
+        );
         if (childData) {
           children.push(childData);
         }
@@ -96,7 +110,11 @@ export class TaskService implements ITaskReconciliationService {
   /**
    * Internal method to build TaskTreeData structure
    */
-  private async buildTaskTreeData(rootId: string, maxDepth?: number): Promise<TaskTreeData | null> {
+  private async buildTaskTreeData(
+    rootId: string,
+    maxDepth?: number,
+    statusFilters?: { statuses?: TaskStatus[] }
+  ): Promise<TaskTreeData | null> {
     const rootTask = await this.store.getTask(rootId);
     if (!rootTask) return null;
 
@@ -104,7 +122,7 @@ export class TaskService implements ITaskReconciliationService {
       const children: TaskTreeData[] = [];
 
       if (maxDepth === undefined || currentDepth < maxDepth) {
-        const subtasks = await this.store.listTasks({ parentId: task.id });
+        const subtasks = await this.store.listTasks({ parentId: task.id, ...statusFilters });
         for (const subtask of subtasks) {
           children.push(await buildData(subtask, currentDepth + 1));
         }
@@ -140,7 +158,7 @@ export class TaskService implements ITaskReconciliationService {
     const descendants: Task[] = [];
 
     const collectDescendants = async (parentId: string): Promise<void> => {
-      const children = await this.store.listTasks({ parentId });
+      const children = await this.store.listTasks({ parentId, statuses: [] });
       for (const child of children) {
         descendants.push(child);
         await collectDescendants(child.id);
@@ -223,8 +241,14 @@ export class TaskService implements ITaskReconciliationService {
   /**
    * Get multiple task trees efficiently
    */
-  async getTaskTrees(rootIds: string[], maxDepth?: number): Promise<TaskTree[]> {
-    const trees = await Promise.all(rootIds.map((id) => this.getTaskTree(id, maxDepth)));
+  async getTaskTrees(
+    rootIds: string[],
+    maxDepth?: number,
+    statusFilters?: { statuses?: TaskStatus[] }
+  ): Promise<TaskTree[]> {
+    const trees = await Promise.all(
+      rootIds.map((id) => this.getTaskTree(id, maxDepth, statusFilters))
+    );
 
     return trees.filter((tree): tree is TaskTree => tree !== null);
   }

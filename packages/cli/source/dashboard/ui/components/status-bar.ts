@@ -40,6 +40,8 @@ export class StatusBar {
 			autoFlushEnabled,
 			expandedTaskIds,
 			isFlushingChanges,
+			showCompletedTasks,
+			statusFilterCounts,
 		} = state;
 
 		const parts: string[] = [];
@@ -77,6 +79,20 @@ export class StatusBar {
 			}
 			if (pendingTasks > 0) {
 				parts.push(`Pending: ${pendingTasks}`);
+			}
+		}
+
+		// Status filter indicator
+		if (statusFilterCounts.total > 0) {
+			if (showCompletedTasks) {
+				parts.push(`View: All (${statusFilterCounts.total})`);
+			} else {
+				parts.push(
+					`View: Active (${statusFilterCounts.visible}/${statusFilterCounts.total})`,
+				);
+				if (statusFilterCounts.hidden > 0) {
+					parts.push(`Hidden: ${statusFilterCounts.hidden}`);
+				}
 			}
 		}
 

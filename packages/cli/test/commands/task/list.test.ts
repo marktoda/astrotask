@@ -8,7 +8,7 @@ describe('List Task Command', () => {
     expect(listCommand.description).toBeDefined();
     expect(typeof listCommand.description).toBe('string');
     expect(listCommand.description.length).toBeGreaterThan(0);
-    expect(listCommand.description).toBe('List tasks with status and priority information');
+    expect(listCommand.description).toBe('List tasks with status and priority information. By default, shows only pending and in-progress tasks. Use --show-all to include completed and archived tasks.');
   });
 
   it('should export default component', () => {

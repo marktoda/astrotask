@@ -1,14 +1,14 @@
 /**
  * File-based cooperative locking for PGLite database access coordination
- * 
+ *
  * Implements a simple file-locking mechanism to coordinate database access
  * between CLI and MCP server processes. Uses exclusive file creation with
  * retry logic and stale lock detection.
  */
 
-import { writeFile, unlink, readFile, mkdir } from 'node:fs/promises';
-import { dirname, resolve } from 'node:path';
+import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
 import { hostname } from 'node:os';
+import { dirname, resolve } from 'node:path';
 import { createModuleLogger } from '../utils/logger.js';
 
 const logger = createModuleLogger('DatabaseLock');
@@ -36,7 +36,10 @@ export interface LockOptions {
 }
 
 export class DatabaseLockError extends Error {
-  constructor(message: string, public readonly lockInfo?: LockInfo) {
+  constructor(
+    message: string,
+    public readonly lockInfo?: LockInfo
+  ) {
     super(message);
     this.name = 'DatabaseLockError';
   }
@@ -51,7 +54,7 @@ export class DatabaseLock {
     // Create lock file path in same directory as database
     const dbDir = dirname(resolve(databasePath));
     this.lockPath = resolve(dbDir, '.astrolabe.lock');
-    
+
     this.options = {
       maxRetries: options.maxRetries ?? 50,
       retryDelay: options.retryDelay ?? 100,
@@ -66,11 +69,12 @@ export class DatabaseLock {
   private async ensureLockDir(): Promise<void> {
     try {
       await mkdir(dirname(this.lockPath), { recursive: true });
-    } catch (error: any) {
-      if (error.code !== 'EEXIST') {
+    } catch (error: unknown) {
+      const fsError = error as NodeJS.ErrnoException;
+      if (fsError.code !== 'EEXIST') {
         logger.warn('Failed to create lock directory', {
           error,
-          lockDir: dirname(this.lockPath)
+          lockDir: dirname(this.lockPath),
         });
       }
     }
@@ -80,6 +84,7 @@ export class DatabaseLock {
    * Acquire the database lock with retry logic
    * @throws {DatabaseLockError} If lock cannot be acquired within timeout
    */
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Complex locking logic with multiple edge cases is necessary for robust database coordination
   async acquire(): Promise<void> {
     // Ensure lock directory exists first
     await this.ensureLockDir();
@@ -95,95 +100,101 @@ export class DatabaseLock {
     while (attempt < this.options.maxRetries) {
       try {
         // Try to create lock file exclusively (fails if exists)
-        await writeFile(this.lockPath, JSON.stringify(lockInfo, null, 2), { 
-          flag: 'wx' // Exclusive create - fails if file exists
+        await writeFile(this.lockPath, JSON.stringify(lockInfo, null, 2), {
+          flag: 'wx', // Exclusive create - fails if file exists
         });
-        
+
         this.lockInfo = lockInfo;
         logger.debug(`Database lock acquired on attempt ${attempt + 1}`, {
           lockPath: this.lockPath,
           processType: this.options.processType,
-          pid: process.pid
+          pid: process.pid,
         });
         return;
-      } catch (error: any) {
-        if (error.code === 'EEXIST') {
+      } catch (error: unknown) {
+        const fsError = error as NodeJS.ErrnoException;
+        if (fsError.code === 'EEXIST') {
           // Lock file exists, check if it's stale
           try {
             const existingLockData = await readFile(this.lockPath, 'utf-8');
             const existingLock: LockInfo = JSON.parse(existingLockData);
-            
+
             const lockAge = Date.now() - existingLock.timestamp;
             if (lockAge > this.options.staleTimeout) {
               logger.warn(`Removing stale lock (age: ${lockAge}ms)`, {
                 existingLock,
-                lockPath: this.lockPath
+                lockPath: this.lockPath,
               });
-              
+
               try {
                 await unlink(this.lockPath);
                 // Continue to next iteration to try acquiring lock
                 attempt--;
-              } catch (unlinkError: any) {
+              } catch (unlinkError: unknown) {
+                const unlinkFsError = unlinkError as NodeJS.ErrnoException;
                 // Check if the file was already removed (race condition)
-                if (unlinkError.code === 'ENOENT') {
+                if (unlinkFsError.code === 'ENOENT') {
                   logger.debug('Stale lock file already removed by another process', {
-                    lockPath: this.lockPath
+                    lockPath: this.lockPath,
                   });
                   attempt--; // Still retry to acquire the lock
                 } else {
-                  logger.warn('Failed to remove stale lock', { 
+                  logger.warn('Failed to remove stale lock', {
                     error: unlinkError,
-                    lockPath: this.lockPath 
+                    lockPath: this.lockPath,
                   });
                 }
               }
             } else {
               // Lock is not stale, wait and retry
               if (attempt === 0) {
-                logger.debug(`Database is locked by ${existingLock.process} (PID: ${existingLock.pid})`, {
-                  lockAge,
-                  existingLock
-                });
+                logger.debug(
+                  `Database is locked by ${existingLock.process} (PID: ${existingLock.pid})`,
+                  {
+                    lockAge,
+                    existingLock,
+                  }
+                );
               }
             }
           } catch (parseError) {
             // Invalid lock file, try to remove it
             logger.warn('Invalid lock file detected, attempting to remove', {
               parseError,
-              lockPath: this.lockPath
+              lockPath: this.lockPath,
             });
-            
+
             try {
               await unlink(this.lockPath);
               attempt--; // Don't count this as a retry attempt
-            } catch (unlinkError: any) {
+            } catch (unlinkError: unknown) {
+              const unlinkFsError = unlinkError as NodeJS.ErrnoException;
               // Check if the file was already removed (race condition)
-              if (unlinkError.code === 'ENOENT') {
+              if (unlinkFsError.code === 'ENOENT') {
                 logger.debug('Invalid lock file already removed by another process', {
-                  lockPath: this.lockPath
+                  lockPath: this.lockPath,
                 });
                 attempt--; // Still retry to acquire the lock
               } else {
                 logger.warn('Failed to remove invalid lock file', {
                   unlinkError,
-                  lockPath: this.lockPath
+                  lockPath: this.lockPath,
                 });
               }
             }
           }
-          
+
           attempt++;
           if (attempt < this.options.maxRetries) {
-            await new Promise(resolve => setTimeout(resolve, this.options.retryDelay));
+            await new Promise((resolve) => setTimeout(resolve, this.options.retryDelay));
           }
-        } else if (error.code === 'ENOENT') {
+        } else if (fsError.code === 'ENOENT') {
           // Directory doesn't exist, ensure it and retry
           await this.ensureLockDir();
           // Don't increment attempt for this case
         } else {
           // Unexpected error
-          throw new DatabaseLockError(`Failed to acquire database lock: ${error.message}`);
+          throw new DatabaseLockError(`Failed to acquire database lock: ${fsError.message}`);
         }
       }
     }
@@ -218,15 +229,16 @@ export class DatabaseLock {
       logger.debug('Database lock released', {
         lockPath: this.lockPath,
         processType: this.options.processType,
-        pid: process.pid
+        pid: process.pid,
       });
-    } catch (error: any) {
-      if (error.code === 'ENOENT') {
+    } catch (error: unknown) {
+      const fsError = error as NodeJS.ErrnoException;
+      if (fsError.code === 'ENOENT') {
         logger.warn('Lock file was already removed', { lockPath: this.lockPath });
       } else {
         logger.error('Failed to release database lock', {
           error,
-          lockPath: this.lockPath
+          lockPath: this.lockPath,
         });
         throw error;
       }
@@ -242,22 +254,23 @@ export class DatabaseLock {
     try {
       const lockData = await readFile(this.lockPath, 'utf-8');
       const lockInfo: LockInfo = JSON.parse(lockData);
-      
+
       const lockAge = Date.now() - lockInfo.timestamp;
       if (lockAge > this.options.staleTimeout) {
         return { locked: false }; // Stale lock doesn't count
       }
-      
+
       return { locked: true, info: lockInfo };
-    } catch (error: any) {
-      if (error.code === 'ENOENT') {
+    } catch (error: unknown) {
+      const fsError = error as NodeJS.ErrnoException;
+      if (fsError.code === 'ENOENT') {
         return { locked: false };
       }
-      
+
       // If we can't read the lock file, assume it's corrupted and not locked
       logger.warn('Failed to read lock file, assuming not locked', {
         error,
-        lockPath: this.lockPath
+        lockPath: this.lockPath,
       });
       return { locked: false };
     }
@@ -284,8 +297,9 @@ export class DatabaseLock {
     try {
       await unlink(this.lockPath);
       logger.warn('Lock file forcibly removed', { lockPath: this.lockPath });
-    } catch (error: any) {
-      if (error.code === 'ENOENT') {
+    } catch (error: unknown) {
+      const fsError = error as NodeJS.ErrnoException;
+      if (fsError.code === 'ENOENT') {
         logger.info('Lock file does not exist', { lockPath: this.lockPath });
       } else {
         throw error;
@@ -303,7 +317,7 @@ export async function withDatabaseLock<T>(
   fn: () => Promise<T>
 ): Promise<T> {
   const lock = new DatabaseLock(databasePath, options);
-  
+
   try {
     await lock.acquire();
     return await fn();
@@ -312,4 +326,4 @@ export async function withDatabaseLock<T>(
       await lock.release();
     }
   }
-} 
+}

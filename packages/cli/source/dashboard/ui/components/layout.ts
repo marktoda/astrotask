@@ -124,6 +124,16 @@ export class DashboardLayout {
 			state().toggleHelpOverlay();
 		});
 
+		// Toggle completed tasks visibility
+		this.screen.key(["c"], () => {
+			state().toggleShowCompletedTasks();
+			const newState = state();
+			const statusText = newState.showCompletedTasks
+				? "Showing all tasks (including completed)"
+				: "Hiding completed tasks";
+			state().setStatusMessage(statusText);
+		});
+
 		// Focus management
 		this.unsubscribe = this.store.subscribe((state) => {
 			// Skip all updates if editor is active

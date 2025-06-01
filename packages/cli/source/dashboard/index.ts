@@ -28,13 +28,13 @@ async function main() {
 		}
 
 		// Initialize database with consistent configuration
-		const dbOptions = { 
-			dataDir: process.env['DATABASE_PATH'] || './data/astrolabe.db',
-			verbose: process.env['DB_VERBOSE'] === 'true',
+		const dbOptions = {
+			dataDir: process.env["DATABASE_PATH"] || "./data/astrolabe.db",
+			verbose: process.env["DB_VERBOSE"] === "true",
 			enableLocking: true,
 			lockOptions: {
-				processType: 'cli-dashboard'  // Identify this as CLI dashboard process
-			}
+				processType: "cli-dashboard", // Identify this as CLI dashboard process
+			},
 		};
 		const db = await createDatabase(dbOptions);
 

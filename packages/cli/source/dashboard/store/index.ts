@@ -24,6 +24,14 @@ export interface DashboardState {
 	contextSlicesByTaskId: Map<string, ContextSlice[]>;
 	loadingContextSlices: Set<string>; // Track which task IDs are currently loading
 
+	// Status filtering state
+	showCompletedTasks: boolean; // When false, hide done/archived tasks (default: false)
+	statusFilterCounts: {
+		total: number;
+		visible: number;
+		hidden: number;
+	};
+
 	// UI state
 	activePanel: "sidebar" | "tree" | "details";
 	commandPaletteOpen: boolean;
@@ -100,6 +108,11 @@ export interface DashboardActions {
 	setConfirmExit: (confirm: boolean) => void;
 	toggleDetailViewMode: () => void;
 	toggleTreeViewMode: () => void;
+
+	// Status filtering actions
+	toggleShowCompletedTasks: () => void;
+	setShowCompletedTasks: (show: boolean) => void;
+	updateStatusFilterCounts: () => void;
 
 	// Project actions
 	selectProject: (projectId: string | null) => void;
@@ -180,6 +193,8 @@ export function createDashboardStore(
 		lastFlushTime: 0,
 		autoFlushEnabled: false,
 		isFlushingChanges: false,
+		showCompletedTasks: false,
+		statusFilterCounts: { total: 0, visible: 0, hidden: 0 },
 
 		// Helper to trigger re-renders after mutations
 		triggerTreeUpdate: () => {
@@ -239,6 +254,9 @@ export function createDashboardStore(
 
 				// Calculate progress
 				get().recalculateAllProgress();
+
+				// Update status filter counts
+				get().updateStatusFilterCounts();
 
 				// Enable auto-flush for automatic saving
 				get().enableAutoFlush();
@@ -852,6 +870,55 @@ export function createDashboardStore(
 				treeViewMode:
 					state.treeViewMode === "hierarchy" ? "dependencies" : "hierarchy",
 			}));
+		},
+
+		// Status filtering actions
+		toggleShowCompletedTasks: () => {
+			set((state) => ({ showCompletedTasks: !state.showCompletedTasks }));
+			get().updateStatusFilterCounts();
+			get().triggerTreeUpdate();
+		},
+
+		setShowCompletedTasks: (show) => {
+			set({ showCompletedTasks: show });
+			get().updateStatusFilterCounts();
+			get().triggerTreeUpdate();
+		},
+
+		updateStatusFilterCounts: () => {
+			const { trackingTree, showCompletedTasks } = get();
+			if (!trackingTree) {
+				set({
+					statusFilterCounts: { total: 0, visible: 0, hidden: 0 },
+				});
+				return;
+			}
+
+			let totalCount = 0;
+			let visibleCount = 0;
+
+			trackingTree.walkDepthFirst((node) => {
+				totalCount++;
+
+				// A task is visible if we're showing completed tasks OR the task is not completed
+				const isCompleted =
+					node.task.status === "done" || node.task.status === "archived";
+				const isVisible = showCompletedTasks || !isCompleted;
+
+				if (isVisible) {
+					visibleCount++;
+				}
+			});
+
+			const hiddenCount = totalCount - visibleCount;
+
+			set({
+				statusFilterCounts: {
+					total: totalCount,
+					visible: visibleCount,
+					hidden: hiddenCount,
+				},
+			});
 		},
 
 		// Project actions

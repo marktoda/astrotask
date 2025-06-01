@@ -156,7 +156,7 @@ export class DependencyService implements IDependencyReconciliationService {
     // Get task data for status checking
     const tasks = taskIds
       ? await Promise.all(taskIds.map((id) => this.store.getTask(id)))
-      : await this.store.listTasks();
+      : await this.store.listTasks({ statuses: [] });
 
     const validTasks = tasks.filter((t): t is Task => t !== null);
     const taskData = validTasks.map((task) => ({

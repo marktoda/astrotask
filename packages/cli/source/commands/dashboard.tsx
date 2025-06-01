@@ -3,7 +3,8 @@ import { fileURLToPath } from "url";
 import { Text } from "ink";
 import React from "react";
 
-export const description = "Launch the interactive TUI dashboard";
+export const description =
+	"Launch the interactive TUI dashboard with task management and status filtering (press 'c' to toggle completed tasks)";
 
 export default function Dashboard() {
 	React.useEffect(() => {
