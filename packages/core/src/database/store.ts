@@ -7,8 +7,8 @@ import type {
   CreateContextSlice as NewContextSlice,
 } from '../schemas/contextSlice.js';
 import type { CreateTask as NewTask, Task, TaskStatus } from '../schemas/task.js';
-import { generateNextTaskId } from '../utils/taskId.js';
 import { TASK_IDENTIFIERS } from '../utils/TaskTreeConstants.js';
+import { generateNextTaskId } from '../utils/taskId.js';
 import * as schema from './schema.js';
 
 /**

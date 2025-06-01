@@ -21,10 +21,9 @@
     "test:watch": "vitest",
     "db:generate": "drizzle-kit generate",
     "db:electrify": "node scripts/patch-electrify.js",
-    "db:migrate:remote": "PGHOST=$PGHOST PGPORT=$PGPORT drizzle-kit push",
+    "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
-    "db:setup": "pnpm db:generate && pnpm db:electrify",
-    "db:deploy": "pnpm db:setup && pnpm db:migrate:remote"
+    "db:setup": "pnpm db:generate && pnpm db:electrify"
   },
   "keywords": [
     "task-management",

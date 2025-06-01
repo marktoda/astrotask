@@ -30,7 +30,7 @@ describe('Database Configuration', () => {
       expect(store).toBeDefined();
       expect(store.pgLite).toBeDefined();
       expect(store.sql).toBeDefined();
-      expect(store.electric).toBeUndefined();
+      expect(store.electricSyncActive).toBe(false);
       expect(store.isEncrypted).toBe(false);
       expect(store.isSyncing).toBe(false);
       expect(typeof store.close).toBe('function');
@@ -50,13 +50,13 @@ describe('Database Configuration', () => {
       });
 
       expect(store).toBeDefined();
-      expect(store.electric).toBeUndefined();
+      expect(store.electricSyncActive).toBe(false);
       expect(store.isSyncing).toBe(false);
 
       await store.close();
     });
 
-    it('should create database with Electric SQL sync (but not connected)', async () => {
+    it('should create database with Electric SQL sync configuration', async () => {
       // Don't set ELECTRIC_URL so sync won't actually connect
       const originalUrl = process.env.ELECTRIC_URL;
       delete process.env.ELECTRIC_URL;
@@ -68,8 +68,7 @@ describe('Database Configuration', () => {
       });
 
       expect(store).toBeDefined();
-      expect(store.electric).toBeDefined();
-      expect(store.isSyncing).toBe(false); // Not syncing because no URL
+      expect(store.electricSyncActive).toBe(false); // Not syncing because no URL
 
       await store.close();
 
@@ -173,7 +172,7 @@ describe('Database Configuration', () => {
       // Test root tasks filtering
       const rootTasks = await store.listRootTasks();
       expect(rootTasks).toHaveLength(1);
-      expect(rootTasks[0].parentId).toBeNull();
+      expect(rootTasks[0].parentId).toBe('__PROJECT_ROOT__');
 
       // Test delete
       const deleted = await store.deleteTask(newTask.id);
@@ -263,19 +262,17 @@ describe('Database Configuration', () => {
     it('should create local database with createLocalDatabase', async () => {
       const store = await createLocalDatabase(testDbPath);
       
-      expect(store.electric).toBeUndefined();
+      expect(store.electricSyncActive).toBe(false);
       expect(store.isSyncing).toBe(false);
       
       await store.close();
     });
 
     it('should create synced database with createSyncedDatabase', async () => {
-      const store = await createSyncedDatabase(testDbPath, {
-        // Don't provide URL so it runs in local mode
-      });
+      const store = await createSyncedDatabase(testDbPath, '');
       
-      expect(store.electric).toBeDefined();
-      expect(store.isSyncing).toBe(false); // False because no URL
+      expect(store.electricSyncActive).toBe(false); // False because empty URL
+      expect(store.isSyncing).toBe(false);
       
       await store.close();
     });

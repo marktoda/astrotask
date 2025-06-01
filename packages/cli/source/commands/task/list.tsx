@@ -42,9 +42,13 @@ export default function List() {
 	}
 
 	// Root tasks are now children of PROJECT_ROOT
-	const rootTasks = tasks.filter((t) => t.parentId === TASK_IDENTIFIERS.PROJECT_ROOT);
+	const rootTasks = tasks.filter(
+		(t) => t.parentId === TASK_IDENTIFIERS.PROJECT_ROOT,
+	);
 	// Subtasks are children of user tasks (not PROJECT_ROOT)
-	const subtasks = tasks.filter((t) => t.parentId && t.parentId !== TASK_IDENTIFIERS.PROJECT_ROOT);
+	const subtasks = tasks.filter(
+		(t) => t.parentId && t.parentId !== TASK_IDENTIFIERS.PROJECT_ROOT,
+	);
 
 	return (
 		<Box flexDirection="column">

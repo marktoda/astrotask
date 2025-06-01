@@ -24,10 +24,8 @@
    // Or explicitly configure
    const store = await createDatabase({
      enableSync: true,
-     electricConfig: {
-       syncUrl: 'http://localhost:3000',
-       tables: ['tasks', 'context_slices']
-     }
+     electricUrl: 'http://localhost:3000',
+     syncTables: ['tasks', 'context_slices', 'task_dependencies']
    });
    ```
 
@@ -38,14 +36,13 @@
 Main database creation function with automatic Electric SQL sync.
 
 **Options:**
-- `dataDir` - Database file path (default: `'./data/astrolabe.db'`)
+- `dataDir` - Database file path (default: from config)
 - `enableSync` - Enable Electric SQL sync (default: `true`)
-- `electricConfig` - Electric SQL configuration
-  - `syncUrl` - Electric SQL server URL
-  - `tables` - Tables to sync (default: `['tasks', 'context_slices']`)
-  - `verbose` - Enable verbose logging
+- `electricUrl` - Electric SQL server URL (default: from `ELECTRIC_URL` env)
+- `syncTables` - Tables to sync (default: `['tasks', 'context_slices', 'task_dependencies']`)
 - `enableEncryption` - Enable database encryption (default: `false`)
 - `verbose` - Enable verbose logging (default: from config)
+- `electricDebug` - Enable Electric sync debug logging (default: `false`)
 
 ### createLocalDatabase(dataDir?)
 
@@ -55,63 +52,71 @@ Create a local-only database without sync.
 const store = await createLocalDatabase('./my-local.db');
 ```
 
-### createSyncedDatabase(dataDir?, electricConfig?)
+### createSyncedDatabase(dataDir?, electricUrl?)
 
 Create a database with Electric SQL sync enabled.
 
 ```typescript
-const store = await createSyncedDatabase('./my-synced.db', {
-  syncUrl: 'http://electric.example.com'
-});
+const store = await createSyncedDatabase('./my-synced.db', 'http://electric.example.com');
 ```
 
 ## How It Works
 
-1. **Automatic Sync**: When Electric SQL is configured, the database automatically syncs changes bidirectionally with the remote Postgres database.
+The implementation leverages the `@electric-sql/pglite-sync` plugin which provides:
 
-2. **Offline Support**: Works offline and syncs when connection is restored.
-
-3. **Conflict Resolution**: Uses last-write-wins by default (handled by Electric SQL).
-
-4. **Real-time Updates**: Changes from other clients appear automatically.
-
-## Troubleshooting
-
-### No Sync Happening
-- Check that `ELECTRIC_URL` is set correctly
-- Verify Electric SQL server is running
-- Check logs for connection errors
-
-### Connection Timeout
-- Ensure Electric SQL server is accessible
-- Check firewall/network settings
-- Verify the URL includes the correct port
-
-### Local-Only Mode
-If Electric SQL connection fails, the database continues working in local-only mode. Check logs for details.
+1. **Automatic Migration Handling**: The plugin manages schema synchronization automatically
+2. **Built-in Retry Logic**: Exponential backoff for connection failures
+3. **Persistent Sync State**: Resume sync between sessions
+4. **Transactional Consistency**: Multi-table sync maintains consistency
+5. **Offline Support**: Works offline and syncs when connection is restored
 
 ## Architecture
 
-The simplified architecture consists of:
+The simplified architecture uses the SDK's built-in features:
 
-1. **electric.ts** - Core Electric SQL integration
-   - Manages Shape subscriptions
-   - Handles data synchronization
-   - Minimal, focused implementation
+1. **index.ts** - Database factory functions
+   - Simple configuration
+   - Automatic sync setup
+   - Clean API surface
 
 2. **store.ts** - Database operations interface
    - Type-safe CRUD operations
    - Business logic methods
    - Works with or without sync
 
-3. **index.ts** - Factory functions
-   - Simple database creation
-   - Configuration handling
-   - Migration management
+3. **@electric-sql/pglite-sync** - Handles all sync complexity
+   - Migration tracking
+   - Connection management
+   - Error recovery
+   - Status monitoring
 
 ## Benefits
 
-- **Simple**: Single environment variable configuration
-- **Reliable**: Leverages Electric SQL's built-in features
-- **Maintainable**: ~200 lines vs 1000+ lines
-- **Fast**: Direct Electric SQL integration without overhead 
+- **Simple**: Minimal configuration required
+- **Reliable**: Leverages battle-tested SDK features
+- **Maintainable**: Uses built-in functionality instead of custom code
+- **Fast**: Optimized sync implementation by Electric SQL team
+
+## Troubleshooting
+
+### No Sync Happening
+- Check that `ELECTRIC_URL` is set correctly
+- Verify Electric SQL server is running
+- Enable debug logging with `electricDebug: true`
+
+### Connection Timeout
+- Ensure Electric SQL server is accessible
+- Check firewall/network settings
+- Verify the URL includes the correct port
+
+### Migration Issues
+- The SDK handles migration compatibility automatically
+- If issues persist, check Electric SQL server logs
+- Ensure all clients are using compatible schema versions
+
+## Migration Workflow
+
+1. **Generate Migrations**: `pnpm db:generate`
+2. **Electrify Tables**: `pnpm db:electrify` (adds ENABLE ELECTRIC statements)
+3. **Apply Locally**: Migrations are applied automatically when creating database
+4. **Deploy to Production**: Use Electric SQL's migration proxy for production deployment 

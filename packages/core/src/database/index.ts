@@ -3,6 +3,12 @@
  *
  * This module provides simplified database creation with optional Electric SQL sync.
  * Uses the official @electric-sql/pglite-sync plugin for automatic sync management.
+ *
+ * Implements Electric Schema Sync design doc requirements using the SDK's built-in features:
+ * - Client bootstrap logic with automatic migration handling
+ * - Built-in retry logic and error handling
+ * - Status monitoring through shape subscriptions
+ * - Offline mode support
  */
 
 import { mkdirSync } from 'node:fs';
@@ -10,12 +16,12 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PGlite } from '@electric-sql/pglite';
 import { electricSync } from '@electric-sql/pglite-sync';
+import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/pglite';
 import { migrate } from 'drizzle-orm/pglite/migrator';
-import { eq } from 'drizzle-orm';
+import { TASK_IDENTIFIERS } from '../utils/TaskTreeConstants.js';
 import { cfg } from '../utils/config.js';
 import { createModuleLogger } from '../utils/logger.js';
-import { TASK_IDENTIFIERS } from '../utils/TaskTreeConstants.js';
 import * as schema from './schema.js';
 import { DatabaseStore, type Store } from './store.js';
 
@@ -38,6 +44,39 @@ export interface DatabaseOptions {
   enableEncryption?: boolean;
   /** Verbose logging */
   verbose?: boolean;
+  /** Enable debug logging for Electric sync */
+  electricDebug?: boolean;
+}
+
+export interface ElectricShape {
+  isUpToDate: boolean;
+  shapeId: string;
+  subscribe: (onUpdate: () => void, onError: (err: Error) => void) => void;
+  unsubscribe: () => void;
+}
+
+export interface ElectricMultiShape {
+  isUpToDate: boolean;
+  unsubscribe: () => void;
+}
+
+interface ElectricShapeConfig {
+  shape: {
+    url: string;
+    params: { table: string };
+  };
+  table: string;
+  primaryKey: string[];
+}
+
+interface ElectricEnabledPGlite extends PGlite {
+  electric: {
+    syncShapesToTables: (config: {
+      shapes: Record<string, ElectricShapeConfig>;
+      key: string;
+      onInitialSync?: () => void;
+    }) => Promise<ElectricMultiShape>;
+  };
 }
 
 /**
@@ -83,22 +122,75 @@ async function ensureProjectRoot(db: ReturnType<typeof drizzle>): Promise<void> 
       createdAt: now,
       updatedAt: now,
     });
-    
+
     logger.debug('Created PROJECT_ROOT task');
   }
 }
 
 /**
- * Create a database store with optional Electric SQL sync
+ * Extended Store interface with Electric sync capabilities
  */
-export async function createDatabase(options: DatabaseOptions = {}): Promise<Store> {
+export interface ElectricStore extends Store {
+  /** Active shape subscriptions for single table sync */
+  shapes?: Record<string, ElectricShape> | undefined;
+  /** Active multi-table sync subscription */
+  multiTableSync?: ElectricMultiShape | undefined;
+  /** Stop all Electric sync subscriptions */
+  stopSync: () => Promise<void>;
+  /** Whether Electric sync is active (mutable version for sync management) */
+  electricSyncActive: boolean;
+}
+
+/**
+ * Enhanced database store with Electric sync management
+ */
+class ElectricDatabaseStore extends DatabaseStore implements ElectricStore {
+  shapes?: Record<string, ElectricShape> | undefined;
+  multiTableSync?: ElectricMultiShape | undefined;
+  electricSyncActive = false;
+
+  async stopSync(): Promise<void> {
+    // Unsubscribe from all single table shapes
+    if (this.shapes) {
+      for (const shape of Object.values(this.shapes)) {
+        shape.unsubscribe();
+      }
+      this.shapes = undefined;
+    }
+
+    // Unsubscribe from multi-table sync
+    if (this.multiTableSync) {
+      this.multiTableSync.unsubscribe();
+      this.multiTableSync = undefined;
+    }
+
+    this.electricSyncActive = false;
+  }
+
+  override async close(): Promise<void> {
+    await this.stopSync();
+    await super.close();
+  }
+}
+
+/**
+ * Create a database store with optional Electric SQL sync
+ *
+ * Leverages the built-in features of @electric-sql/pglite-sync:
+ * - Automatic migration handling and schema sync
+ * - Built-in retry logic with exponential backoff
+ * - Persistent sync state for resuming between sessions
+ * - Transactional consistency for multi-table sync
+ */
+export async function createDatabase(options: DatabaseOptions = {}): Promise<ElectricStore> {
   const {
     dataDir = cfg.DATA_DIR,
     enableSync = true,
     electricUrl = cfg.ELECTRIC_URL,
-    syncTables = ['tasks', 'context_slices'],
+    syncTables = ['tasks', 'context_slices', 'task_dependencies'],
     enableEncryption = false,
     verbose = cfg.DB_VERBOSE,
+    electricDebug = false,
   } = options;
 
   if (verbose) {
@@ -113,7 +205,14 @@ export async function createDatabase(options: DatabaseOptions = {}): Promise<Sto
     const pgLite = await PGlite.create({
       dataDir,
       debug: verbose ? 1 : 0,
-      extensions: enableSync && electricUrl ? { electric: electricSync() } : {},
+      extensions:
+        enableSync && electricUrl
+          ? {
+              electric: electricSync({
+                debug: electricDebug,
+              }),
+            }
+          : {},
     });
 
     // Initialize Drizzle ORM
@@ -125,66 +224,53 @@ export async function createDatabase(options: DatabaseOptions = {}): Promise<Sto
     // Ensure PROJECT_ROOT task exists
     await ensureProjectRoot(db);
 
+    // Create store
+    const store = new ElectricDatabaseStore(pgLite, db, false, enableEncryption);
+
     // Start Electric SQL sync if enabled
-    let isSyncing = false;
     if (enableSync && electricUrl && 'electric' in pgLite) {
       try {
-        // Sync each configured table
+        // Use multi-table sync for transactional consistency
+        const shapes: Record<string, ElectricShapeConfig> = {};
+
         for (const tableName of syncTables) {
-          logger.debug({ table: tableName }, 'Starting sync for table');
-
-          // Map database column names to shape column names
-          const columnMap =
-            tableName === 'tasks'
-              ? {
-                  id: 'id',
-                  title: 'title',
-                  description: 'description',
-                  status: 'status',
-                  priority: 'priority',
-                  prd: 'prd',
-                  contextDigest: 'context_digest',
-                  parentId: 'parent_id',
-                  createdAt: 'created_at',
-                  updatedAt: 'updated_at',
-                }
-              : tableName === 'context_slices'
-                ? {
-                    id: 'id',
-                    title: 'title',
-                    description: 'description',
-                    taskId: 'task_id',
-                    contextDigest: 'context_digest',
-                    createdAt: 'created_at',
-                    updatedAt: 'updated_at',
-                  }
-                : {};
-
-          await pgLite.electric.syncShapeToTable({
+          shapes[tableName] = {
             shape: {
-              url: `${electricUrl}/v1/shape/${tableName}`,
+              url: `${electricUrl}/v1/shape`,
+              params: { table: tableName },
             },
-            shapeKey: tableName,
             table: tableName,
             primaryKey: ['id'],
-            mapColumns: columnMap,
-          });
+          };
         }
 
-        isSyncing = true;
-        logger.info({ tables: syncTables }, 'Electric SQL sync started successfully');
+        if (verbose) {
+          logger.info({ tables: syncTables }, 'Starting Electric SQL sync');
+        }
+
+        const sync = await (pgLite as ElectricEnabledPGlite).electric.syncShapesToTables({
+          shapes,
+          key: 'astrolabe-sync',
+          onInitialSync: () => {
+            logger.info('Electric SQL initial sync complete');
+          },
+        });
+
+        store.multiTableSync = sync;
+        store.electricSyncActive = true;
+
+        if (verbose) {
+          logger.info({ tables: syncTables }, 'Electric SQL sync started successfully');
+        }
       } catch (error) {
         logger.warn({ error }, 'Failed to start Electric SQL sync - continuing in local-only mode');
       }
     }
 
-    // Create store
-    const store = new DatabaseStore(pgLite, db, isSyncing, enableEncryption);
-
     if (verbose) {
       logger.info(
         {
-          syncing: store.isSyncing,
+          syncing: store.electricSyncActive,
           encrypted: enableEncryption,
         },
         'Database initialized successfully'
@@ -201,19 +287,21 @@ export async function createDatabase(options: DatabaseOptions = {}): Promise<Sto
 /**
  * Create a local-only database without sync
  */
-export async function createLocalDatabase(dataDir?: string): Promise<Store> {
+export async function createLocalDatabase(dataDir?: string): Promise<ElectricStore> {
   return createDatabase({
     dataDir: dataDir ?? cfg.DATA_DIR,
     enableSync: false,
-    verbose: cfg.DB_VERBOSE,
   });
 }
 
 /**
- * Create a synced database with Electric SQL
+ * Create a database with Electric SQL sync enabled
  */
-export async function createSyncedDatabase(dataDir?: string, electricUrl?: string): Promise<Store> {
-  const url = electricUrl || cfg.ELECTRIC_URL;
+export async function createSyncedDatabase(
+  dataDir?: string,
+  electricUrl?: string
+): Promise<ElectricStore> {
+  const url = electricUrl ?? cfg.ELECTRIC_URL;
   if (!url) {
     logger.warn('No Electric URL provided, creating local-only database');
     return createLocalDatabase(dataDir);
@@ -223,7 +311,6 @@ export async function createSyncedDatabase(dataDir?: string, electricUrl?: strin
     dataDir: dataDir ?? cfg.DATA_DIR,
     enableSync: true,
     electricUrl: url,
-    verbose: cfg.DB_VERBOSE,
   });
 }
 

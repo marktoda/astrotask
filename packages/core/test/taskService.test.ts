@@ -91,8 +91,8 @@ describe('TaskService', () => {
   it('returns ordered ancestors (root first)', async () => {
     const { A11, A, A1 } = (global as any).testTaskIds;
     const ancestors = await service.getTaskAncestors(A11);
-    // Should return ancestors in order from root to immediate parent
-    expect(ancestors.map((a) => a.id)).toEqual([A, A1]);
+    // Should return ancestors in order from PROJECT_ROOT to immediate parent
+    expect(ancestors.map((a) => a.id)).toEqual([TASK_IDENTIFIERS.PROJECT_ROOT, A, A1]);
   });
 
   it('lists all descendants', async () => {
@@ -104,10 +104,10 @@ describe('TaskService', () => {
 
   it('calculates correct task depth', async () => {
     const { A, A1, A11 } = (global as any).testTaskIds;
-    // Depths start from 0 for root tasks
-    expect(await service.getTaskDepth(A)).toBe(0);
-    expect(await service.getTaskDepth(A1)).toBe(1);
-    expect(await service.getTaskDepth(A11)).toBe(2);
+    // Depths start from 0 for PROJECT_ROOT, so user root tasks are depth 1
+    expect(await service.getTaskDepth(A)).toBe(1);
+    expect(await service.getTaskDepth(A1)).toBe(2);
+    expect(await service.getTaskDepth(A11)).toBe(3);
   });
 
   it('moves task subtree to a new parent', async () => {
