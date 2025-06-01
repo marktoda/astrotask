@@ -1,33 +1,28 @@
 /**
  * Ultra-Minimal Handler modules for MCP Server operations
  *
- * Provides only the 4 essential MCP tools:
- * - parsePRD: Bootstrap project from requirements
- * - expandTask: Break down tasks into subtasks  
+ * Provides only the 5 essential MCP tools:
+ * - getNextTask: Get next available task to work on (with optional parent)
+ * - addTasks: Create tasks in batch (with dependencies and hierarchies)
+ * - addTaskContext: Add context slice to a task
  * - addDependency: Add dependency relationships
- * - getNextTask: Get next available task to work on
+ * - listTasks: List tasks with optional filters
  */
 
 export { MinimalHandlers } from './MinimalHandlers.js';
 export { 
-  parsePRDSchema,
-  expandTaskSchema,
-  expandTasksBatchSchema,
-  expandHighComplexityTasksSchema,
-  addDependencySchema,
   getNextTaskSchema,
-  analyzeNodeComplexitySchema,
-  analyzeComplexitySchema,
-  complexityReportSchema,
-  type ParsePRDInput,
-  type ExpandTaskInput,
-  type ExpandTasksBatchInput,
-  type ExpandHighComplexityTasksInput,
-  type AddDependencyInput,
+  addTaskSchema,
+  addTasksSchema,
+  listTasksSchema,
+  addTaskContextSchema,
+  addDependencySchema,
   type GetNextTaskInput,
-  type AnalyzeNodeComplexityInput,
-  type AnalyzeComplexityInput,
-  type ComplexityReportInput,
+  type AddTaskInput,
+  type AddTasksInput,
+  type ListTasksInput,
+  type AddTaskContextInput,
+  type AddDependencyInput,
   type HandlerContext,
   type MCPHandler
 } from './types.js';

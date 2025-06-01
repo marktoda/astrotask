@@ -1,41 +1,27 @@
 /**
  * Ultra-Minimal MCP Handlers
  * 
- * Implements only the 4 essential tools for AI agent task management:
- * - parsePRD: Bootstrap project from requirements
- * - expandTask: Break down tasks into subtasks  
+ * Implements only the 5 essential tools for AI agent task management:
+ * - getNextTask: Get next available task to work on (with optional parent)
+ * - addTasks: Create tasks in batch (with dependencies and hierarchies)
+ * - addTaskContext: Add context slice to a task
  * - addDependency: Add dependency relationships
- * - getNextTask: Get next available task to work on
+ * - listTasks: List tasks with optional filters
  */
 
 import { createModuleLogger } from '@astrolabe/core';
-import {
-  createComplexityAnalyzer,
-  createComplexityContextService,
-  type ComplexityReport,
-  DependencyService,
-  TaskService,
-  TrackingDependencyGraph,
-  TrackingTaskTree,
-} from '@astrolabe/core';
+import { TrackingTaskTree } from '@astrolabe/core';
 import type {
-  ParsePRDInput,
-  ExpandTaskInput,
-  ExpandTasksBatchInput,
-  ExpandHighComplexityTasksInput,
-  AddDependencyInput,
   GetNextTaskInput,
-  AnalyzeComplexityInput,
-  AnalyzeNodeComplexityInput,
-  ComplexityReportInput,
+  AddTaskInput,
+  AddTasksInput,
+  ListTasksInput,
+  AddTaskContextInput,
+  AddDependencyInput,
   HandlerContext,
   MCPHandler,
 } from './types.js';
 import type { Task, TaskDependency, TaskTree, ContextSlice } from '@astrolabe/core';
-import { 
-  createPRDTaskGenerator, 
-  createTaskExpansionService
-} from '@astrolabe/core';
 
 export class MinimalHandlers implements MCPHandler {
   private logger = createModuleLogger('MinimalHandlers');
@@ -43,53 +29,113 @@ export class MinimalHandlers implements MCPHandler {
   constructor(public readonly context: HandlerContext) {}
 
   /**
-   * Parse PRD content and generate initial task structure
+   * Get the next available task to work on
+   * Supports optional parent ID to get next subtask within a specific parent
    */
-  async parsePRD(args: ParsePRDInput): Promise<{
-    rootTask: Task;
-    totalTasks: number;
+  async getNextTask(args: GetNextTaskInput = {}): Promise<{
+    task: Task | null;
+    availableTasks: Task[];
     message: string;
+    context?: {
+      ancestors: Task[];
+      descendants: TaskTree[];
+      root: TaskTree | null;
+      dependencies: Task[];
+      dependents: Task[];
+      isBlocked: boolean;
+      blockedBy: Task[];
+      contextSlices: ContextSlice[];
+      parentTask?: Task;
+      siblings?: Task[];
+    };
   }> {
     try {
-      // Create PRD generator
-      const prdGenerator = createPRDTaskGenerator(this.logger, this.context.store);
+      let availableTasks: Task[] = [];
+      let parentTask: Task | null = null;
+      let siblings: Task[] | undefined;
 
-      // Generate task tree from PRD content
-      const result = await prdGenerator.generate({
-        content: args.content,
-        context: {
-          parentTaskId: args.parentTaskId,
-        },
-        metadata: {
-          maxTasks: args.maxTasks,
-        },
-      });
+      if (args.parentTaskId) {
+        // Get parent task and its children
+        parentTask = await this.context.store.getTask(args.parentTaskId);
+        if (!parentTask) {
+          throw new Error(`Parent task ${args.parentTaskId} not found`);
+        }
 
-      // Apply the generated tree to persistence
-      const { updatedTree } = await result.tree.flush(this.context.taskService);
-      
-      // Apply dependency graph if it has operations
-      if (result.graph.hasPendingChanges) {
-        await result.graph.flush(this.context.dependencyService);
+        // Get all children of the parent
+        const tree = await this.context.taskService.getTaskTree(args.parentTaskId);
+        if (!tree) {
+          // No children exist, return empty
+          availableTasks = [];
+          siblings = [];
+        } else {
+          const children = tree.getChildren().map(child => child.task);
+          // Filter to available tasks (no incomplete dependencies)
+          availableTasks = await this.filterAvailableTasks(children, args);
+          siblings = children;
+        }
+      } else {
+        // Get all available tasks (no incomplete dependencies)
+        availableTasks = await this.context.taskService.getAvailableTasks({
+          status: args.status,
+          priority: args.priority,
+        });
       }
 
-      // Count all tasks in the tree
-      let totalTasks = 1; // Root task
-      const countTasks = (tree: any): void => {
-        totalTasks += tree.getChildren().length;
-        for (const child of tree.getChildren()) {
-          countTasks(child);
+      // Find the highest priority pending task
+      const nextTask = availableTasks
+        .filter(task => task.status === 'pending')
+        .sort((a, b) => {
+          // Sort by priority (high > medium > low), then by ID
+          const priorityOrder = { high: 3, medium: 2, low: 1 };
+          const aPriority = priorityOrder[a.priority as keyof typeof priorityOrder] || 1;
+          const bPriority = priorityOrder[b.priority as keyof typeof priorityOrder] || 1;
+          
+          if (aPriority !== bPriority) {
+            return bPriority - aPriority;
+          }
+          
+          return a.id.localeCompare(b.id);
+        })[0] || null;
+
+      const message = nextTask 
+        ? `Next task to work on: ${nextTask.title}`
+        : availableTasks.length > 0
+        ? 'No pending tasks available (all tasks are in progress or completed)'
+        : args.parentTaskId
+        ? `No tasks available under parent ${args.parentTaskId}`
+        : 'No tasks available';
+
+      let context = undefined;
+
+      // If we have a next task, get its full context
+      if (nextTask) {
+        const taskWithContext = await this.context.taskService.getTaskWithContext(nextTask.id);
+        if (taskWithContext) {
+          const contextSlices = await this.context.store.listContextSlices(nextTask.id);
+          
+          context = {
+            ancestors: taskWithContext.ancestors,
+            descendants: taskWithContext.descendants,
+            root: taskWithContext.root,
+            dependencies: taskWithContext.dependencies,
+            dependents: taskWithContext.dependents,
+            isBlocked: taskWithContext.isBlocked,
+            blockedBy: taskWithContext.blockedBy,
+            contextSlices,
+            ...(parentTask && { parentTask }),
+            ...(siblings && { siblings }),
+          };
         }
-      };
-      countTasks(updatedTree);
+      }
 
       return {
-        rootTask: updatedTree.task,
-        totalTasks,
-        message: `Successfully generated ${totalTasks} tasks from PRD`
+        task: nextTask,
+        availableTasks,
+        message,
+        context
       };
     } catch (error) {
-      this.logger.error('PRD parsing failed', {
+      this.logger.error('Getting next task failed', {
         error: error instanceof Error ? error.message : String(error),
         requestId: this.context.requestId,
       });
@@ -98,58 +144,177 @@ export class MinimalHandlers implements MCPHandler {
   }
 
   /**
-   * Expand a task into subtasks
+   * Add multiple tasks in batch with support for hierarchies and dependencies
+   * Supports local referencing by array index for parent/dependency relationships
    */
-  async expandTask(args: ExpandTaskInput): Promise<{
-    parentTask: Task;
-    subtasks: Task[];
+  async addTasks(args: {
+    tasks: Array<AddTaskInput & {
+      parentIndex?: number; // Reference to parent by array index
+      dependsOn?: number[]; // Array of indices this task depends on
+    }>;
+  }): Promise<{
+    tasks: Task[];
     message: string;
-    usedComplexityAnalysis?: boolean;
-    contextSlicesCreated?: number;
-    metadata?: {
-      expansionMethod: 'complexity-guided' | 'manual' | 'default';
-      recommendedSubtasks?: number;
-      actualSubtasks: number;
-      researchEnabled: boolean;
-      forcedReplacement: boolean;
-    };
+    dependenciesCreated: TaskDependency[];
   }> {
     try {
-      // Create task expansion service with configuration
-      const expansionService = createTaskExpansionService(
-        this.logger,
-        this.context.store,
-        this.context.taskService,
-        {
-          useComplexityAnalysis: true,
-          research: false, // Default to false, will be overridden by args
-          complexityThreshold: 5,
-          defaultSubtasks: 3,
-          maxSubtasks: 20,
-          forceReplace: false,
-          createContextSlices: true,
-        }
-      );
+      const createdTasks: Task[] = [];
+      const dependenciesCreated: TaskDependency[] = [];
 
-      // Use the enhanced expansion service
-      const result = await expansionService.expandTask({
+      // First pass: Create all tasks
+      for (let i = 0; i < args.tasks.length; i++) {
+        const taskInput = args.tasks[i];
+        let parentTaskId: string | undefined;
+
+        // Resolve parent reference
+        if (taskInput.parentIndex !== undefined) {
+          if (taskInput.parentIndex >= createdTasks.length || taskInput.parentIndex < 0) {
+            throw new Error(`Invalid parentIndex ${taskInput.parentIndex} for task ${i}`);
+          }
+          parentTaskId = createdTasks[taskInput.parentIndex].id;
+        } else if (taskInput.parentTaskId) {
+          parentTaskId = taskInput.parentTaskId;
+        }
+
+        // Create the task
+        let createdTask: Task;
+        if (parentTaskId) {
+          // Verify parent exists
+          const parentTask = await this.context.store.getTask(parentTaskId);
+          if (!parentTask) {
+            throw new Error(`Parent task ${parentTaskId} not found for task ${i}`);
+          }
+
+          // Create subtask using store directly for batch operations
+          createdTask = await this.context.store.addTask({
+            title: taskInput.title,
+            description: taskInput.description,
+            status: taskInput.status || 'pending',
+            priority: taskInput.priority || 'medium',
+            parentId: parentTaskId,
+          });
+        } else {
+          // Create standalone task
+          createdTask = await this.context.store.addTask({
+            title: taskInput.title,
+            description: taskInput.description,
+            status: taskInput.status || 'pending',
+            priority: taskInput.priority || 'medium',
+          });
+        }
+
+        createdTasks.push(createdTask);
+      }
+
+      // Second pass: Create dependencies
+      for (let i = 0; i < args.tasks.length; i++) {
+        const taskInput = args.tasks[i];
+        if (taskInput.dependsOn && taskInput.dependsOn.length > 0) {
+          const dependentTask = createdTasks[i];
+          
+          for (const depIndex of taskInput.dependsOn) {
+            if (depIndex >= createdTasks.length || depIndex < 0) {
+              throw new Error(`Invalid dependency index ${depIndex} for task ${i}`);
+            }
+            
+            const dependencyTask = createdTasks[depIndex];
+            const dependency = await this.context.taskService.addTaskDependency(
+              dependentTask.id,
+              dependencyTask.id
+            );
+            dependenciesCreated.push(dependency);
+          }
+        }
+      }
+
+      const message = `Successfully created ${createdTasks.length} tasks with ${dependenciesCreated.length} dependencies`;
+
+      return {
+        tasks: createdTasks,
+        message,
+        dependenciesCreated,
+      };
+    } catch (error) {
+      this.logger.error('Adding tasks batch failed', {
+        error: error instanceof Error ? error.message : String(error),
+        requestId: this.context.requestId,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * List tasks with optional filters
+   */
+  async listTasks(args: {
+    status?: string;
+    parentId?: string;
+    includeProjectRoot?: boolean;
+  } = {}): Promise<{
+    tasks: Task[];
+    total: number;
+    message: string;
+  }> {
+    try {
+      const filters: any = {};
+      
+      if (args.status) {
+        filters.status = args.status;
+      }
+      
+      if (args.parentId !== undefined) {
+        filters.parentId = args.parentId;
+      }
+      
+      if (args.includeProjectRoot !== undefined) {
+        filters.includeProjectRoot = args.includeProjectRoot;
+      }
+
+      const tasks = await this.context.store.listTasks(filters);
+
+      return {
+        tasks,
+        total: tasks.length,
+        message: `Found ${tasks.length} tasks`
+      };
+    } catch (error) {
+      this.logger.error('Listing tasks failed', {
+        error: error instanceof Error ? error.message : String(error),
+        requestId: this.context.requestId,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Add a context slice to a task
+   */
+  async addTaskContext(args: AddTaskContextInput): Promise<{
+    contextSlice: ContextSlice;
+    task: Task;
+    message: string;
+  }> {
+    try {
+      // Verify task exists
+      const task = await this.context.store.getTask(args.taskId);
+      if (!task) {
+        throw new Error(`Task ${args.taskId} not found`);
+      }
+
+      // Create context slice
+      const contextSlice = await this.context.store.addContextSlice({
         taskId: args.taskId,
-        numSubtasks: args.numSubtasks,
-        context: args.context,
-        research: args.research ?? false,
-        force: args.force ?? false,
+        title: args.title,
+        description: args.description,
       });
 
       return {
-        parentTask: result.parentTask,
-        subtasks: result.subtasks,
-        message: result.message,
-        usedComplexityAnalysis: result.usedComplexityAnalysis,
-        contextSlicesCreated: result.contextSlicesCreated,
-        metadata: result.metadata,
+        contextSlice,
+        task,
+        message: `Successfully added context slice "${args.title}" to task ${args.taskId}`
       };
     } catch (error) {
-      this.logger.error('Task expansion failed', {
+      this.logger.error('Adding task context failed', {
         error: error instanceof Error ? error.message : String(error),
         taskId: args.taskId,
         requestId: this.context.requestId,
@@ -187,459 +352,40 @@ export class MinimalHandlers implements MCPHandler {
   }
 
   /**
-   * Get the next available task to work on
+   * Helper to filter tasks by availability (respecting dependencies)
    */
-  async getNextTask(args: GetNextTaskInput = {}): Promise<{
-    task: Task | null;
-    availableTasks: Task[];
-    message: string;
-    context?: {
-      ancestors: Task[];
-      descendants: TaskTree[];
-      root: TaskTree | null;
-      dependencies: Task[];
-      dependents: Task[];
-      isBlocked: boolean;
-      blockedBy: Task[];
-      contextSlices: ContextSlice[];
-    };
-  }> {
-    try {
-      // Get available tasks (no incomplete dependencies)
-      const availableTasks = await this.context.taskService.getAvailableTasks({
-        status: args.status,
-        priority: args.priority,
-      });
+  private async filterAvailableTasks(tasks: Task[], filters: GetNextTaskInput): Promise<Task[]> {
+    const availableTasks: Task[] = [];
+    
+    for (const task of tasks) {
+      // Apply status filter if provided
+      if (filters.status && task.status !== filters.status) {
+        continue;
+      }
+      
+      // Apply priority filter if provided
+      if (filters.priority && task.priority !== filters.priority) {
+        continue;
+      }
 
-      // Find the highest priority pending task
-      const nextTask = availableTasks
-        .filter(task => task.status === 'pending')
-        .sort((a, b) => {
-          // Sort by priority (high > medium > low), then by ID
-          const priorityOrder = { high: 3, medium: 2, low: 1 };
-          const aPriority = priorityOrder[a.priority as keyof typeof priorityOrder] || 1;
-          const bPriority = priorityOrder[b.priority as keyof typeof priorityOrder] || 1;
-          
-          if (aPriority !== bPriority) {
-            return bPriority - aPriority;
-          }
-          
-          return a.id.localeCompare(b.id);
-        })[0] || null;
-
-      const message = nextTask 
-        ? `Next task to work on: ${nextTask.title}`
-        : availableTasks.length > 0
-        ? 'No pending tasks available (all tasks are in progress or completed)'
-        : 'No tasks available';
-
-      let context = undefined;
-
-      // If we have a next task, get its full context
-      if (nextTask) {
-        const taskWithContext = await this.context.taskService.getTaskWithContext(nextTask.id);
-        if (taskWithContext) {
-          const contextSlices = await this.context.store.listContextSlices(nextTask.id);
-          
-          context = {
-            ancestors: taskWithContext.ancestors,
-            descendants: taskWithContext.descendants,
-            root: taskWithContext.root,
-            dependencies: taskWithContext.dependencies,
-            dependents: taskWithContext.dependents,
-            isBlocked: taskWithContext.isBlocked,
-            blockedBy: taskWithContext.blockedBy,
-            contextSlices,
-          };
+      // Check if task has incomplete dependencies
+      const dependencies = await this.context.dependencyService.getDependencies(task.id);
+      let hasIncompleteDependencies = false;
+      
+      // Check each dependency
+      for (const depId of dependencies) {
+        const depTask = await this.context.store.getTask(depId);
+        if (depTask && depTask.status !== 'done' && depTask.status !== 'cancelled') {
+          hasIncompleteDependencies = true;
+          break;
         }
       }
 
-      return {
-        task: nextTask,
-        availableTasks,
-        message,
-        context
-      };
-    } catch (error) {
-      this.logger.error('Getting next task failed', {
-        error: error instanceof Error ? error.message : String(error),
-        requestId: this.context.requestId,
-      });
-      throw error;
-    }
-  }
-
-  /**
-   * Analyze project complexity and generate recommendations
-   */
-  async analyzeComplexity(args: AnalyzeComplexityInput): Promise<{
-    report: ComplexityReport;
-    message: string;
-    contextSlicesCreated: number;
-    contextMessage: string;
-  }> {
-    try {
-      // Get all tasks from the store
-      const allTasks = await this.context.store.listTasks();
-      
-      if (allTasks.length === 0) {
-        throw new Error('No tasks found to analyze');
+      if (!hasIncompleteDependencies) {
+        availableTasks.push(task);
       }
-
-      // Create complexity analyzer
-      const analyzer = createComplexityAnalyzer(this.logger, {
-        threshold: args.threshold || 5,
-        research: args.research || false,
-        batchSize: 5,
-      });
-
-      // Create complexity context service
-      const contextService = createComplexityContextService(this.logger, this.context.store, {
-        threshold: args.threshold || 5,
-        research: args.research || false,
-        batchSize: 5,
-        autoUpdate: true,
-        includeRecommendations: true,
-      });
-
-      // Analyze tasks
-      const report = await analyzer.analyzeTasks(allTasks);
-
-      // Create context slices for all tasks
-      let contextSlicesCreated = 0;
-      let contextMessage = "";
-      
-      try {
-        const taskIds = allTasks.map(task => task.id);
-        const contexts = await contextService.generateComplexityContextBatch(taskIds);
-        contextSlicesCreated = contexts.length;
-        contextMessage = `Created ${contextSlicesCreated} context slices for analyzed tasks`;
-      } catch (contextError) {
-        this.logger.warn("Failed to create context slices", { error: contextError });
-        contextMessage = "Failed to create context slices (analysis still completed)";
-      }
-
-      return {
-        report,
-        message: `Analyzed ${report.meta.tasksAnalyzed} tasks and saved complexity data to database`,
-        contextSlicesCreated,
-        contextMessage,
-      };
-    } catch (error) {
-      this.logger.error('Complexity analysis failed', {
-        error: error instanceof Error ? error.message : String(error),
-        requestId: this.context.requestId,
-      });
-      throw error;
     }
-  }
 
-  /**
-   * Analyze a specific node and all its children
-   */
-  async analyzeNodeComplexity(args: AnalyzeNodeComplexityInput): Promise<{
-    report: ComplexityReport;
-    message: string;
-    contextSlicesCreated: number;
-    contextMessage: string;
-  }> {
-    try {
-      // Create complexity analyzer
-      const analyzer = createComplexityAnalyzer(this.logger, {
-        threshold: args.threshold || 5,
-        research: args.research || false,
-        batchSize: 5,
-      });
-
-      // Create complexity context service
-      const contextService = createComplexityContextService(this.logger, this.context.store, {
-        threshold: args.threshold || 5,
-        research: args.research || false,
-        batchSize: 5,
-        autoUpdate: true,
-        includeRecommendations: true,
-      });
-
-      // Analyze the specific node and its children
-      const report = await analyzer.analyzeNodeAndChildren(
-        args.nodeId,
-        async () => await this.context.store.listTasks()
-      );
-
-      // Create context slices for node and children
-      let contextSlicesCreated = 0;
-      let contextMessage = "";
-      
-      try {
-        const contextResult = await contextService.generateComplexityContextForNodeAndChildren(args.nodeId);
-        contextSlicesCreated = contextResult.contexts.length;
-        contextMessage = `Created ${contextSlicesCreated} context slices for node and children`;
-      } catch (contextError) {
-        this.logger.warn("Failed to create context slices", { error: contextError });
-        contextMessage = "Failed to create context slices (analysis still completed)";
-      }
-
-      return {
-        report,
-        message: `Analyzed node ${args.nodeId} and its ${report.meta.tasksAnalyzed - 1} children and saved complexity data to database`,
-        contextSlicesCreated,
-        contextMessage,
-      };
-    } catch (error) {
-      this.logger.error('Node complexity analysis failed', {
-        error: error instanceof Error ? error.message : String(error),
-        nodeId: args.nodeId,
-        requestId: this.context.requestId,
-      });
-      throw error;
-    }
-  }
-
-  /**
-   * Display complexity information from database context slices
-   */
-  async complexityReport(args: ComplexityReportInput): Promise<{
-    complexityData: Array<{ taskId: string; taskTitle: string; complexity: number | null; analysis: string | null }>;
-    formatted: string;
-    message: string;
-  }> {
-    try {
-      // Get all tasks from the database
-      const allTasks = await this.context.store.listTasks();
-      
-      if (allTasks.length === 0) {
-        return {
-          complexityData: [],
-          formatted: "No tasks found in the database.",
-          message: "No tasks available for complexity analysis"
-        };
-      }
-
-      // Get complexity data from context slices for each task
-      const complexityData = [];
-      
-      for (const task of allTasks) {
-        const contextSlices = await this.context.store.listContextSlices(task.id);
-        const complexitySlice = contextSlices.find(slice => 
-          slice.title.toLowerCase().includes('complexity')
-        );
-        
-        let complexity: number | null = null;
-        let analysis: string | null = null;
-        
-        if (complexitySlice && complexitySlice.description) {
-          // Extract complexity score from description
-          const match = complexitySlice.description.match(/complexity[:\s]*(\d+(?:\.\d+)?)/i);
-          complexity = match && match[1] ? parseFloat(match[1]) : null;
-          analysis = complexitySlice.description;
-        }
-        
-        complexityData.push({
-          taskId: task.id,
-          taskTitle: task.title,
-          complexity,
-          analysis
-        });
-      }
-
-      // Filter to only tasks with complexity data
-      const tasksWithComplexity = complexityData.filter(item => item.complexity !== null);
-      
-      if (tasksWithComplexity.length === 0) {
-        return {
-          complexityData,
-          formatted: "No complexity analysis found in database. Run 'analyze-complexity' first to generate complexity data.",
-          message: "No complexity data available"
-        };
-      }
-
-      // Format the report
-      const avgComplexity = tasksWithComplexity.reduce((sum, item) => sum + (item.complexity || 0), 0) / tasksWithComplexity.length;
-      const highComplexityTasks = tasksWithComplexity.filter(item => (item.complexity || 0) >= 7);
-      
-      const formatted = [
-        '📊 Task Complexity Analysis (from Database)',
-        '============================================',
-        '',
-        `Tasks with Complexity Data: ${tasksWithComplexity.length}`,
-        `Average Complexity: ${avgComplexity.toFixed(1)}/10`,
-        `High Complexity Tasks (≥7): ${highComplexityTasks.length}`,
-        '',
-        'Task Details:',
-        ...tasksWithComplexity
-          .sort((a, b) => (b.complexity || 0) - (a.complexity || 0))
-          .map(item => `  ${item.taskId}: ${item.taskTitle} [${item.complexity}/10]`)
-      ].join('\n');
-
-      return {
-        complexityData,
-        formatted,
-        message: `Found complexity data for ${tasksWithComplexity.length} tasks in database`
-      };
-    } catch (error) {
-      this.logger.error('Loading complexity data from database failed', {
-        error: error instanceof Error ? error.message : String(error),
-        requestId: this.context.requestId,
-      });
-      throw error;
-    }
-  }
-
-  /**
-   * Expand multiple tasks in batch
-   */
-  async expandTasksBatch(args: ExpandTasksBatchInput): Promise<{
-    results: Array<{
-      parentTask: Task;
-      subtasks: Task[];
-      message: string;
-      usedComplexityAnalysis: boolean;
-      contextSlicesCreated: number;
-      metadata: {
-        expansionMethod: 'complexity-guided' | 'manual' | 'default';
-        recommendedSubtasks?: number;
-        actualSubtasks: number;
-        researchEnabled: boolean;
-        forcedReplacement: boolean;
-      };
-    }>;
-    summary: {
-      totalTasks: number;
-      successfulExpansions: number;
-      failedExpansions: number;
-      totalSubtasksCreated: number;
-    };
-    message: string;
-  }> {
-    try {
-      // Create task expansion service
-      const expansionService = createTaskExpansionService(
-        this.logger,
-        this.context.store,
-        this.context.taskService,
-        {
-          useComplexityAnalysis: true,
-          research: args.research ?? false,
-          complexityThreshold: 5,
-          defaultSubtasks: 3,
-          maxSubtasks: 20,
-          forceReplace: args.force ?? false,
-          createContextSlices: true,
-        }
-      );
-
-      // Expand tasks in batch
-      const results = await expansionService.expandTasksBatch(args.taskIds, {
-        numSubtasks: args.numSubtasks,
-        context: args.context,
-        research: args.research,
-        force: args.force,
-      });
-
-      const summary = {
-        totalTasks: args.taskIds.length,
-        successfulExpansions: results.length,
-        failedExpansions: args.taskIds.length - results.length,
-        totalSubtasksCreated: results.reduce((sum, result) => sum + result.subtasks.length, 0),
-      };
-
-      const message = `Batch expansion completed: ${summary.successfulExpansions}/${summary.totalTasks} tasks expanded, ${summary.totalSubtasksCreated} subtasks created`;
-
-      return {
-        results,
-        summary,
-        message,
-      };
-    } catch (error) {
-      this.logger.error('Batch task expansion failed', {
-        error: error instanceof Error ? error.message : String(error),
-        taskIds: args.taskIds,
-        requestId: this.context.requestId,
-      });
-      throw error;
-    }
-  }
-
-  /**
-   * Automatically expand high-complexity tasks
-   */
-  async expandHighComplexityTasks(args: ExpandHighComplexityTasksInput): Promise<{
-    complexityReport: {
-      meta: {
-        generatedAt: string;
-        tasksAnalyzed: number;
-        totalTasks: number;
-        analysisCount: number;
-        thresholdScore: number;
-        projectName?: string;
-        usedResearch: boolean;
-      };
-      complexityAnalysis: Array<{
-        taskId: string;
-        taskTitle: string;
-        complexityScore: number;
-        recommendedSubtasks: number;
-        expansionPrompt: string;
-        reasoning: string;
-      }>;
-    };
-    expansionResults: Array<{
-      parentTask: Task;
-      subtasks: Task[];
-      message: string;
-      usedComplexityAnalysis: boolean;
-      contextSlicesCreated: number;
-      metadata: {
-        expansionMethod: 'complexity-guided' | 'manual' | 'default';
-        recommendedSubtasks?: number;
-        actualSubtasks: number;
-        researchEnabled: boolean;
-        forcedReplacement: boolean;
-      };
-    }>;
-    summary: {
-      tasksAnalyzed: number;
-      highComplexityTasks: number;
-      tasksExpanded: number;
-      totalSubtasksCreated: number;
-    };
-    message: string;
-  }> {
-    try {
-      // Create task expansion service
-      const expansionService = createTaskExpansionService(
-        this.logger,
-        this.context.store,
-        this.context.taskService,
-        {
-          useComplexityAnalysis: true,
-          research: args.research ?? false,
-          complexityThreshold: args.complexityThreshold ?? 5,
-          defaultSubtasks: 3,
-          maxSubtasks: 20,
-          forceReplace: args.force ?? false,
-          createContextSlices: true,
-        }
-      );
-
-      // Analyze and expand high-complexity tasks
-      const result = await expansionService.expandHighComplexityTasks(args.complexityThreshold);
-
-      const message = `High-complexity task expansion completed: ${result.summary.tasksExpanded}/${result.summary.highComplexityTasks} high-complexity tasks expanded, ${result.summary.totalSubtasksCreated} subtasks created`;
-
-      return {
-        complexityReport: result.complexityReport,
-        expansionResults: result.expansionResults,
-        summary: result.summary,
-        message,
-      };
-    } catch (error) {
-      this.logger.error('High-complexity task expansion failed', {
-        error: error instanceof Error ? error.message : String(error),
-        complexityThreshold: args.complexityThreshold,
-        requestId: this.context.requestId,
-      });
-      throw error;
-    }
+    return availableTasks;
   }
 } 

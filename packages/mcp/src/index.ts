@@ -5,15 +5,11 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { createDatabase, type DatabaseOptions, TaskService, DependencyService, createModuleLogger, logShutdown } from '@astrolabe/core';
 import {
   MinimalHandlers,
-  parsePRDSchema,
-  expandTaskSchema,
-  expandTasksBatchSchema,
-  expandHighComplexityTasksSchema,
-  addDependencySchema,
   getNextTaskSchema,
-  analyzeNodeComplexitySchema,
-  analyzeComplexitySchema,
-  complexityReportSchema
+  addTasksSchema,
+  listTasksSchema,
+  addTaskContextSchema,
+  addDependencySchema
 } from './handlers/index.js';
 import { wrapMCPHandler } from './utils/response.js';
 
@@ -21,19 +17,18 @@ const logger = createModuleLogger('mcp-server');
 
 /**
  * Ultra-Minimal Astrolabe MCP Server
- * Provides only 4 essential tools for AI agent task management
+ * Provides only 5 essential tools for AI agent task management
  */
 async function main() {
   // Create the high-level MCP server instance
   const server = new McpServer({
     name: 'astrolabe-mcp-server',
-    version: '0.2.0',
+    version: '0.3.0',
   });
 
   // Initialize database and services
   const dbOptions: DatabaseOptions = { 
     dataDir: process.env.DATABASE_PATH || 'astrolabe.db',
-    enableSync: process.env.ELECTRIC_URL ? true : false,
     verbose: process.env.DB_VERBOSE === 'true'
   };
   const store = await createDatabase(dbOptions);
@@ -52,32 +47,32 @@ async function main() {
   // Create minimal handlers
   const handlers = new MinimalHandlers(handlerContext);
 
-  // Register the 4 essential tools
-  server.tool('parsePRD',
-    parsePRDSchema.shape,
+  // Register the 5 essential tools
+  server.tool('getNextTask',
+    getNextTaskSchema.shape,
     wrapMCPHandler(async (args) => {
-      return handlers.parsePRD(args);
+      return handlers.getNextTask(args);
     })
   );
 
-  server.tool('expandTask',
-    expandTaskSchema.shape,
+  server.tool('addTasks',
+    addTasksSchema.shape,
     wrapMCPHandler(async (args) => {
-      return handlers.expandTask(args);
+      return handlers.addTasks(args);
     })
   );
 
-  server.tool('expandTasksBatch',
-    expandTasksBatchSchema.shape,
+  server.tool('listTasks',
+    listTasksSchema.shape,
     wrapMCPHandler(async (args) => {
-      return handlers.expandTasksBatch(args);
+      return handlers.listTasks(args);
     })
   );
 
-  server.tool('expandHighComplexityTasks',
-    expandHighComplexityTasksSchema.shape,
+  server.tool('addTaskContext',
+    addTaskContextSchema.shape,
     wrapMCPHandler(async (args) => {
-      return handlers.expandHighComplexityTasks(args);
+      return handlers.addTaskContext(args);
     })
   );
 
@@ -88,39 +83,11 @@ async function main() {
     })
   );
 
-  server.tool('getNextTask',
-    getNextTaskSchema.shape,
-    wrapMCPHandler(async (args) => {
-      return handlers.getNextTask(args);
-    })
-  );
-
-  server.tool('analyze_node_complexity',
-    analyzeNodeComplexitySchema.shape,
-    wrapMCPHandler(async (args) => {
-      return handlers.analyzeNodeComplexity(args);
-    })
-  );
-
-  server.tool('analyze_project_complexity',
-    analyzeComplexitySchema.shape,
-    wrapMCPHandler(async (args) => {
-      return handlers.analyzeComplexity(args);
-    })
-  );
-
-  server.tool('complexity_report',
-    complexityReportSchema.shape,
-    wrapMCPHandler(async (args) => {
-      return handlers.complexityReport(args);
-    })
-  );
-
   // Begin listening on stdio
   const transport = new StdioServerTransport();
   await server.connect(transport);
 
-  logger.info('Astrolabe MCP Server started with 9 tools: parsePRD, expandTask, expandTasksBatch, expandHighComplexityTasks, addDependency, getNextTask, analyze_node_complexity, analyze_project_complexity, complexity_report');
+  logger.info('Astrolabe MCP Server started with 5 tools: getNextTask, addTasks, listTasks, addTaskContext, addDependency');
 }
 
 // Handle cleanup on process termination
