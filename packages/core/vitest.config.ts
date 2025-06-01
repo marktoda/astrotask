@@ -7,9 +7,14 @@ export default defineConfig({
     // Test file patterns - look in test directory
     include: ['test/**/*.{test,spec}.{js,ts}'],
     // Exclude patterns
-    exclude: ['node_modules', 'dist', '.git'],
+    exclude: [
+      'node_modules/**',
+      'dist/**',
+    ],
     // Environment
-    environment: 'node'
+    environment: 'node',
+    testTimeout: 30000,
+    globals: true
   },
   resolve: {
     alias: {

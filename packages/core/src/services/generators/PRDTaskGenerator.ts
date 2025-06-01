@@ -15,12 +15,12 @@ import type { ChatOpenAI } from '@langchain/openai';
 import type { Logger } from 'pino';
 
 import type { Store } from '../../database/store.js';
-import type { CreateTask, Task } from '../../schemas/task.js';
-import { TaskService } from '../../services/TaskService.js';
 import type { TaskTree } from '../../entities/TaskTree.js';
 import { TASK_IDENTIFIERS } from '../../entities/TaskTreeConstants.js';
 import { TrackingDependencyGraph } from '../../entities/TrackingDependencyGraph.js';
 import { TrackingTaskTree } from '../../entities/TrackingTaskTree.js';
+import type { CreateTask, Task } from '../../schemas/task.js';
+import { TaskService } from '../../services/TaskService.js';
 import { createLLM } from '../../utils/llm.js';
 import { PRD_SYSTEM_PROMPT, generatePRDPrompt } from '../../utils/prompts.js';
 import type { GenerationResult, TaskGenerator } from './TaskGenerator.js';

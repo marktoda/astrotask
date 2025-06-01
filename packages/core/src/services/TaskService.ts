@@ -1,6 +1,4 @@
 import type { Store } from '../database/store.js';
-import type { TaskDependencyGraph, TaskWithDependencies } from '../schemas/dependency.js';
-import type { CreateTask, Task, TaskStatus } from '../schemas/task.js';
 import { TaskTree, type TaskTreeData } from '../entities/TaskTree.js';
 import { CachedTaskTreeOperations, TaskTreeCache } from '../entities/TaskTreeCache.js';
 import { TASK_IDENTIFIERS } from '../entities/TaskTreeConstants.js';
@@ -11,6 +9,8 @@ import {
 } from '../entities/TaskTreeValidation.js';
 import type { ReconciliationPlan } from '../entities/TrackingTaskTree.js';
 import type { ITaskReconciliationService } from '../entities/TrackingTypes.js';
+import type { TaskDependencyGraph, TaskWithDependencies } from '../schemas/dependency.js';
+import type { CreateTask, Task, TaskStatus } from '../schemas/task.js';
 import {
   type StatusTransitionResult,
   validateStatusTransition,

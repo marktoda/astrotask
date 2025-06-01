@@ -2,12 +2,12 @@ import { randomUUID } from 'node:crypto';
 import type { PGlite } from '@electric-sql/pglite';
 import { and, desc, eq, isNull, ne } from 'drizzle-orm';
 import type { PgliteDatabase } from 'drizzle-orm/pglite';
+import { TASK_IDENTIFIERS } from '../entities/TaskTreeConstants.js';
 import type {
   ContextSlice,
   CreateContextSlice as NewContextSlice,
 } from '../schemas/contextSlice.js';
 import type { CreateTask as NewTask, Task, TaskStatus } from '../schemas/task.js';
-import { TASK_IDENTIFIERS } from '../entities/TaskTreeConstants.js';
 import { generateNextTaskId } from '../utils/taskId.js';
 import * as schema from './schema.js';
 

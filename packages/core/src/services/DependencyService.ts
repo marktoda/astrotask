@@ -13,6 +13,12 @@ import { randomUUID } from 'node:crypto';
 import { and, eq, inArray } from 'drizzle-orm';
 import { taskDependencies } from '../database/schema.js';
 import type { Store } from '../database/store.js';
+import { DependencyGraph, type IDependencyGraph } from '../entities/DependencyGraph.js';
+import type {
+  DependencyPendingOperation,
+  DependencyReconciliationPlan,
+} from '../entities/TrackingDependencyGraph.js';
+import type { IDependencyReconciliationService } from '../entities/TrackingTypes.js';
 import type {
   CreateTaskDependency,
   DependencyValidationResult,
@@ -21,12 +27,6 @@ import type {
   TaskWithDependencies,
 } from '../schemas/dependency.js';
 import type { Task } from '../schemas/task.js';
-import { DependencyGraph, type IDependencyGraph } from '../entities/DependencyGraph.js';
-import type {
-  DependencyPendingOperation,
-  DependencyReconciliationPlan,
-} from '../entities/TrackingDependencyGraph.js';
-import type { IDependencyReconciliationService } from '../entities/TrackingTypes.js';
 
 /**
  * Service for managing task dependencies and dependency graphs
@@ -35,7 +35,7 @@ import type { IDependencyReconciliationService } from '../entities/TrackingTypes
  * for task dependency relationships.
  */
 export class DependencyService implements IDependencyReconciliationService {
-  constructor(private store: Store) { }
+  constructor(private store: Store) {}
 
   // ---------------------------------------------------------------------------
   // Core CRUD Operations
@@ -143,14 +143,14 @@ export class DependencyService implements IDependencyReconciliationService {
     // Get all dependencies
     const allDependencies = taskIds
       ? await this.store.sql
-        .select()
-        .from(taskDependencies)
-        .where(
-          and(
-            inArray(taskDependencies.dependentTaskId, taskIds),
-            inArray(taskDependencies.dependencyTaskId, taskIds)
+          .select()
+          .from(taskDependencies)
+          .where(
+            and(
+              inArray(taskDependencies.dependentTaskId, taskIds),
+              inArray(taskDependencies.dependencyTaskId, taskIds)
+            )
           )
-        )
       : await this.store.sql.select().from(taskDependencies);
 
     // Get task data for status checking
@@ -382,7 +382,8 @@ export class DependencyService implements IDependencyReconciliationService {
         return;
       }
       throw new Error(
-        `Failed to add dependency ${operation.dependentTaskId} -> ${operation.dependencyTaskId}: ${error instanceof Error ? error.message : String(error)
+        `Failed to add dependency ${operation.dependentTaskId} -> ${operation.dependencyTaskId}: ${
+          error instanceof Error ? error.message : String(error)
         }`
       );
     }
@@ -401,7 +402,8 @@ export class DependencyService implements IDependencyReconciliationService {
       await this.removeDependency(operation.dependentTaskId, operation.dependencyTaskId);
     } catch (error) {
       throw new Error(
-        `Failed to remove dependency ${operation.dependentTaskId} -> ${operation.dependencyTaskId}: ${error instanceof Error ? error.message : String(error)
+        `Failed to remove dependency ${operation.dependentTaskId} -> ${operation.dependencyTaskId}: ${
+          error instanceof Error ? error.message : String(error)
         }`
       );
     }
