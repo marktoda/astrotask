@@ -1,4 +1,4 @@
-import type { Task, TaskDependency } from "@astrolabe/core";
+import type { Task, TaskDependency } from "@astrotask/core";
 import { create } from "zustand";
 
 export interface AppState {

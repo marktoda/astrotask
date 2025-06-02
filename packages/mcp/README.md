@@ -1,10 +1,10 @@
-# @astrolabe/mcp
+# @astrotask/mcp
 
 MCP (Model Context Protocol) server for Astrolabe, enabling AI agents to interact with the task management system through standardized tools and interfaces.
 
 ## Overview
 
-The `@astrolabe/mcp` package implements a Model Context Protocol server that exposes Astrolabe's task management capabilities to AI agents. It provides a set of well-defined tools that agents can use to create, update, query, and manage tasks in a structured and type-safe manner.
+The `@astrotask/mcp` package implements a Model Context Protocol server that exposes Astrolabe's task management capabilities to AI agents. It provides a set of well-defined tools that agents can use to create, update, query, and manage tasks in a structured and type-safe manner.
 
 ## Features
 
@@ -18,13 +18,13 @@ The `@astrolabe/mcp` package implements a Model Context Protocol server that exp
 ## Installation
 
 ```bash
-pnpm add @astrolabe/mcp
+pnpm add @astrotask/mcp
 
 # Or with npm
-npm install @astrolabe/mcp
+npm install @astrotask/mcp
 
 # Or with yarn
-yarn add @astrolabe/mcp
+yarn add @astrotask/mcp
 ```
 
 ## Quick Start
@@ -33,17 +33,17 @@ yarn add @astrolabe/mcp
 
 ```bash
 # Start the MCP server
-npx @astrolabe/mcp
+npx @astrotask/mcp
 
 # Or with custom configuration
-npx @astrolabe/mcp --database-path ./custom-tasks.db --port 3001
+npx @astrotask/mcp --database-path ./custom-tasks.db --port 3001
 ```
 
 ### Programmatic Usage
 
 ```typescript
-import { createMCPServer } from '@astrolabe/mcp';
-import { createDatabase } from '@astrolabe/core';
+import { createMCPServer } from '@astrotask/mcp';
+import { createDatabase } from '@astrotask/core';
 
 // Create database and MCP server
 const store = createDatabase({ path: './tasks.db' });
@@ -61,9 +61,9 @@ Add to your `.cursor/mcp.json`:
 ```json
 {
   "mcpServers": {
-    "astrolabe": {
+    "astrotask": {
       "command": "npx",
-      "args": ["@astrolabe/mcp"],
+      "args": ["@astrotask/mcp"],
       "env": {
         "DATABASE_PATH": "./tasks.db"
       }
@@ -223,14 +223,14 @@ LOG_LEVEL=info
 NODE_ENV=production
 
 # Server configuration
-MCP_SERVER_NAME=astrolabe
+MCP_SERVER_NAME=astrotask
 MCP_SERVER_VERSION=1.0.0
 ```
 
 ### Command Line Options
 
 ```bash
-npx @astrolabe/mcp --help
+npx @astrotask/mcp --help
 
 Options:
   --database-path <path>    Database file path (default: ./tasks.db)
@@ -251,9 +251,9 @@ Configure Cursor to use Astrolabe MCP server:
 ```json
 {
   "mcpServers": {
-    "astrolabe": {
+    "astrotask": {
       "command": "npx",
-      "args": ["@astrolabe/mcp"],
+      "args": ["@astrotask/mcp"],
       "env": {
         "DATABASE_PATH": "./tasks.db",
         "LOG_LEVEL": "info"
@@ -272,9 +272,9 @@ Add to your Claude Desktop MCP configuration:
 ```json
 {
   "mcpServers": {
-    "astrolabe": {
+    "astrotask": {
       "command": "npx",
-      "args": ["@astrolabe/mcp"],
+      "args": ["@astrotask/mcp"],
       "env": {
         "DATABASE_PATH": "/path/to/your/tasks.db"
       }
@@ -290,8 +290,8 @@ Add to your Claude Desktop MCP configuration:
 import asyncio
 from mcp import Client
 
-async def interact_with_astrolabe():
-    client = Client("npx @astrolabe/mcp")
+async def interact_with_astrotask():
+    client = Client("npx @astrotask/mcp")
     
     # Create a new task
     result = await client.call_tool("createTask", {
@@ -314,7 +314,7 @@ async def interact_with_astrolabe():
     
     print(f"Completed {len(completed)} tasks")
 
-asyncio.run(interact_with_astrolabe())
+asyncio.run(interact_with_astrotask())
 ```
 
 ## Error Handling
@@ -362,16 +362,16 @@ Common error codes:
 ```bash
 # Clone the repository
 git clone <repository-url>
-cd astrolabe
+cd astrotask
 
 # Install dependencies
 pnpm install
 
 # Start development server with hot reload
-pnpm --filter @astrolabe/mcp dev
+pnpm --filter @astrotask/mcp dev
 
 # Run tests
-pnpm --filter @astrolabe/mcp test
+pnpm --filter @astrotask/mcp test
 ```
 
 ### Custom Tool Development
@@ -379,7 +379,7 @@ pnpm --filter @astrolabe/mcp test
 Extend the MCP server with custom tools:
 
 ```typescript
-import { MCPHandler, HandlerContext } from '@astrolabe/mcp';
+import { MCPHandler, HandlerContext } from '@astrotask/mcp';
 
 class CustomTaskHandler implements MCPHandler {
   constructor(public readonly context: HandlerContext) {}
@@ -401,10 +401,10 @@ Enable debug logging to troubleshoot issues:
 
 ```bash
 # Enable debug logs
-DEBUG=astrolabe:* npx @astrolabe/mcp
+DEBUG=astrotask:* npx @astrotask/mcp
 
 # Or set log level
-LOG_LEVEL=debug npx @astrolabe/mcp
+LOG_LEVEL=debug npx @astrotask/mcp
 ```
 
 The debug output includes:
@@ -427,12 +427,12 @@ MIT License - see [LICENSE](../../LICENSE) for details.
 
 ## Related Packages
 
-- [`@astrolabe/core`](../core/README.md) - Core task management library
-- [`@astrolabe/cli`](../cli/README.md) - Command-line interface
+- [`@astrotask/core`](../core/README.md) - Core task management library
+- [`@astrotask/cli`](../cli/README.md) - Command-line interface
 
 ## Support
 
-- [GitHub Issues](https://github.com/astrolabe/astrolabe/issues) - Bug reports and feature requests
+- [GitHub Issues](https://github.com/astrotask/astrotask/issues) - Bug reports and feature requests
 - [Documentation](../../docs/) - Comprehensive guides and API reference
 - [Examples](../../docs/examples/) - Usage examples and tutorials
 

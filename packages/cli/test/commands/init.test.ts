@@ -9,14 +9,14 @@ vi.mock('fs/promises', () => ({
   writeFile: vi.fn(),
 }));
 
-// Mock @astrolabe/core
-vi.mock('@astrolabe/core', () => ({
+// Mock @astrotask/core
+vi.mock('@astrotask/core', () => ({
   createDatabase: vi.fn(),
 }));
 
 // Import the init command to test its exports
 import * as initCommand from '../../source/commands/init.js';
-import { createDatabase } from '@astrolabe/core';
+import { createDatabase } from '@astrotask/core';
 
 const mockAccess = vi.mocked(access);
 const mockMkdir = vi.mocked(mkdir);

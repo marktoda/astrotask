@@ -1,4 +1,4 @@
-import { TaskService, cfg, createDatabase } from "@astrolabe/core";
+import { TaskService, cfg, createDatabase } from "@astrotask/core";
 import { Text } from "ink";
 import type { AppProps } from "pastel";
 import React from "react";

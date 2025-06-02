@@ -2,7 +2,7 @@
 *A local-first, MCP-compatible task-navigation platform for humans + AI agents*
 
 > **Why “Astrolabe”?**
-> An astrolabe let medieval sailors locate themselves from the stars.
+> An astrotask let medieval sailors locate themselves from the stars.
 > Likewise, this tool helps developers & agents “plot their position” in a project—offline, precisely, and with just one reading.
 
 ---
@@ -38,7 +38,7 @@ It must work for solo devs at 30 000 ft with no Wi-Fi and for small teams that s
 ```mermaid
 graph TD
   subgraph Local
-    CLI["CLI / VS Code<br>(astrolabe …)"]
+    CLI["CLI / VS Code<br>(astrotask …)"]
     MCP[[MCP Server]]
     Resolver[Context Resolver]
     SQLite[(SQLite • ElectricSQL)]
@@ -62,7 +62,7 @@ graph TD
 | Layer                | Key Duties                                                          |
 | -------------------- | ------------------------------------------------------------------- |
 | **Domain**           | Zod schemas `Task`, `Epic`, `Project`, `ContextSlice`.              |
-| **SQLite**           | Single file `astrolabe.db` (encrypted with SQLCipher).              |
+| **SQLite**           | Single file `astrotask.db` (encrypted with SQLCipher).              |
 | **ElectricSQL**      | CRDT merge & offline-first sync.                                    |
 | **MCP Server**       | Named functions (see §6) via JSON-RPC over HTTP/WS.                 |
 | **Context Resolver** | Embeddings store (pgvector or sqlite-vector); thin-slice summaries. |
@@ -110,7 +110,7 @@ The MCP manifest advertises these so agents can discover them.
 ## 7 Idiomatic CLI Layout
 
 ```
-astrolabe ─┬ task     list|add|update|rm|done
+astrotask ─┬ task     list|add|update|rm|done
            ├ context  show <taskId>
            ├ prd      import <file> | export <epicIds>
            ├ graph    render [--format mermaid]
@@ -122,16 +122,16 @@ astrolabe ─┬ task     list|add|update|rm|done
 
 ```bash
 # list open tasks
-astrolabe task list --status todo
+astrotask task list --status todo
 
 # quick capture
-astrolabe task add "Add OAuth flow" --parent epic:auth
+astrotask task add "Add OAuth flow" --parent epic:auth
 
 # one-shot context bundle for an agent
-astrolabe context show 123e456-…
+astrotask context show 123e456-…
 
 # push tasks tagged #linear
-astrolabe sync linear push
+astrotask sync linear push
 ```
 
 ---
@@ -148,7 +148,7 @@ astrolabe sync linear push
 
 | Aspect    | Approach                                |
 | --------- | --------------------------------------- |
-| At-Rest   | SQLCipher encryption on `astrolabe.db`. |
+| At-Rest   | SQLCipher encryption on `astrotask.db`. |
 | In-Flight | HTTPS + JWT (per-project secrets).      |
 | Secrets   | Stored in OS keychain, never in DB.     |
 
@@ -166,10 +166,10 @@ astrolabe sync linear push
 
 ## 11 Developer Experience
 
-* `npx astrolabe init` → DB + MCP scaffold.
+* `npx astrotask init` → DB + MCP scaffold.
 * Hot-reload MCP when Zod schemas change.
-* `astrolabe graph render` → Mermaid for README/PR.
-* `astrolabe prd import docs/login.md` → autogenerate epics + tasks.
+* `astrotask graph render` → Mermaid for README/PR.
+* `astrotask prd import docs/login.md` → autogenerate epics + tasks.
 
 ---
 

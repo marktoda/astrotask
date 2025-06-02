@@ -1,5 +1,5 @@
 {
-  "name": "@astrolabe/core",
+  "name": "@astrotask/core",
   "version": "0.1.0",
   "description": "A local-first, MCP-compatible task-navigation platform for humans + AI agents",
   "main": "dist/index.js",
@@ -29,7 +29,7 @@
     "mcp",
     "typescript",
     "offline-first",
-    "astrolabe"
+    "astrotask"
   ],
   "author": "",
   "license": "MIT",

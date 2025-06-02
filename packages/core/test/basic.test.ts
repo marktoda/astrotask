@@ -9,8 +9,8 @@ describe('Astrolabe Basic Tests', () => {
   });
 
   it('should handle string operations', () => {
-    const projectName = 'astrolabe';
-    expect(projectName).toBe('astrolabe');
+    const projectName = 'astrotask';
+    expect(projectName).toBe('astrotask');
     expect(projectName.length).toBeGreaterThan(0);
   });
 
@@ -21,15 +21,15 @@ describe('Astrolabe Basic Tests', () => {
 
   it('should validate object properties', () => {
     const config = {
-      name: 'astrolabe',
+      name: 'astrotask',
       version: '0.1.0',
       description: 'A local-first, MCP-compatible task-navigation platform',
     };
 
     expect(config).toHaveProperty('name');
-    expect(config.name).toBe('astrolabe');
+    expect(config.name).toBe('astrotask');
     expect(config).toMatchObject({
-      name: 'astrolabe',
+      name: 'astrotask',
       version: '0.1.0',
     });
   });

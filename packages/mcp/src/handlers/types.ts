@@ -14,8 +14,8 @@ import {
   taskPriority,
   type TaskStatus,
   type TaskPriority
-} from '@astrolabe/core';
-import type { Store, TaskService, DependencyService } from '@astrolabe/core';
+} from '@astrotask/core';
+import type { Store, TaskService, DependencyService } from '@astrotask/core';
 
 /**
  * Context object passed to all MCP handlers containing shared dependencies

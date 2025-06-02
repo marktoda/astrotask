@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { MinimalHandlers } from '../../src/handlers/MinimalHandlers.js';
-import { createDatabase, type Store, TASK_IDENTIFIERS } from '@astrolabe/core';
+import { createDatabase, type Store, TASK_IDENTIFIERS } from '@astrotask/core';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';

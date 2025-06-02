@@ -379,35 +379,35 @@ export const dependencyValidationRules = {
 
 ```bash
 # Add dependencies
-astrolabe task add-dependency <dependent-task> <dependency-task>
-astrolabe task remove-dependency <dependent-task> <dependency-task>
+astrotask task add-dependency <dependent-task> <dependency-task>
+astrotask task remove-dependency <dependent-task> <dependency-task>
 
 # View dependencies
-astrolabe task dependencies <task-id>
-astrolabe task dependents <task-id>  
+astrotask task dependencies <task-id>
+astrotask task dependents <task-id>  
 
 # Find available work
-astrolabe task available --priority high
+astrotask task available --priority high
 
 # Visualize dependency graph
-astrolabe graph dependencies --root <task-id> --format mermaid
+astrotask graph dependencies --root <task-id> --format mermaid
 
 # Validate dependencies
-astrolabe task validate-dependencies --fix-cycles
+astrotask task validate-dependencies --fix-cycles
 ```
 
 ### 9.2 Status Feedback
 
 ```bash
-$ astrolabe task update ABCD --status in-progress
+$ astrotask task update ABCD --status in-progress
 Error: Task ABCD is blocked by incomplete dependencies: XYZW, EFGH
 
-$ astrolabe task available
+$ astrotask task available
 Available tasks (can start now):
   XYZW - Setup authentication system (high priority)
   IJKL - Write documentation (medium priority)
 
-$ astrolabe task dependencies ABCD
+$ astrotask task dependencies ABCD
 Task ABCD depends on:
   ✗ XYZW - Setup authentication system (in-progress)
   ✗ EFGH - Database schema migration (pending)

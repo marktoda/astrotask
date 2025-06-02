@@ -50,7 +50,7 @@ importers:
 
   packages/cli:
     dependencies:
-      '@astrolabe/core':
+      '@astrotask/core':
         specifier: workspace:*
         version: link:../core
       blessed:
@@ -214,7 +214,7 @@ importers:
 
   packages/mcp:
     dependencies:
-      '@astrolabe/core':
+      '@astrotask/core':
         specifier: workspace:*
         version: link:../core
       '@modelcontextprotocol/sdk':

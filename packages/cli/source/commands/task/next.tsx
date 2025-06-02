@@ -1,5 +1,5 @@
-import type { ContextSlice, Task, TaskTree } from "@astrolabe/core";
-import { taskPriority, taskStatus } from "@astrolabe/core";
+import type { ContextSlice, Task, TaskTree } from "@astrotask/core";
+import { taskPriority, taskStatus } from "@astrotask/core";
 import { Box, Text } from "ink";
 import { useEffect, useState } from "react";
 import zod from "zod";
@@ -183,8 +183,8 @@ export default function Next({ options }: Props) {
 
 				<Box marginTop={1}>
 					<Text color="green">
-						💡 Use <Text color="cyan">astrolabe task list</Text> to see all
-						tasks or <Text color="cyan">astrolabe start &lt;task-id&gt;</Text>{" "}
+						💡 Use <Text color="cyan">astrotask task list</Text> to see all
+						tasks or <Text color="cyan">astrotask start &lt;task-id&gt;</Text>{" "}
 						to begin a specific task
 					</Text>
 				</Box>
@@ -288,16 +288,16 @@ export default function Next({ options }: Props) {
 					Suggested Actions:
 				</Text>
 				<Text color="green">
-					• Start: <Text color="cyan">astrolabe start {task.id}</Text>
+					• Start: <Text color="cyan">astrotask start {task.id}</Text>
 				</Text>
 				<Text color="green">
 					• View details:{" "}
-					<Text color="cyan">astrolabe task tree {task.id}</Text>
+					<Text color="cyan">astrotask task tree {task.id}</Text>
 				</Text>
 				{context?.dependents && context.dependents.length > 0 && (
 					<Text color="green">
 						• See blocked tasks:{" "}
-						<Text color="cyan">astrolabe task available</Text>
+						<Text color="cyan">astrotask task available</Text>
 					</Text>
 				)}
 			</Box>

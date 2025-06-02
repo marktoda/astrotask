@@ -2,7 +2,7 @@ import { execFileSync } from "child_process";
 import { promises as fs } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
-import type { Task } from "@astrolabe/core";
+import type { Task } from "@astrotask/core";
 import type blessed from "blessed";
 
 export interface TaskTemplate {
@@ -331,7 +331,7 @@ notes: |
 			};
 		}
 
-		const tempFile = join(tmpdir(), `astrolabe-task-${Date.now()}.md`);
+		const tempFile = join(tmpdir(), `astrotask-task-${Date.now()}.md`);
 
 		try {
 			// Write template to temp file
@@ -427,7 +427,7 @@ notes: |
 			};
 		}
 
-		const tempFile = join(tmpdir(), `astrolabe-edit-task-${Date.now()}.md`);
+		const tempFile = join(tmpdir(), `astrotask-edit-task-${Date.now()}.md`);
 
 		try {
 			// Write template with existing task data to temp file

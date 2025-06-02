@@ -1,6 +1,6 @@
 # Core API Reference
 
-Complete API reference for `@astrolabe/core` - the foundational library for Astrolabe task management.
+Complete API reference for `@astrotask/core` - the foundational library for Astrolabe task management.
 
 ## Table of Contents
 
@@ -27,7 +27,7 @@ Creates a new database store instance with SQLite backend.
 
 **Example:**
 ```typescript
-import { createDatabase } from '@astrolabe/core';
+import { createDatabase } from '@astrotask/core';
 
 // Basic SQLite database
 const store = createDatabase({
@@ -434,7 +434,7 @@ Creates a logger instance for a specific module.
 
 **Example:**
 ```typescript
-import { createModuleLogger } from '@astrolabe/core';
+import { createModuleLogger } from '@astrotask/core';
 
 const logger = createModuleLogger('TaskService');
 
@@ -456,7 +456,7 @@ Utility for consistent error logging.
 
 **Example:**
 ```typescript
-import { logError } from '@astrolabe/core';
+import { logError } from '@astrotask/core';
 
 try {
   await riskyOperation();
@@ -471,7 +471,7 @@ Creates a timer for performance monitoring.
 
 **Example:**
 ```typescript
-import { startTimer } from '@astrolabe/core';
+import { startTimer } from '@astrotask/core';
 
 const endTimer = startTimer(logger, 'database-query');
 await database.query('SELECT * FROM tasks');
@@ -503,7 +503,7 @@ PORT=3000
 Access configuration through the `cfg` export:
 
 ```typescript
-import { cfg } from '@astrolabe/core';
+import { cfg } from '@astrotask/core';
 
 console.log(cfg.LOG_LEVEL);    // Current log level
 console.log(cfg.NODE_ENV);     // Current environment

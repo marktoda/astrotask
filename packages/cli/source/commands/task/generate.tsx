@@ -5,7 +5,7 @@ import {
 	TaskService,
 	createModuleLogger,
 	createPRDTaskGenerator,
-} from "@astrolabe/core";
+} from "@astrotask/core";
 import { Box, Text } from "ink";
 import { useEffect, useState } from "react";
 import zod from "zod";

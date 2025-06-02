@@ -2,7 +2,7 @@ import { defineConfig } from 'drizzle-kit';
 import 'dotenv/config';
 
 // Use the unified DATABASE_URI configuration
-const databaseUrl = process.env.DATABASE_URI || './data/astrolabe.db';
+const databaseUrl = process.env.DATABASE_URI || './data/astrotask.db';
 
 export default defineConfig({
   schema: './src/database/schema.ts',

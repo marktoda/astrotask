@@ -29,9 +29,9 @@ This document evaluates migrating from PGLite to SQLite to solve concurrent data
 **Example:**
 ```bash
 # With SQLite WAL mode, these all work concurrently:
-$ astrolabe list          # Reader 1
-$ astrolabe show TASK-1   # Reader 2
-$ astrolabe add-task ...  # Writer (blocks other writers only)
+$ astrotask list          # Reader 1
+$ astrotask show TASK-1   # Reader 2
+$ astrotask add-task ...  # Writer (blocks other writers only)
 ```
 
 ### 2. Migration Complexity
@@ -180,7 +180,7 @@ If concurrent access remains problematic:
        volumes:
          - ./data/postgres:/var/lib/postgresql/data
        environment:
-         POSTGRES_DB: astrolabe
+         POSTGRES_DB: astrotask
          POSTGRES_HOST_AUTH_METHOD: trust
    ```
 

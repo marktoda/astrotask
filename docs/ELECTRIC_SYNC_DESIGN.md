@@ -823,7 +823,7 @@ services:
   postgres:
     image: postgres:16
     environment:
-      POSTGRES_DB: astrolabe
+      POSTGRES_DB: astrotask
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     ports:
@@ -835,7 +835,7 @@ services:
   electric:
     image: electricsql/electric:1.0.17
     environment:
-      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/astrolabe
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/astrotask
       ELECTRIC_INSECURE: "true"  # For development only
     ports:
       - "3000:3000"
@@ -847,7 +847,7 @@ services:
 ```env
 # Electric Configuration
 ELECTRIC_URL=http://localhost:3000
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/astrolabe
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/astrotask
 
 # API Configuration  
 API_URL=http://localhost:8080

@@ -1,6 +1,6 @@
 import { dirname, join, resolve } from "path";
 import { fileURLToPath } from "url";
-import { createDatabase } from "@astrolabe/core";
+import { createDatabase } from "@astrotask/core";
 import { access, mkdir, writeFile } from "fs/promises";
 import { Box, Text } from "ink";
 import SelectInput from "ink-select-input";
@@ -19,7 +19,7 @@ export const options = zod.object({
 	"database-path": zod
 		.string()
 		.optional()
-		.describe("Database file path (default: ./data/astrolabe.db)"),
+		.describe("Database file path (default: ./data/astrotask.db)"),
 	force: zod
 		.boolean()
 		.optional()
@@ -69,7 +69,7 @@ function generateMcpConfig(
 		case "cursor":
 			return {
 				mcpServers: {
-					"astrolabe-task": {
+					"astrotask-task": {
 						command: "node",
 						args: [mcpServerPath],
 						env: {
@@ -82,7 +82,7 @@ function generateMcpConfig(
 		case "roo":
 			return {
 				mcpServers: {
-					"astrolabe-task": {
+					"astrotask-task": {
 						command: "node",
 						args: [mcpServerPath],
 						env: {
@@ -96,7 +96,7 @@ function generateMcpConfig(
 			// Cline configuration format (research needed)
 			return {
 				mcpServers: {
-					"astrolabe-task": {
+					"astrotask-task": {
 						command: "node",
 						args: [mcpServerPath],
 						env: {
@@ -110,7 +110,7 @@ function generateMcpConfig(
 		case "claude-desktop":
 			return {
 				mcpServers: {
-					"astrolabe-task": {
+					"astrotask-task": {
 						command: "node",
 						args: [mcpServerPath],
 						env: {
@@ -228,7 +228,7 @@ function InteractivePrompts({
 	};
 
 	const handleDatabaseSubmit = (value: string) => {
-		const databasePath = value.trim() || "./data/astrolabe.db";
+		const databasePath = value.trim() || "./data/astrotask.db";
 		setPromptState((prev) => ({ ...prev, databasePath, currentStep: "force" }));
 	};
 
@@ -270,10 +270,10 @@ function InteractivePrompts({
 				</Text>
 				<Text></Text>
 				<Text bold>Database file path (press Enter for default):</Text>
-				<Text color="gray">Default: ./data/astrolabe.db</Text>
+				<Text color="gray">Default: ./data/astrotask.db</Text>
 				<TextInput
 					value={databaseInput}
-					placeholder="./data/astrolabe.db"
+					placeholder="./data/astrotask.db"
 					onChange={setDatabaseInput}
 					onSubmit={handleDatabaseSubmit}
 				/>
@@ -317,7 +317,7 @@ export default function Init({ options }: Props) {
 			// We have all required options, proceed directly
 			setFinalOptions({
 				editor: options.editor,
-				databasePath: options["database-path"] || "./data/astrolabe.db",
+				databasePath: options["database-path"] || "./data/astrotask.db",
 				force: options.force || false,
 			});
 		}
@@ -455,9 +455,9 @@ export default function Init({ options }: Props) {
 							• Restart your editor to load the MCP configuration
 						</Text>
 						<Text color="gray">
-							• Run "astrolabe task list" to see your starter tasks
+							• Run "astrotask task list" to see your starter tasks
 						</Text>
-						<Text color="gray">• Begin working with "astrolabe task next"</Text>
+						<Text color="gray">• Begin working with "astrotask task next"</Text>
 					</Box>
 				</Box>
 			)}

@@ -20,7 +20,7 @@ The service contains **no persistence logic of its own** – all reads and write
 ## Importing
 
 ```typescript
-import { TaskService } from '@astrolabe/core/services/TaskService';
+import { TaskService } from '@astrotask/core/services/TaskService';
 ```
 
 ---

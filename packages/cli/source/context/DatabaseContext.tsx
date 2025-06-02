@@ -1,4 +1,4 @@
-import { type Store, TaskService } from "@astrolabe/core";
+import { type Store, TaskService } from "@astrotask/core";
 import React from "react";
 
 export interface DatabaseContextValue {

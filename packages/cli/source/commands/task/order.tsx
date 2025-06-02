@@ -1,4 +1,4 @@
-import type { Task } from "@astrolabe/core";
+import type { Task } from "@astrotask/core";
 import { Box, Text } from "ink";
 import { useEffect, useState } from "react";
 import zod from "zod";
@@ -144,7 +144,7 @@ export default function Order({ options }: Props) {
 						{result.unresolvableTasks.join(", ")}
 					</Text>
 					<Text color="yellow">
-						Use <Text color="cyan">astrolabe task validate-dependencies</Text>{" "}
+						Use <Text color="cyan">astrotask task validate-dependencies</Text>{" "}
 						to identify cycles
 					</Text>
 				</Box>
@@ -201,7 +201,7 @@ export default function Order({ options }: Props) {
 				</Box>
 				<Box marginLeft={2}>
 					<Text color="gray">
-						• Use <Text color="cyan">astrolabe task available</Text> to see what
+						• Use <Text color="cyan">astrotask task available</Text> to see what
 						can be started now
 					</Text>
 				</Box>

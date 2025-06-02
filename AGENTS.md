@@ -2,7 +2,7 @@
 
 Welcome to **Astrolabe** – a local-first, MCP-compatible task-navigation platform for humans + AI agents. This document explains how to get a new contributor from zero to productive while maintaining the code quality bar we expect in production.
 
-> **Why "Astrolabe"?** An astrolabe helped medieval sailors locate themselves from the stars. Likewise, this tool helps developers & agents "plot their position" in a project—offline, precisely, and with just one reading.
+> **Why "Astrolabe"?** An astrotask helped medieval sailors locate themselves from the stars. Likewise, this tool helps developers & agents "plot their position" in a project—offline, precisely, and with just one reading.
 
 ---
 
@@ -23,7 +23,7 @@ Welcome to **Astrolabe** – a local-first, MCP-compatible task-navigation platf
 
 ```text
 packages/            # Monorepo packages (pnpm workspace)
-  core/              # Core application library (@astrolabe/core)
+  core/              # Core application library (@astrotask/core)
     src/             # TypeScript source code
       index.ts       # Main exports
   cli/               # Command-line interface
@@ -108,7 +108,7 @@ Astrolabe is built with offline-first principles and MCP compatibility:
 ```mermaid
 graph TD
   subgraph Local
-    CLI["CLI Interface<br>(astrolabe)"]
+    CLI["CLI Interface<br>(astrotask)"]
     MCP[[MCP Server]]
     SQLite[(SQLite Database<br>ElectricSQL)]
     Resolver[Context Resolver]
@@ -262,7 +262,7 @@ See the [dev_workflow.mdc](.cursor/rules/dev_workflow.mdc) rule for complete gui
 Future CLI layout based on design:
 
 ```
-astrolabe ─┬ task     list|add|update|rm|done
+astrotask ─┬ task     list|add|update|rm|done
            ├ context  show <taskId>
            ├ prd      import <file> | export <epicIds>
            ├ graph    render [--format mermaid]
@@ -274,16 +274,16 @@ astrolabe ─┬ task     list|add|update|rm|done
 
 ```bash
 # list open tasks
-astrolabe task list --status todo
+astrotask task list --status todo
 
 # quick capture
-astrolabe task add "Add OAuth flow" --parent epic:auth
+astrotask task add "Add OAuth flow" --parent epic:auth
 
 # one-shot context bundle for an agent
-astrolabe context show 123e456-…
+astrotask context show 123e456-…
 
 # push tasks tagged #linear
-astrolabe sync linear push
+astrotask sync linear push
 ```
 
 ---

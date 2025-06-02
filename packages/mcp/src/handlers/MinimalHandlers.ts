@@ -10,11 +10,11 @@
  * - listTasks: List tasks with optional filters
  */
 
-import type { Task, TaskStatus } from '@astrolabe/core';
-import type { TaskDependency, ContextSlice } from '@astrolabe/core';
-import { TASK_IDENTIFIERS } from '@astrolabe/core';
-import { validateTaskId } from '@astrolabe/core';
-import { createModuleLogger } from '@astrolabe/core';
+import type { Task, TaskStatus } from '@astrotask/core';
+import type { TaskDependency, ContextSlice } from '@astrotask/core';
+import { TASK_IDENTIFIERS } from '@astrotask/core';
+import { validateTaskId } from '@astrotask/core';
+import { createModuleLogger } from '@astrotask/core';
 import type { HandlerContext, MCPHandler } from './types.js';
 import type {
   GetNextTaskInput,

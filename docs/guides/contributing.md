@@ -38,11 +38,11 @@ Before contributing, ensure you have:
 
 ```bash
 # Fork the repository on GitHub, then clone your fork
-git clone https://github.com/YOUR_USERNAME/astrolabe.git
-cd astrolabe
+git clone https://github.com/YOUR_USERNAME/astrotask.git
+cd astrotask
 
 # Add upstream remote
-git remote add upstream https://github.com/astrolabe/astrolabe.git
+git remote add upstream https://github.com/astrotask/astrotask.git
 ```
 
 ### 2. Install Dependencies
@@ -98,9 +98,9 @@ pnpm verify
 ## Project Structure
 
 ```
-astrolabe/
+astrotask/
 ├── packages/                 # Monorepo packages
-│   ├── core/                # Core library (@astrolabe/core)
+│   ├── core/                # Core library (@astrotask/core)
 │   │   ├── src/
 │   │   │   ├── database/    # Database layer
 │   │   │   ├── services/    # Business logic
@@ -109,12 +109,12 @@ astrolabe/
 │   │   │   └── config/      # Configuration
 │   │   ├── test/            # Core tests
 │   │   └── dist/            # Compiled output
-│   ├── mcp/                 # MCP server (@astrolabe/mcp)
+│   ├── mcp/                 # MCP server (@astrotask/mcp)
 │   │   ├── src/
 │   │   │   ├── handlers/    # MCP tool handlers
 │   │   │   └── index.ts     # Server entry point
 │   │   └── dist/
-│   └── cli/                 # CLI interface (@astrolabe/cli)
+│   └── cli/                 # CLI interface (@astrotask/cli)
 │       ├── source/          # CLI source code
 │       └── dist/
 ├── docs/                    # Documentation
@@ -297,7 +297,7 @@ Use Vitest for all testing:
 
 ```typescript
 import { describe, test, expect, beforeEach } from 'vitest';
-import { createDatabase, TaskService } from '@astrolabe/core';
+import { createDatabase, TaskService } from '@astrotask/core';
 
 describe('TaskService', () => {
   let taskService: TaskService;
@@ -350,7 +350,7 @@ pnpm test
 pnpm test:watch
 
 # Run tests for specific package
-pnpm --filter @astrolabe/core test
+pnpm --filter @astrotask/core test
 
 # Run with coverage
 pnpm test --coverage

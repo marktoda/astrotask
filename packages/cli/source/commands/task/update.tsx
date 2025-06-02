@@ -1,4 +1,4 @@
-import { taskPriority, taskStatus } from "@astrolabe/core";
+import { taskPriority, taskStatus } from "@astrotask/core";
 import { Text } from "ink";
 import { useEffect, useState } from "react";
 import zod from "zod";

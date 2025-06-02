@@ -28,13 +28,13 @@ Install the CLI globally for the best user experience:
 
 ```bash
 # Install globally with pnpm (recommended)
-pnpm add -g @astrolabe/cli
+pnpm add -g @astrotask/cli
 
 # Or with npm
-npm install -g @astrolabe/cli
+npm install -g @astrotask/cli
 
 # Or with yarn
-yarn global add @astrolabe/cli
+yarn global add @astrotask/cli
 ```
 
 ### Option 2: Using the Core Library (For Developers)
@@ -43,10 +43,10 @@ If you're building applications with Astrolabe:
 
 ```bash
 # Add to your project
-pnpm add @astrolabe/core
+pnpm add @astrotask/core
 
 # For MCP server functionality
-pnpm add @astrolabe/mcp
+pnpm add @astrotask/mcp
 ```
 
 ### Option 3: Development Setup
@@ -55,8 +55,8 @@ To contribute or run from source:
 
 ```bash
 # Clone the repository
-git clone https://github.com/astrolabe/astrolabe.git
-cd astrolabe
+git clone https://github.com/astrotask/astrotask.git
+cd astrotask
 
 # Install dependencies
 pnpm install
@@ -75,11 +75,11 @@ mkdir my-project
 cd my-project
 
 # Initialize Astrolabe
-astrolabe init --name "My First Project"
+astrotask init --name "My First Project"
 ```
 
 This creates:
-- `.astrolabe.json` - Configuration file
+- `.astrotask.json` - Configuration file
 - `tasks.db` - Local SQLite database
 - Basic project structure
 
@@ -87,43 +87,43 @@ This creates:
 
 ```bash
 # Create a simple task
-astrolabe create "Set up development environment"
+astrotask create "Set up development environment"
 
 # Create a task with description
-astrolabe create "Implement user authentication" \
+astrotask create "Implement user authentication" \
   --description "Add JWT-based auth with refresh tokens"
 
 # Create a subtask
-astrolabe create "Write unit tests" --parent task_123
+astrotask create "Write unit tests" --parent task_123
 ```
 
 ### 3. View and Manage Tasks
 
 ```bash
 # List all tasks
-astrolabe list
+astrotask list
 
 # Show task details
-astrolabe show task_123
+astrotask show task_123
 
 # Update task status
-astrolabe update task_123 --status in-progress
+astrotask update task_123 --status in-progress
 
 # Complete a task
-astrolabe complete task_123
+astrotask complete task_123
 ```
 
 ### 4. Organize with Projects
 
 ```bash
 # Create a project
-astrolabe project create "Mobile App Redesign"
+astrotask project create "Mobile App Redesign"
 
 # Assign tasks to project
-astrolabe create "Design new UI" --project proj_123
+astrotask create "Design new UI" --project proj_123
 
 # View project tasks
-astrolabe project show proj_123
+astrotask project show proj_123
 ```
 
 ## Quick Start: Programmatic Usage
@@ -131,7 +131,7 @@ astrolabe project show proj_123
 ### 1. Basic Task Management
 
 ```typescript
-import { createDatabase, TaskService } from '@astrolabe/core';
+import { createDatabase, TaskService } from '@astrotask/core';
 
 // Initialize database and service
 const store = createDatabase({ path: './tasks.db' });
@@ -193,7 +193,7 @@ For AI agent integration, set up the MCP server:
 
 ```bash
 # Start MCP server
-npx @astrolabe/mcp --database-path ./tasks.db
+npx @astrotask/mcp --database-path ./tasks.db
 ```
 
 ### 2. Configure with Cursor IDE
@@ -203,9 +203,9 @@ Create `.cursor/mcp.json` in your project:
 ```json
 {
   "mcpServers": {
-    "astrolabe": {
+    "astrotask": {
       "command": "npx",
-      "args": ["@astrolabe/mcp"],
+      "args": ["@astrotask/mcp"],
       "env": {
         "DATABASE_PATH": "./tasks.db",
         "LOG_LEVEL": "info"
@@ -291,7 +291,7 @@ interface ContextSlice {
 
 ### CLI Configuration
 
-The CLI can be configured through `.astrolabe.json`:
+The CLI can be configured through `.astrotask.json`:
 
 ```json
 {
@@ -325,14 +325,14 @@ ASTROLABE_THEME=dark
 ASTROLABE_LOG_LEVEL=info
 
 # MCP server settings
-MCP_SERVER_NAME=astrolabe
+MCP_SERVER_NAME=astrotask
 MCP_SERVER_VERSION=1.0.0
 ```
 
 ### Programmatic Configuration
 
 ```typescript
-import { cfg } from '@astrolabe/core';
+import { cfg } from '@astrotask/core';
 
 // Access current configuration
 console.log('Log level:', cfg.LOG_LEVEL);
@@ -345,45 +345,45 @@ console.log('Environment:', cfg.NODE_ENV);
 
 ```bash
 # Start your day
-astrolabe list --status pending
+astrotask list --status pending
 
 # Pick a task to work on
-astrolabe start task_123
+astrotask start task_123
 
 # Update progress
-astrolabe update task_123 --description "Added user model"
+astrotask update task_123 --description "Added user model"
 
 # Complete the task
-astrolabe complete task_123 --notes "Implemented with validation"
+astrotask complete task_123 --notes "Implemented with validation"
 ```
 
 ### 2. Project Planning
 
 ```bash
 # Create project
-astrolabe project create "Q1 Feature Release"
+astrotask project create "Q1 Feature Release"
 
 # Break down into tasks
-astrolabe create "User authentication" --project proj_123
-astrolabe create "Dashboard redesign" --project proj_123
-astrolabe create "Performance optimization" --project proj_123
+astrotask create "User authentication" --project proj_123
+astrotask create "Dashboard redesign" --project proj_123
+astrotask create "Performance optimization" --project proj_123
 
 # Create subtasks
-astrolabe create "Login form" --parent task_456
-astrolabe create "Password reset" --parent task_456
+astrotask create "Login form" --parent task_456
+astrotask create "Password reset" --parent task_456
 ```
 
 ### 3. Team Collaboration
 
 ```bash
 # Export tasks for sharing
-astrolabe export --format json --output team-tasks.json
+astrotask export --format json --output team-tasks.json
 
 # Import tasks from teammate
-astrolabe import teammate-tasks.json
+astrotask import teammate-tasks.json
 
 # Sync with shared database (if using sync)
-astrolabe sync --remote https://sync.example.com
+astrotask sync --remote https://sync.example.com
 ```
 
 ## Best Practices
@@ -416,25 +416,25 @@ astrolabe sync --remote https://sync.example.com
 **Database locked error:**
 ```bash
 # Check for running processes
-astrolabe status --verbose
+astrotask status --verbose
 
 # Force unlock if needed
-astrolabe config database.force-unlock true
+astrotask config database.force-unlock true
 ```
 
 **Permission errors:**
 ```bash
 # Check file permissions
-ls -la .astrolabe.json
+ls -la .astrotask.json
 
 # Reset configuration
-astrolabe config --reset
+astrotask config --reset
 ```
 
 **MCP connection issues:**
 ```bash
 # Check MCP server status
-DEBUG=astrolabe:* npx @astrolabe/mcp
+DEBUG=astrotask:* npx @astrotask/mcp
 
 # Verify configuration
 cat .cursor/mcp.json
@@ -445,7 +445,7 @@ cat .cursor/mcp.json
 - **Documentation**: Check the [full documentation](../README.md)
 - **API Reference**: See [API docs](../api/core-api.md)
 - **Examples**: Browse [example projects](../examples/)
-- **Issues**: Report bugs on [GitHub Issues](https://github.com/astrolabe/astrolabe/issues)
+- **Issues**: Report bugs on [GitHub Issues](https://github.com/astrotask/astrotask/issues)
 
 ## Next Steps
 
@@ -462,7 +462,7 @@ Now that you're set up, explore these advanced features:
 ### Simple Todo App
 
 ```typescript
-import { createDatabase, TaskService } from '@astrolabe/core';
+import { createDatabase, TaskService } from '@astrotask/core';
 
 class TodoApp {
   private taskService: TaskService;
@@ -503,7 +503,7 @@ console.log('Pending todos:', todos.length);
 ### Project Management Dashboard
 
 ```typescript
-import { createDatabase, TaskService } from '@astrolabe/core';
+import { createDatabase, TaskService } from '@astrotask/core';
 
 class ProjectDashboard {
   private taskService: TaskService;

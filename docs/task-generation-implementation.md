@@ -136,7 +136,7 @@ This document summarizes the implementation of the extensible task auto-generati
 ### Programmatic Usage
 
 ```typescript
-import { createPRDTaskGenerator, createModuleLogger } from '@astrolabe/core';
+import { createPRDTaskGenerator, createModuleLogger } from '@astrotask/core';
 
 const logger = createModuleLogger('TaskGen');
 const generator = createPRDTaskGenerator(logger);

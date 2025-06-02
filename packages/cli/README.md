@@ -1,10 +1,10 @@
-# @astrolabe/cli
+# @astrotask/cli
 
 Command-line interface for Astrolabe, providing an intuitive terminal-based experience for task management with offline-first capabilities and AI agent integration.
 
 ## Overview
 
-The `@astrolabe/cli` package provides a beautiful, interactive command-line interface built with React and Ink. It offers full access to Astrolabe's task management capabilities through an intuitive terminal experience.
+The `@astrotask/cli` package provides a beautiful, interactive command-line interface built with React and Ink. It offers full access to Astrolabe's task management capabilities through an intuitive terminal experience.
 
 ## Features
 
@@ -20,51 +20,51 @@ The `@astrolabe/cli` package provides a beautiful, interactive command-line inte
 
 ```bash
 # Install globally
-npm install -g @astrolabe/cli
+npm install -g @astrotask/cli
 
 # Or with pnpm
-pnpm add -g @astrolabe/cli
+pnpm add -g @astrotask/cli
 
 # Or with yarn
-yarn global add @astrolabe/cli
+yarn global add @astrotask/cli
 ```
 
 ## Quick Start
 
 ```bash
 # Initialize a new project
-astrolabe init
+astrotask init
 
 # Create your first task
-astrolabe create "Setup development environment"
+astrotask create "Setup development environment"
 
 # List all tasks
-astrolabe list
+astrotask list
 
 # Start working on a task
-astrolabe start <task-id>
+astrotask start <task-id>
 
 # Mark a task as complete
-astrolabe complete <task-id>
+astrotask complete <task-id>
 ```
 
 ## Commands
 
 ### Project Management
 
-#### `astrolabe init [options]`
+#### `astrotask init [options]`
 
 Initialize a new Astrolabe project in the current directory.
 
 ```bash
 # Basic initialization
-astrolabe init
+astrotask init
 
 # Initialize with project name
-astrolabe init --name "My Project"
+astrotask init --name "My Project"
 
 # Initialize with custom database path
-astrolabe init --database ./custom-tasks.db
+astrotask init --database ./custom-tasks.db
 ```
 
 **Options:**
@@ -73,32 +73,32 @@ astrolabe init --database ./custom-tasks.db
 - `--encrypted`: Enable database encryption
 - `--force`: Overwrite existing configuration
 
-#### `astrolabe status`
+#### `astrotask status`
 
 Show project overview and statistics.
 
 ```bash
-astrolabe status
+astrotask status
 ```
 
 ### Task Management
 
-#### `astrolabe list [options]`
+#### `astrotask list [options]`
 
 List tasks with optional filtering and formatting.
 
 ```bash
 # List all tasks
-astrolabe list
+astrotask list
 
 # List only pending tasks
-astrolabe list --status pending
+astrotask list --status pending
 
 # List with subtasks
-astrolabe list --tree
+astrotask list --tree
 
 # List in JSON format
-astrolabe list --json
+astrotask list --json
 ```
 
 **Options:**
@@ -107,22 +107,22 @@ astrolabe list --json
 - `--json`: Output in JSON format
 - `--limit <n>`: Limit number of results
 
-#### `astrolabe create <title> [options]`
+#### `astrotask create <title> [options]`
 
 Create a new task.
 
 ```bash
 # Create a simple task
-astrolabe create "Implement user authentication"
+astrotask create "Implement user authentication"
 
 # Create with description
-astrolabe create "Setup CI/CD" --description "Configure GitHub Actions for automated testing"
+astrotask create "Setup CI/CD" --description "Configure GitHub Actions for automated testing"
 
 # Create as subtask
-astrolabe create "Write unit tests" --parent task_123
+astrotask create "Write unit tests" --parent task_123
 
 # Create with specific status
-astrolabe create "Review PR #456" --status in-progress
+astrotask create "Review PR #456" --status in-progress
 ```
 
 **Options:**
@@ -131,28 +131,28 @@ astrolabe create "Review PR #456" --status in-progress
 - `--status <status>`: Initial status
 - `--priority <level>`: Priority level (`high`, `medium`, `low`)
 
-#### `astrolabe task generate [options]`
+#### `astrotask task generate [options]`
 
 Generate multiple tasks from a Product Requirements Document (PRD) using AI.
 
 ```bash
 # Generate tasks from inline content
-astrolabe task generate --content "Build a user authentication system with JWT tokens, password reset, and email verification"
+astrotask task generate --content "Build a user authentication system with JWT tokens, password reset, and email verification"
 
 # Generate tasks from a PRD file
-astrolabe task generate --file ./docs/prd.md
+astrotask task generate --file ./docs/prd.md
 
 # Generate tasks as subtasks of an existing task
-astrolabe task generate --file ./feature-spec.md --parent task_123
+astrotask task generate --file ./feature-spec.md --parent task_123
 
 # Preview tasks without saving (dry run)
-astrolabe task generate --content "Create a dashboard with charts" --dry
+astrotask task generate --content "Create a dashboard with charts" --dry
 
 # Generate with existing tasks as context
-astrolabe task generate --file ./prd.md --context "task_456,task_789" --verbose
+astrotask task generate --file ./prd.md --context "task_456,task_789" --verbose
 
 # Generate with detailed output
-astrolabe task generate --file ./requirements.md --verbose
+astrotask task generate --file ./requirements.md --verbose
 ```
 
 **Options:**
@@ -191,28 +191,28 @@ astrolabe task generate --file ./requirements.md --verbose
 
 This command will analyze the PRD and generate actionable implementation tasks like "Implement user registration endpoint", "Create email verification service", "Design user database schema", etc.
 
-#### `astrolabe task expand <id> [options]`
+#### `astrotask task expand <id> [options]`
 
 Expand a single task into multiple subtasks using AI-powered complexity analysis.
 
 ```bash
 # Basic task expansion (uses complexity analysis to determine optimal subtask count)
-astrolabe task expand task_123
+astrotask task expand task_123
 
 # Expand with additional context for better AI generation
-astrolabe task expand task_123 --context "Focus on security and scalability requirements"
+astrotask task expand task_123 --context "Focus on security and scalability requirements"
 
 # Expand with detailed output showing complexity analysis
-astrolabe task expand task_123 --verbose
+astrotask task expand task_123 --verbose
 
 # Force replace existing subtasks (if any)
-astrolabe task expand task_123 --force
+astrotask task expand task_123 --force
 
 # Expand all leaf tasks under a parent (root mode)
-astrolabe task expand task_123 --root parent_task_456
+astrotask task expand task_123 --root parent_task_456
 
 # Use higher complexity threshold for expansion recommendations
-astrolabe task expand task_123 --threshold 7
+astrotask task expand task_123 --threshold 7
 ```
 
 **Options:**
@@ -261,47 +261,47 @@ Context slices created: 1
 **Root Mode Example:**
 ```bash
 # Expand all leaf tasks under a feature
-astrolabe task expand any_task --root feature_authentication
+astrotask task expand any_task --root feature_authentication
 
 # This will find all tasks under "feature_authentication" that have no children
 # and expand each of them into subtasks automatically
 ```
 
-#### `astrolabe show <id>`
+#### `astrotask show <id>`
 
 Show detailed information about a specific task.
 
 ```bash
 # Show task details
-astrolabe show task_123
+astrotask show task_123
 
 # Show with full context (ancestors and descendants)
-astrolabe show task_123 --context
+astrotask show task_123 --context
 
 # Show in JSON format
-astrolabe show task_123 --json
+astrotask show task_123 --json
 ```
 
 **Options:**
 - `--context`: Include parent and child tasks
 - `--json`: Output in JSON format
 
-#### `astrolabe update <id> [options]`
+#### `astrotask update <id> [options]`
 
 Update an existing task.
 
 ```bash
 # Update task title
-astrolabe update task_123 --title "New title"
+astrotask update task_123 --title "New title"
 
 # Update status
-astrolabe update task_123 --status done
+astrotask update task_123 --status done
 
 # Update description
-astrolabe update task_123 --description "Updated description"
+astrotask update task_123 --description "Updated description"
 
 # Move to different parent
-astrolabe update task_123 --parent task_456
+astrotask update task_123 --parent task_456
 ```
 
 **Options:**
@@ -311,19 +311,19 @@ astrolabe update task_123 --parent task_456
 - `--parent <id>`: New parent task ID
 - `--priority <level>`: New priority level
 
-#### `astrolabe delete <id> [options]`
+#### `astrotask delete <id> [options]`
 
 Delete a task.
 
 ```bash
 # Delete a single task
-astrolabe delete task_123
+astrotask delete task_123
 
 # Delete task and all subtasks
-astrolabe delete task_123 --cascade
+astrotask delete task_123 --cascade
 
 # Force delete without confirmation
-astrolabe delete task_123 --force
+astrotask delete task_123 --force
 ```
 
 **Options:**
@@ -332,53 +332,53 @@ astrolabe delete task_123 --force
 
 ### Task Status Management
 
-#### `astrolabe start <id>`
+#### `astrotask start <id>`
 
 Mark a task as in-progress and optionally start a timer.
 
 ```bash
 # Start working on a task
-astrolabe start task_123
+astrotask start task_123
 
 # Start with time tracking
-astrolabe start task_123 --track-time
+astrotask start task_123 --track-time
 ```
 
-#### `astrolabe complete <id>`
+#### `astrotask complete <id>`
 
 Mark a task as complete.
 
 ```bash
 # Complete a task
-astrolabe complete task_123
+astrotask complete task_123
 
 # Complete with notes
-astrolabe complete task_123 --notes "Implemented JWT authentication with refresh tokens"
+astrotask complete task_123 --notes "Implemented JWT authentication with refresh tokens"
 ```
 
-#### `astrolabe pause <id>`
+#### `astrotask pause <id>`
 
 Pause work on a task (sets status back to pending).
 
 ```bash
-astrolabe pause task_123
+astrotask pause task_123
 ```
 
 ### Search and Filtering
 
-#### `astrolabe search <query> [options]`
+#### `astrotask search <query> [options]`
 
 Search tasks by title, description, or content.
 
 ```bash
 # Search by title
-astrolabe search "authentication"
+astrotask search "authentication"
 
 # Search in descriptions
-astrolabe search "JWT" --in-description
+astrotask search "JWT" --in-description
 
 # Search with filters
-astrolabe search "bug" --status pending
+astrotask search "bug" --status pending
 ```
 
 **Options:**
@@ -388,45 +388,45 @@ astrolabe search "bug" --status pending
 
 ### Import/Export
 
-#### `astrolabe export [options]`
+#### `astrotask export [options]`
 
 Export tasks to various formats.
 
 ```bash
 # Export to JSON
-astrolabe export --format json --output tasks.json
+astrotask export --format json --output tasks.json
 
 # Export to Markdown
-astrolabe export --format markdown --output tasks.md
+astrotask export --format markdown --output tasks.md
 ```
 
-#### `astrolabe import <file> [options]`
+#### `astrotask import <file> [options]`
 
 Import tasks from file.
 
 ```bash
 # Import from JSON
-astrolabe import tasks.json
+astrotask import tasks.json
 ```
 
 ### Configuration
 
-#### `astrolabe config [key] [value]`
+#### `astrotask config [key] [value]`
 
 Manage CLI configuration.
 
 ```bash
 # Show all configuration
-astrolabe config
+astrotask config
 
 # Get specific value
-astrolabe config database.path
+astrotask config database.path
 
 # Set configuration value
-astrolabe config database.path ./new-tasks.db
+astrotask config database.path ./new-tasks.db
 
 # Reset to defaults
-astrolabe config --reset
+astrotask config --reset
 ```
 
 ## Interactive Mode
@@ -434,7 +434,7 @@ astrolabe config --reset
 Launch interactive mode for guided task management:
 
 ```bash
-astrolabe interactive
+astrotask interactive
 ```
 
 Interactive mode provides:
@@ -447,7 +447,7 @@ Interactive mode provides:
 
 The CLI can be configured through:
 
-1. **Configuration file** (`.astrolabe.json` in project root)
+1. **Configuration file** (`.astrotask.json` in project root)
 2. **Environment variables**
 3. **Command-line flags**
 
@@ -511,7 +511,7 @@ The CLI supports multiple themes:
 
 Set theme with:
 ```bash
-astrolabe config display.theme dark
+astrotask config display.theme dark
 ```
 
 ## Integration with MCP
@@ -520,10 +520,10 @@ The CLI can work alongside MCP servers for AI agent integration:
 
 ```bash
 # Start CLI with MCP server integration
-astrolabe --mcp-server ./mcp-server.js
+astrotask --mcp-server ./mcp-server.js
 
 # Enable AI assistance mode
-astrolabe --ai-assist
+astrotask --ai-assist
 ```
 
 ## Troubleshooting
@@ -533,28 +533,28 @@ astrolabe --ai-assist
 **Database locked error:**
 ```bash
 # Check for running processes
-astrolabe status --verbose
+astrotask status --verbose
 
 # Force unlock database
-astrolabe config database.force-unlock true
+astrotask config database.force-unlock true
 ```
 
 **Permission errors:**
 ```bash
 # Check file permissions
-ls -la .astrolabe.json
+ls -la .astrotask.json
 
 # Reset configuration
-astrolabe config --reset
+astrotask config --reset
 ```
 
 **Performance issues:**
 ```bash
 # Enable debug logging
-ASTROLABE_LOG_LEVEL=debug astrolabe list
+ASTROLABE_LOG_LEVEL=debug astrotask list
 
 # Check database size
-astrolabe status --database-info
+astrotask status --database-info
 ```
 
 ## Development
@@ -564,29 +564,29 @@ astrolabe status --database-info
 ```bash
 # Clone repository
 git clone <repository-url>
-cd astrolabe
+cd astrotask
 
 # Install dependencies
 pnpm install
 
 # Build CLI package
-pnpm --filter @astrolabe/cli build
+pnpm --filter @astrotask/cli build
 
 # Link for development
-pnpm --filter @astrolabe/cli link --global
+pnpm --filter @astrotask/cli link --global
 ```
 
 ### Running Tests
 
 ```bash
 # Run CLI tests
-pnpm --filter @astrolabe/cli test
+pnpm --filter @astrotask/cli test
 
 # Run with coverage
-pnpm --filter @astrolabe/cli test --coverage
+pnpm --filter @astrotask/cli test --coverage
 
 # Run in watch mode
-pnpm --filter @astrolabe/cli test:watch
+pnpm --filter @astrotask/cli test:watch
 ```
 
 ## Contributing
@@ -604,5 +604,5 @@ MIT License - see [LICENSE](../../LICENSE) for details.
 
 ## Related Packages
 
-- [`@astrolabe/core`](../core/README.md) - Core task management library
-- [`@astrolabe/mcp`](../mcp/README.md) - MCP server for AI agent integration
+- [`@astrotask/core`](../core/README.md) - Core task management library
+- [`@astrotask/mcp`](../mcp/README.md) - MCP server for AI agent integration

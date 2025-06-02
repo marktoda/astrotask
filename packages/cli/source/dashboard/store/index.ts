@@ -1,11 +1,11 @@
-import type { ContextSlice, Task, TaskTree } from "@astrolabe/core";
+import type { ContextSlice, Task, TaskTree } from "@astrotask/core";
 import {
 	DependencyService,
 	TaskService,
 	TrackingDependencyGraph,
 	TrackingTaskTree,
 	createDatabase,
-} from "@astrolabe/core";
+} from "@astrotask/core";
 import type blessed from "blessed";
 import { create } from "zustand";
 import { EditorService, type PendingTaskData } from "../services/editor.js";

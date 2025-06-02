@@ -4,9 +4,9 @@ services:
     image: postgres:16          # or any supported tag
     restart: unless-stopped
     environment:
-      POSTGRES_USER: astrolabe   # create this user
+      POSTGRES_USER: astrotask   # create this user
       POSTGRES_PASSWORD: secret  # set a strong password
-      POSTGRES_DB: astrolabe     # database to auto-create
+      POSTGRES_DB: astrotask     # database to auto-create
     ports:
       - "5432:5432"              # host → container
     volumes:

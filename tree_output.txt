@@ -1,9 +1,9 @@
 
-> astrolabe@0.1.0 cli /home/toda/dev/astrolabe
+> astrotask@0.1.0 cli /home/toda/dev/astrotask
 > node packages/cli/dist/cli.js task tree --show-all
 
 Initialising database…
-[2K[1A[2K[GInitialized database at: ./data/astrolabe.db (with locking)
+[2K[1A[2K[GInitialized database at: ./data/astrotask.db (with locking)
 Initialising database…
 [2K[1A[2K[GLoading task tree...
 [2K[1A[2K[G🌳 Task Tree (All Tasks) (showing all)
@@ -54,7 +54,7 @@ URLs
 │   └── ⏳ Analyze Database URI Format Detection (TMCS-OXSW) [pending]
 │       Design and implement URI format detection logic to determine whether to
 use PGLite or real Postgres
-└── ⏳ rename astrolabe -> astrotask (UOUI) [pending]
+└── ⏳ rename astrotask -> astrotask (UOUI) [pending]
 
 Legend:
 ⏳ Pending 🔄 In Progress ✅ Done ❌ Cancelled

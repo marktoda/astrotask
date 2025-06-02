@@ -1,5 +1,5 @@
-import type { NewTask } from "@astrolabe/core";
-import { taskPriority } from "@astrolabe/core";
+import type { NewTask } from "@astrotask/core";
+import { taskPriority } from "@astrotask/core";
 import { Text } from "ink";
 import { useEffect, useState } from "react";
 import zod from "zod";

@@ -54,7 +54,7 @@ We will implement a socket-based proxy pattern using `@electric-sql/pglite-socke
           │             │                       │
           │  ┌──────────▼──────────────────┐    │
           │  │   Database Files            │    │
-          │  │  ./data/astrolabe.db        │    │
+          │  │  ./data/astrotask.db        │    │
           │  └─────────────────────────────┘    │
           └─────────────────────────────────────┘
 ```
@@ -80,7 +80,7 @@ The CLI will be modified to:
 
 #### Database URL Configuration
 - **MCP Server**: Uses direct file access to PGLite
-- **CLI and other clients**: Uses `postgres://localhost:45432/astrolabe`
+- **CLI and other clients**: Uses `postgres://localhost:45432/astrotask`
 - Configuration will be environment-aware
 
 #### Error Handling
@@ -136,8 +136,8 @@ PGLITE_SOCKET_PORT=45432        # Port for socket server
 PGLITE_SOCKET_HOST=127.0.0.1   # Host binding (localhost only for security)
 
 # Database configuration
-DATABASE_PATH=./data/astrolabe.db  # Path to PGLite database files
-DATABASE_URL=postgres://localhost:45432/astrolabe  # URL for CLI/clients
+DATABASE_PATH=./data/astrotask.db  # Path to PGLite database files
+DATABASE_URL=postgres://localhost:45432/astrotask  # URL for CLI/clients
 ```
 
 ### Connection Factory
@@ -215,7 +215,7 @@ export async function createDatabaseConnection(options: ConnectionOptions) {
     return socket;
   } catch (error) {
     if (requireSocket) {
-      throw new Error('MCP server not running. Start with: npx astrolabe-mcp-server');
+      throw new Error('MCP server not running. Start with: npx astrotask-mcp-server');
     }
     
     if (!fallbackToDirect) {
@@ -254,7 +254,7 @@ export async function createDatabaseConnection(options: ConnectionOptions) {
 
 1. **Quick CLI Usage** (MCP not running):
    ```bash
-   $ astrolabe list
+   $ astrotask list
    ⚠️  MCP server not detected, using direct database access
       Note: Only one process can access the database at a time
    
@@ -265,7 +265,7 @@ export async function createDatabaseConnection(options: ConnectionOptions) {
 
 2. **Concurrent Usage** (MCP running):
    ```bash
-   $ astrolabe list
+   $ astrotask list
    ✓ Connected to MCP server (socket mode)
    
    Tasks:
@@ -275,14 +275,14 @@ export async function createDatabaseConnection(options: ConnectionOptions) {
 
 3. **Conflict Detection**:
    ```bash
-   $ astrolabe list
+   $ astrotask list
    ⚠️  MCP server not detected, using direct database access
    ❌ Database is locked by another process
    
    Options:
    1. Stop the other process using the database
-   2. Start the MCP server: npx astrolabe-mcp-server
-   3. Force direct access (risky): astrolabe list --force
+   2. Start the MCP server: npx astrotask-mcp-server
+   3. Force direct access (risky): astrotask list --force
    ```
 
 ### Benefits of Hybrid Approach

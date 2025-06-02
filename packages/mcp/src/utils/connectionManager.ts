@@ -6,7 +6,7 @@
  * Now enhanced with cooperative locking support for better concurrency.
  */
 
-import { createDatabase, type DatabaseOptions, type Store, createModuleLogger } from '@astrolabe/core';
+import { createDatabase, type DatabaseOptions, type Store, createModuleLogger } from '@astrotask/core';
 
 const logger = createModuleLogger('ConnectionManager');
 

@@ -1,2 +1,2 @@
 - acceptance criteria
-- astrolabe -> astrotask
+- astrotask -> astrotask

@@ -166,7 +166,7 @@ try {
 const mappedGraph = trackingGraph.applyIdMappings(idMappings);
 
 // After: centralized utilities
-import { createIdMapper } from "@astrolabe/core";
+import { createIdMapper } from "@astrotask/core";
 
 const mapper = createIdMapper(idMappings);
 const mappedOperations = operations.map((op) =>

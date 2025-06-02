@@ -153,17 +153,17 @@ export default function Help() {
 			<Text bold>Usage:</Text>
 			<Box flexDirection="column" paddingLeft={2}>
 				<Text>
-					<Text color="cyan">astrolabe &lt;command&gt; [options]</Text> - Run a
+					<Text color="cyan">astrotask &lt;command&gt; [options]</Text> - Run a
 					command
 				</Text>
 				<Text>
 					<Text color="cyan">
-						astrolabe &lt;group&gt; &lt;subcommand&gt; [options]
+						astrotask &lt;group&gt; &lt;subcommand&gt; [options]
 					</Text>{" "}
 					- Run a subcommand
 				</Text>
 				<Text>
-					<Text color="cyan">astrolabe &lt;command&gt; --help</Text> - Get
+					<Text color="cyan">astrotask &lt;command&gt; --help</Text> - Get
 					detailed help for a command
 				</Text>
 			</Box>
@@ -171,20 +171,20 @@ export default function Help() {
 			<Text bold>Examples:</Text>
 			<Box flexDirection="column" paddingLeft={2}>
 				<Text>
-					<Text color="cyan">astrolabe task list</Text> - List all tasks
+					<Text color="cyan">astrotask task list</Text> - List all tasks
 				</Text>
 				<Text>
-					<Text color="cyan">astrolabe task add --title "My Task"</Text> - Add a
+					<Text color="cyan">astrotask task add --title "My Task"</Text> - Add a
 					new task
 				</Text>
 				<Text>
 					<Text color="cyan">
-						astrolabe dependency add --dependent task1 --dependency task2
+						astrotask dependency add --dependent task1 --dependency task2
 					</Text>{" "}
 					- Add dependency
 				</Text>
 				<Text>
-					<Text color="cyan">astrolabe dashboard</Text> - Launch interactive
+					<Text color="cyan">astrotask dashboard</Text> - Launch interactive
 					dashboard
 				</Text>
 			</Box>
@@ -192,7 +192,7 @@ export default function Help() {
 			<Text bold>For More Information:</Text>
 			<Box flexDirection="column" paddingLeft={2}>
 				<Text>
-					• Use <Text color="cyan">astrolabe &lt;command&gt; --help</Text> for
+					• Use <Text color="cyan">astrotask &lt;command&gt; --help</Text> for
 					detailed command help
 				</Text>
 				<Text>

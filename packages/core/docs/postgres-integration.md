@@ -7,16 +7,16 @@ Astrolabe Core supports both PGLite (for local file-based databases) and Postgre
 Simply provide a PostgreSQL connection string instead of a file path:
 
 ```typescript
-import { createDatabase } from '@astrolabe/core';
+import { createDatabase } from '@astrotask/core';
 
 // Local PGLite database (default)
 const localStore = await createDatabase({
-  dataDir: './data/astrolabe.db'
+  dataDir: './data/astrotask.db'
 });
 
 // PostgreSQL database
 const pgStore = await createDatabase({
-  dataDir: 'postgresql://user:password@localhost:5432/astrolabe'
+  dataDir: 'postgresql://user:password@localhost:5432/astrotask'
 });
 
 // Both stores implement the same interface
@@ -77,7 +77,7 @@ interface DbCapabilities {
 
 The database module automatically detects the backend from the connection string:
 
-- **PGLite**: File paths like `./data/astrolabe.db`, `memory://`, or `idb://`
+- **PGLite**: File paths like `./data/astrotask.db`, `memory://`, or `idb://`
 - **PostgreSQL**: URLs starting with `postgresql://`, `postgres://`, or `pg://`
 
 ### Unified Store Interface
@@ -128,9 +128,9 @@ interface DatabaseOptions {
 For advanced use cases, you can use the factory directly:
 
 ```typescript
-import { openDatabase, parseDbUrl } from '@astrolabe/core';
+import { openDatabase, parseDbUrl } from '@astrotask/core';
 
-const backend = await openDatabase('postgresql://localhost/astrolabe', {
+const backend = await openDatabase('postgresql://localhost/astrotask', {
   migrationsDir: './migrations',
   debug: true,
 });
@@ -162,7 +162,7 @@ class SQLiteAdapter implements DatabaseBackend {
 Set the `POSTGRES_TEST_URL` environment variable to run integration tests:
 
 ```bash
-export POSTGRES_TEST_URL="postgresql://localhost:5432/astrolabe_test"
+export POSTGRES_TEST_URL="postgresql://localhost:5432/astrotask_test"
 npm test
 ```
 

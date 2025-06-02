@@ -6,7 +6,7 @@ The dashboard is built using blessed.js for terminal UI with a clean separation 
 
 ### Core Components
 
-- **Store (`store/index.ts`)**: Zustand-based state management that integrates with `@astrolabe/core`
+- **Store (`store/index.ts`)**: Zustand-based state management that integrates with `@astrotask/core`
 - **TaskTreeComponent (`ui/components/task-tree.ts`)**: Main task tree visualization
 - **KeymapService (`services/keymap.ts`)**: Centralized keyboard binding management
 - **Layout (`ui/components/layout.ts`)**: Main layout orchestration
@@ -16,7 +16,7 @@ The dashboard is built using blessed.js for terminal UI with a clean separation 
 #### 1. Native TaskTree and DependencyGraph Integration
 
 - **Before**: Manual dependency tracking with Maps
-- **After**: Direct integration with `TaskService` and `DependencyService` from `@astrolabe/core`
+- **After**: Direct integration with `TaskService` and `DependencyService` from `@astrotask/core`
 - **Benefits**: 
   - Consistent data structures across the application
   - Leverages optimized tree traversal methods

@@ -2,7 +2,7 @@ import {
 	createComplexityAnalyzer,
 	createComplexityContextService,
 	createModuleLogger,
-} from "@astrolabe/core";
+} from "@astrotask/core";
 import { Box, Text } from "ink";
 import { useEffect, useState } from "react";
 import zod from "zod";
@@ -174,7 +174,7 @@ export default function Complexity({ options }: Props) {
 				<Text color="red">❌ Error: {error}</Text>
 				<Text color="gray">
 					Try checking if the node ID exists with:{" "}
-					<Text color="cyan">astrolabe task list</Text>
+					<Text color="cyan">astrotask task list</Text>
 				</Text>
 			</Box>
 		);
@@ -330,23 +330,23 @@ export default function Complexity({ options }: Props) {
 					{highComplexityTasks.length > 0 && (
 						<Text>
 							<Text color="cyan">
-								astrolabe task complexity --nodeId=
+								astrotask task complexity --nodeId=
 								{highComplexityTasks[0].taskId}
 							</Text>{" "}
 							- Analyze specific high-complexity task
 						</Text>
 					)}
 					<Text>
-						<Text color="cyan">astrolabe task tree</Text> - View task hierarchy
+						<Text color="cyan">astrotask task tree</Text> - View task hierarchy
 					</Text>
 					{contextSlicesCreated && contextSlicesCreated > 0 && (
 						<Text>
-							<Text color="cyan">astrolabe context list</Text> - View created
+							<Text color="cyan">astrotask context list</Text> - View created
 							context slices
 						</Text>
 					)}
 					<Text>
-						<Text color="cyan">astrolabe task expand --id=&lt;taskId&gt;</Text>{" "}
+						<Text color="cyan">astrotask task expand --id=&lt;taskId&gt;</Text>{" "}
 						- Expand high-complexity tasks into subtasks
 					</Text>
 				</Box>

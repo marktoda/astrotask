@@ -1,4 +1,4 @@
-import { TaskService, type TaskTree } from "@astrolabe/core";
+import { TaskService, type TaskTree } from "@astrotask/core";
 import { Box, Text } from "ink";
 import { useEffect, useState } from "react";
 import zod from "zod";
@@ -147,7 +147,7 @@ export default function Tree({ options }: Props) {
 			<Box flexDirection="column">
 				<Text>No tasks found{filterText}.</Text>
 				<Text>
-					Use <Text color="cyan">astrolabe task add --title="Task name"</Text>{" "}
+					Use <Text color="cyan">astrotask task add --title="Task name"</Text>{" "}
 					to create your first task.
 				</Text>
 				{!options.showAll && (

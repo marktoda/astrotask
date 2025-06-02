@@ -110,7 +110,7 @@ These support O(1) lookup for rendering.
 | ?     | Show help overlay                      |
 | q     | Quit (double‑tap safety)               |
 
-All keys are configurable via a JSON config (\~/.config/astrolabe/keys.json).
+All keys are configurable via a JSON config (\~/.config/astrotask/keys.json).
 
 ---
 
@@ -218,7 +218,7 @@ CI runs on Node 20 & 22 to catch regressions.
 | Plugin API             | Publish hooks: `onTaskAdded`, `renderOverlay` |
 | Theming                | Support solarized/dark via chalk theme tokens |
 | Notifications          | Desktop popup when blocker unblocks           |
-| Git‑style patch export | `astrolabe format‑patch` for reviews          |
+| Git‑style patch export | `astrotask format‑patch` for reviews          |
 
 ---
 

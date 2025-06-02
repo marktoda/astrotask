@@ -7,7 +7,7 @@ import { TASK_IDENTIFIERS } from '../src/entities/TaskTreeConstants';
 import { cfg } from '../src/utils/config';
 
 describe('Database Configuration', () => {
-  const testDbDir = join(tmpdir(), 'astrolabe-test');
+  const testDbDir = join(tmpdir(), 'astrotask-test');
   const testDbPath = join(testDbDir, 'test.db');
 
   beforeEach(() => {
@@ -282,7 +282,7 @@ describe('Database Configuration', () => {
 
   describe('Database Configuration Constants', () => {
     it('should have correct default configuration', () => {
-      expect(cfg.DATABASE_URI).toBe('./data/astrolabe.db');
+      expect(cfg.DATABASE_URI).toBe('./data/astrotask.db');
       expect(cfg.DB_VERBOSE).toBe(false);
       expect(cfg.DB_TIMEOUT).toBe(5000);
     });

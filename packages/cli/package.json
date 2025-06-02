@@ -1,5 +1,5 @@
 {
-	"name": "@astrolabe/cli",
+	"name": "@astrotask/cli",
 	"version": "0.0.0",
 	"license": "MIT",
 	"bin": "dist/cli.js",
@@ -26,7 +26,7 @@
 		"dist"
 	],
 	"dependencies": {
-		"@astrolabe/core": "workspace:*",
+		"@astrotask/core": "workspace:*",
 		"blessed": "^0.1.81",
 		"chalk": "^5.2.0",
 		"fast-diff": "^1.3.0",

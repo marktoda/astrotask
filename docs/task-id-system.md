@@ -108,7 +108,7 @@ const parsed = parseTaskId("ABCD-EFGH-IJKL");
 ### Zod Schema Validation
 
 ```typescript
-import { taskId } from '@astrolabe/core/schemas/base';
+import { taskId } from '@astrotask/core/schemas/base';
 
 // Validate with Zod schema
 const validatedId = taskId.parse("ABCD-EFGH");

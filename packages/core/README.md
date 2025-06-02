@@ -1,10 +1,10 @@
-# @astrolabe/core
+# @astrotask/core
 
 The core library for Astrolabe, a local-first, MCP-compatible task-navigation platform for humans and AI agents.
 
 ## Overview
 
-`@astrolabe/core` provides the foundational components for building task management applications with offline-first capabilities. It includes database abstractions, task services, type-safe schemas, and utilities for logging and configuration.
+`@astrotask/core` provides the foundational components for building task management applications with offline-first capabilities. It includes database abstractions, task services, type-safe schemas, and utilities for logging and configuration.
 
 ## Features
 
@@ -18,19 +18,19 @@ The core library for Astrolabe, a local-first, MCP-compatible task-navigation pl
 ## Installation
 
 ```bash
-pnpm add @astrolabe/core
+pnpm add @astrotask/core
 
 # Or with npm
-npm install @astrolabe/core
+npm install @astrotask/core
 
 # Or with yarn
-yarn add @astrolabe/core
+yarn add @astrotask/core
 ```
 
 ## Quick Start
 
 ```typescript
-import { createDatabase, TaskService } from '@astrolabe/core';
+import { createDatabase, TaskService } from '@astrotask/core';
 
 // Initialize database
 const store = createDatabase({
@@ -76,7 +76,7 @@ Tasks are the fundamental unit of work in Astrolabe. They support:
 - **Type Safety**: Runtime validation with Zod schemas
 
 ```typescript
-import type { Task, CreateTask, TaskStatus } from '@astrolabe/core';
+import type { Task, CreateTask, TaskStatus } from '@astrotask/core';
 
 const newTask: CreateTask = {
   title: 'Setup CI/CD pipeline',
@@ -90,7 +90,7 @@ const newTask: CreateTask = {
 Context slices provide AI agents with relevant information bundles:
 
 ```typescript
-import type { ContextSlice, CreateContextSlice } from '@astrolabe/core';
+import type { ContextSlice, CreateContextSlice } from '@astrotask/core';
 
 const context: CreateContextSlice = {
   taskId: 'task_123',
@@ -182,7 +182,7 @@ console.log(context.descendants); // Child tasks down the hierarchy
 Creates a new database store instance.
 
 ```typescript
-import { createDatabase } from '@astrolabe/core';
+import { createDatabase } from '@astrotask/core';
 
 // Basic SQLite database
 const store = createDatabase({
@@ -212,7 +212,7 @@ import {
   createTaskSchema, 
   updateTaskSchema,
   contextSliceSchema 
-} from '@astrolabe/core';
+} from '@astrotask/core';
 
 // Validate task data
 const validTask = taskSchema.parse(taskData);
@@ -228,7 +228,7 @@ const validCreation = createTaskSchema.parse(newTaskData);
 Structured logging with configurable levels:
 
 ```typescript
-import { createModuleLogger } from '@astrolabe/core';
+import { createModuleLogger } from '@astrotask/core';
 
 const logger = createModuleLogger('MyModule');
 
@@ -248,7 +248,7 @@ process.env.NODE_ENV = 'development';
 process.env.DATABASE_PATH = './tasks.db';
 
 // Or programmatic configuration
-import { cfg } from '@astrolabe/core';
+import { cfg } from '@astrotask/core';
 
 console.log(cfg.LOG_LEVEL);  // Current log level
 console.log(cfg.NODE_ENV);   // Current environment
@@ -260,7 +260,7 @@ console.log(cfg.DATABASE_PATH); // Database location
 The library provides structured error handling:
 
 ```typescript
-import { DatabaseStore } from '@astrolabe/core';
+import { DatabaseStore } from '@astrotask/core';
 
 try {
   const task = await taskService.createTask(newTaskData);
@@ -280,7 +280,7 @@ try {
 The core library includes comprehensive test utilities:
 
 ```typescript
-import { createDatabase } from '@astrolabe/core';
+import { createDatabase } from '@astrotask/core';
 
 // Create test database
 const testStore = createDatabase({ path: ':memory:' });
@@ -346,5 +346,5 @@ MIT License - see [LICENSE](../../LICENSE) for details.
 
 ## Related Packages
 
-- [`@astrolabe/mcp`](../mcp/README.md) - MCP server for AI agent integration
-- [`@astrolabe/cli`](../cli/README.md) - Command-line interface
+- [`@astrotask/mcp`](../mcp/README.md) - MCP server for AI agent integration
+- [`@astrotask/cli`](../cli/README.md) - Command-line interface

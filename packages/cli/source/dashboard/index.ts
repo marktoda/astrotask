@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { cfg, createDatabase } from "@astrolabe/core";
+import { cfg, createDatabase } from "@astrotask/core";
 import blessed from "blessed";
 import { EditorService } from "./services/editor.js";
 import { KeymapService } from "./services/keymap.js";

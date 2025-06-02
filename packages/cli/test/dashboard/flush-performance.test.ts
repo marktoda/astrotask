@@ -1,6 +1,6 @@
 import { beforeAll, afterAll, beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
-import { createDatabase } from '@astrolabe/core';
-import type { Store } from '@astrolabe/core';
+import { createDatabase } from '@astrotask/core';
+import type { Store } from '@astrotask/core';
 import { createDashboardStore } from '../../source/dashboard/store/index.js';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';

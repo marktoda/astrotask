@@ -5,7 +5,7 @@ import { tmpdir } from 'os';
 import { DatabaseLock, DatabaseLockError, withDatabaseLock, createLockedDatabase, createDatabase, LockingStore } from '../src/database/index.js';
 
 describe('Cooperative Database Locking', () => {
-  const testDbDir = join(tmpdir(), 'astrolabe-locking-test');
+  const testDbDir = join(tmpdir(), 'astrotask-locking-test');
   const testDbPath = join(testDbDir, 'test.db');
 
   beforeEach(() => {
@@ -119,7 +119,7 @@ describe('Cooperative Database Locking', () => {
       mkdirSync(dirname(testDbPath), { recursive: true });
 
       // Create a corrupted lock file
-      const lockPath = join(dirname(testDbPath), '.astrolabe.lock');
+      const lockPath = join(dirname(testDbPath), '.astrotask.lock');
       await writeFile(lockPath, 'invalid json content');
 
       const lock = new DatabaseLock(testDbPath, {
@@ -341,7 +341,7 @@ describe('Cooperative Database Locking', () => {
         process: 'crashed-process'
       };
 
-      const lockPath = join(dirname(testDbPath), '.astrolabe.lock');
+      const lockPath = join(dirname(testDbPath), '.astrotask.lock');
       await writeFile(lockPath, JSON.stringify(staleLockData, null, 2));
 
       // New process should detect and remove stale lock

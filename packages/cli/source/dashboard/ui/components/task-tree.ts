@@ -1,4 +1,4 @@
-import type { Task, TaskTree, TrackingTaskTree } from "@astrolabe/core";
+import type { Task, TaskTree, TrackingTaskTree } from "@astrotask/core";
 import blessed from "blessed";
 import type { StoreApi } from "zustand";
 import type { DashboardStore } from "../../store/index.js";

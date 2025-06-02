@@ -5,7 +5,7 @@
  * particularly after write operations.
  */
 
-import { createModuleLogger, type Store } from '@astrolabe/core';
+import { createModuleLogger, type Store } from '@astrotask/core';
 
 const logger = createModuleLogger('DBCleanup');
 

@@ -90,7 +90,7 @@ Enhanced database creation with locking support:
 ```typescript
 // Create database with locking enabled (default)
 const store = await createDatabase({
-  dataDir: './data/astrolabe.db',
+  dataDir: './data/astrotask.db',
   enableLocking: true,
   lockOptions: {
     processType: 'cli',
@@ -100,14 +100,14 @@ const store = await createDatabase({
 });
 
 // Create locked database directly
-const store = await createLockedDatabase('./data/astrolabe.db', {
+const store = await createLockedDatabase('./data/astrotask.db', {
   processType: 'mcp-server',
   maxRetries: 30,
   retryDelay: 100
 });
 
 // Utility function for lock-protected operations
-await withDatabaseLock('./data/astrolabe.db', { processType: 'script' }, async () => {
+await withDatabaseLock('./data/astrotask.db', { processType: 'script' }, async () => {
   // Your database operations here
 });
 ```
@@ -124,7 +124,7 @@ $ task-master task lock-status
 # Check with verbose details
 $ task-master task lock-status --verbose
 ✅ Database is not locked
-Lock file: /path/to/data/.astrolabe.lock
+Lock file: /path/to/data/.astrotask.lock
 
 # When database is locked
 $ task-master task lock-status
@@ -141,7 +141,7 @@ Lock Details:
 # Force remove lock (use with caution)
 $ task-master task lock-status --force
 ⚠️  Database lock forcibly removed
-Lock file: /path/to/data/.astrolabe.lock
+Lock file: /path/to/data/.astrotask.lock
 ```
 
 ### 5. Error Recovery Mechanisms

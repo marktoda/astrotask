@@ -53,7 +53,7 @@ export class DatabaseLock {
   constructor(databasePath: string, options: LockOptions = {}) {
     // Create lock file path in same directory as database
     const dbDir = dirname(resolve(databasePath));
-    this.lockPath = resolve(dbDir, '.astrolabe.lock');
+    this.lockPath = resolve(dbDir, '.astrotask.lock');
 
     this.options = {
       maxRetries: options.maxRetries ?? 50,

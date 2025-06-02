@@ -14,23 +14,23 @@ export default function DependencyOverview() {
 				<Text bold>Available Commands:</Text>
 				<Box flexDirection="column" paddingLeft={2}>
 					<Text>
-						<Text color="cyan">astrolabe dependency add</Text> - Add a
+						<Text color="cyan">astrotask dependency add</Text> - Add a
 						dependency between tasks
 					</Text>
 					<Text>
-						<Text color="cyan">astrolabe dependency remove</Text> - Remove a
+						<Text color="cyan">astrotask dependency remove</Text> - Remove a
 						dependency between tasks
 					</Text>
 					<Text>
-						<Text color="cyan">astrolabe dependency list</Text> - View
+						<Text color="cyan">astrotask dependency list</Text> - View
 						dependencies for a specific task
 					</Text>
 					<Text>
-						<Text color="cyan">astrolabe dependency validate</Text> - Validate
+						<Text color="cyan">astrotask dependency validate</Text> - Validate
 						dependencies and detect cycles
 					</Text>
 					<Text>
-						<Text color="cyan">astrolabe dependency tree</Text> - Visualize
+						<Text color="cyan">astrotask dependency tree</Text> - Visualize
 						dependency tree
 					</Text>
 				</Box>
@@ -43,7 +43,7 @@ export default function DependencyOverview() {
 						# Add a dependency (task_456 depends on task_123)
 					</Text>
 					<Text>
-						<Text color="cyan">astrolabe dependency add</Text> --dependent
+						<Text color="cyan">astrotask dependency add</Text> --dependent
 						task_456 --dependency task_123
 					</Text>
 
@@ -51,7 +51,7 @@ export default function DependencyOverview() {
 						<Text color="gray"># View all dependencies for a task</Text>
 					</Box>
 					<Text>
-						<Text color="cyan">astrolabe dependency list</Text> --taskId
+						<Text color="cyan">astrotask dependency list</Text> --taskId
 						task_123
 					</Text>
 
@@ -61,14 +61,14 @@ export default function DependencyOverview() {
 						</Text>
 					</Box>
 					<Text>
-						<Text color="cyan">astrolabe dependency validate</Text>
+						<Text color="cyan">astrotask dependency validate</Text>
 					</Text>
 
 					<Box marginTop={1}>
 						<Text color="gray"># Visualize complete dependency tree</Text>
 					</Box>
 					<Text>
-						<Text color="cyan">astrolabe dependency tree</Text>
+						<Text color="cyan">astrotask dependency tree</Text>
 					</Text>
 
 					<Box marginTop={1}>
@@ -77,7 +77,7 @@ export default function DependencyOverview() {
 						</Text>
 					</Box>
 					<Text>
-						<Text color="cyan">astrolabe dependency tree</Text> --root task_123
+						<Text color="cyan">astrotask dependency tree</Text> --root task_123
 						--depth 3
 					</Text>
 				</Box>
@@ -85,7 +85,7 @@ export default function DependencyOverview() {
 
 			<Box marginTop={1}>
 				<Text color="yellow">
-					💡 Tip: Use <Text color="cyan">astrolabe dependency tree</Text> to
+					💡 Tip: Use <Text color="cyan">astrotask dependency tree</Text> to
 					visualize complex dependency relationships
 				</Text>
 			</Box>

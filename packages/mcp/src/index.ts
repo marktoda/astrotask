@@ -2,7 +2,7 @@
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { createDatabase, type DatabaseOptions, TaskService, DependencyService, createModuleLogger, logShutdown, cfg } from '@astrolabe/core';
+import { createDatabase, type DatabaseOptions, TaskService, DependencyService, createModuleLogger, logShutdown, cfg } from '@astrotask/core';
 import {
   MinimalHandlers,
   getNextTaskSchema,
@@ -25,7 +25,7 @@ const logger = createModuleLogger('mcp-server');
 async function main() {
   // Create the high-level MCP server instance
   const server = new McpServer({
-    name: 'astrolabe-mcp-server',
+    name: 'astrotask-mcp-server',
     version: '0.3.0',
   });
 

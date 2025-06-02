@@ -1,5 +1,5 @@
-import type { Task } from "@astrolabe/core";
-import { taskPriority, taskStatus } from "@astrolabe/core";
+import type { Task } from "@astrotask/core";
+import { taskPriority, taskStatus } from "@astrotask/core";
 import { Box, Text } from "ink";
 import { useEffect, useState } from "react";
 import zod from "zod";
@@ -168,7 +168,7 @@ export default function Available({ options }: Props) {
 			<Box marginTop={1}>
 				<Text color="green">
 					💡 Tip: Use{" "}
-					<Text color="cyan">astrolabe task dependencies &lt;task-id&gt;</Text>{" "}
+					<Text color="cyan">astrotask task dependencies &lt;task-id&gt;</Text>{" "}
 					to see why other tasks are blocked
 				</Text>
 			</Box>

@@ -5,11 +5,11 @@ This directory contains the cooperative locking mechanism for PGLite database ac
 ## Quick Start
 
 ```typescript
-import { createDatabase, createLockedDatabase, withDatabaseLock } from '@astrolabe/core';
+import { createDatabase, createLockedDatabase, withDatabaseLock } from '@astrotask/core';
 
 // Create database with locking enabled (default)
 const store = await createDatabase({
-  dataDir: './data/astrolabe.db',
+  dataDir: './data/astrotask.db',
   enableLocking: true,
   lockOptions: {
     processType: 'cli',
@@ -39,7 +39,7 @@ await store.close();
 Low-level lock management:
 
 ```typescript
-const lock = new DatabaseLock('./data/astrolabe.db', {
+const lock = new DatabaseLock('./data/astrotask.db', {
   processType: 'my-app',
   maxRetries: 50,
   retryDelay: 100,
@@ -59,8 +59,8 @@ try {
 High-level store wrapper with automatic locking:
 
 ```typescript
-const baseStore = await createLocalDatabase('./data/astrolabe.db');
-const lockingStore = new LockingStore(baseStore, './data/astrolabe.db', {
+const baseStore = await createLocalDatabase('./data/astrotask.db');
+const lockingStore = new LockingStore(baseStore, './data/astrotask.db', {
   processType: 'my-app'
 });
 
@@ -75,7 +75,7 @@ const tasks = await lockingStore.listTasks();
 For one-off operations:
 
 ```typescript
-await withDatabaseLock('./data/astrolabe.db', { processType: 'script' }, async () => {
+await withDatabaseLock('./data/astrotask.db', { processType: 'script' }, async () => {
   // Your database operations here
   console.log('Database operation completed');
 });
@@ -86,7 +86,7 @@ await withDatabaseLock('./data/astrolabe.db', { processType: 'script' }, async (
 Direct creation of locked database:
 
 ```typescript
-const store = await createLockedDatabase('./data/astrolabe.db', {
+const store = await createLockedDatabase('./data/astrotask.db', {
   processType: 'mcp-server',
   maxRetries: 30,
   retryDelay: 100
@@ -123,7 +123,7 @@ The locking system provides user-friendly error messages:
 
 ```typescript
 try {
-  const store = await createLockedDatabase('./data/astrolabe.db', {
+  const store = await createLockedDatabase('./data/astrotask.db', {
     processType: 'quick-process',
     maxRetries: 2,
     retryDelay: 50
@@ -140,7 +140,7 @@ try {
 
 ## Lock File Format
 
-Lock files are stored as `.astrolabe.lock` in the database directory:
+Lock files are stored as `.astrotask.lock` in the database directory:
 
 ```json
 {
@@ -192,7 +192,7 @@ Common process type identifiers:
 
 Locks older than 30 seconds are automatically considered stale and removed. If you encounter persistent lock issues:
 
-1. Check for crashed processes: `ps aux | grep astrolabe`
+1. Check for crashed processes: `ps aux | grep astrotask`
 2. Force remove lock: `task-master task lock-status --force`
 3. Check file permissions on the database directory
 
@@ -211,7 +211,7 @@ Enable verbose logging to see lock acquisition details:
 
 ```typescript
 const store = await createDatabase({
-  dataDir: './data/astrolabe.db',
+  dataDir: './data/astrotask.db',
   verbose: true,
   lockOptions: {
     processType: 'debug-session'

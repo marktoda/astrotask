@@ -4,7 +4,7 @@ import {
 	TaskService,
 	createModuleLogger,
 	createTaskExpansionService,
-} from "@astrolabe/core";
+} from "@astrotask/core";
 import { Box, Text } from "ink";
 import { useEffect, useState } from "react";
 import zod from "zod";
@@ -192,7 +192,7 @@ export default function Expand({ options }: Props) {
 				<Text color="red">❌ Error: {state.error}</Text>
 				<Text color="gray">
 					Try checking if the task ID exists with:{" "}
-					<Text color="cyan">astrolabe task list</Text>
+					<Text color="cyan">astrotask task list</Text>
 				</Text>
 			</Box>
 		);

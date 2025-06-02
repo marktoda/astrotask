@@ -191,7 +191,7 @@ This architecture is planned for future implementation (see `todo.txt`).
 **Database Lock Errors**
 ```bash
 # Check for running processes
-ps aux | grep astrolabe
+ps aux | grep astrotask
 
 # Enable verbose logging
 DB_VERBOSE=true npm start
@@ -212,7 +212,7 @@ MCP_IDLE_TIMEOUT=1000
 grep "Database optimized" logs.txt
 
 # Check database file size
-ls -lh data/astrolabe.db
+ls -lh data/astrotask.db
 ```
 
 ### Debug Connection Issues

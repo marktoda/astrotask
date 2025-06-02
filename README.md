@@ -55,8 +55,8 @@ Whether you're a developer managing complex projects, a team coordinating work, 
 
 ```bash
 # Clone and set up the development environment
-git clone https://github.com/marktoda/astrolabe.git
-cd astrolabe
+git clone https://github.com/marktoda/astrotask.git
+cd astrotask
 pnpm install
 pnpm build
 
@@ -76,7 +76,7 @@ pnpm cli dashboard                    # Launch interactive dashboard (press 'c' 
 **Note:** API is currently in development. Basic usage:
 
 ```typescript
-import { TaskService } from "@astrolabe/core";
+import { TaskService } from "@astrotask/core";
 
 // Initialize task service
 const taskService = new TaskService();
@@ -112,9 +112,9 @@ Configure in Cursor IDE (`.cursor/mcp.json`):
 ```json
 {
   "mcpServers": {
-    "astrolabe": {
+    "astrotask": {
       "command": "node",
-      "args": ["path/to/astrolabe/packages/mcp/dist/index.js"],
+      "args": ["path/to/astrotask/packages/mcp/dist/index.js"],
       "env": { "DATABASE_PATH": "./tasks.db" }
     }
   }
@@ -145,7 +145,7 @@ Astrolabe is built as a TypeScript monorepo with three core packages:
 │   📱 CLI App    │  🤖 MCP Server  │  📚 API     │
 │ React/Ink UI    │  AI Integration │  Library    │
 ├─────────────────┴─────────────────┴─────────────┤
-│              🧠 @astrolabe/core                  │
+│              🧠 @astrotask/core                  │
 │        TaskService • Database • Schemas         │
 ├─────────────────────────────────────────────────┤
 │                💾 Storage Layer                 │
@@ -155,9 +155,9 @@ Astrolabe is built as a TypeScript monorepo with three core packages:
 
 ### Core Packages
 
-- **[@astrolabe/core](packages/core/)** - Core task management library with database, services, and type-safe schemas
-- **[@astrolabe/mcp](packages/mcp/)** - Model Context Protocol server for AI agent integration
-- **[@astrolabe/cli](packages/cli/)** - Beautiful command-line interface built with React and Ink
+- **[@astrotask/core](packages/core/)** - Core task management library with database, services, and type-safe schemas
+- **[@astrotask/mcp](packages/mcp/)** - Model Context Protocol server for AI agent integration
+- **[@astrotask/cli](packages/cli/)** - Beautiful command-line interface built with React and Ink
 
 ## 📖 Documentation
 
@@ -169,7 +169,7 @@ Astrolabe is built as a TypeScript monorepo with three core packages:
 
 ### API Reference
 
-- **[Core API Documentation](docs/api/core-api.md)** - Complete API reference for `@astrolabe/core`
+- **[Core API Documentation](docs/api/core-api.md)** - Complete API reference for `@astrotask/core`
 - **[TaskService API](docs/api/task-service.md)** - Detailed TaskService methods and examples
 - **[Database API](docs/api/core-api.md#database)** - Database operations and configuration
 
@@ -199,8 +199,8 @@ Astrolabe is built as a TypeScript monorepo with three core packages:
 
 ```bash
 # Clone repository
-git clone https://github.com/marktoda/astrolabe.git
-cd astrolabe
+git clone https://github.com/marktoda/astrotask.git
+cd astrotask
 
 # Install dependencies (requires pnpm)
 pnpm install
@@ -216,8 +216,8 @@ pnpm cli --help
 
 ```bash
 # Clone repository
-git clone https://github.com/marktoda/astrolabe.git
-cd astrolabe
+git clone https://github.com/marktoda/astrotask.git
+cd astrotask
 
 # Install dependencies (requires pnpm)
 pnpm install
@@ -235,10 +235,10 @@ pnpm dev
 
 ```bash
 # Create project structure
-astrolabe create "Mobile App Redesign"
-astrolabe create "User Research" --project proj_123
-astrolabe create "UI Design" --project proj_123 --depends-on task_456
-astrolabe create "Implementation" --project proj_123 --depends-on task_789
+astrotask create "Mobile App Redesign"
+astrotask create "User Research" --project proj_123
+astrotask create "UI Design" --project proj_123 --depends-on task_456
+astrotask create "Implementation" --project proj_123 --depends-on task_789
 ```
 
 ### Development Workflow
@@ -322,9 +322,9 @@ From personal todo lists to enterprise project management, Astrolabe scales with
 
 **Package Status:**
 
-- `@astrolabe/core` - 🔄 **In Development** - Core functionality implemented, testing in progress
-- `@astrolabe/mcp` - 🔄 **In Development** - Basic MCP server implemented, expanding functionality
-- `@astrolabe/cli` - 🔄 **In Development** - CLI framework in place, commands being implemented
+- `@astrotask/core` - 🔄 **In Development** - Core functionality implemented, testing in progress
+- `@astrotask/mcp` - 🔄 **In Development** - Basic MCP server implemented, expanding functionality
+- `@astrotask/cli` - 🔄 **In Development** - CLI framework in place, commands being implemented
 
 ## 🤝 Contributing
 
@@ -389,10 +389,10 @@ Built with these amazing technologies:
 ## 📞 Support & Community
 
 - 📖 **Documentation**: [docs/](docs/) - Comprehensive guides and API reference
-- 🐛 **Issues**: [GitHub Issues](https://github.com/marktoda/astrolabe/issues) - Bug reports and feature requests
-- 💬 **Discussions**: [GitHub Discussions](https://github.com/marktoda/astrolabe/discussions) - Questions and community
+- 🐛 **Issues**: [GitHub Issues](https://github.com/marktoda/astrotask/issues) - Bug reports and feature requests
+- 💬 **Discussions**: [GitHub Discussions](https://github.com/marktoda/astrotask/discussions) - Questions and community
 
 ---
 
-**Ready to get started?** Check out the **[Getting Started Guide](docs/guides/getting-started.md)** or jump right in with `git clone https://github.com/marktoda/astrolabe.git && cd astrolabe && pnpm install && pnpm build`!
+**Ready to get started?** Check out the **[Getting Started Guide](docs/guides/getting-started.md)** or jump right in with `git clone https://github.com/marktoda/astrotask.git && cd astrotask && pnpm install && pnpm build`!
 

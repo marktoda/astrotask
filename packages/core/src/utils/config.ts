@@ -20,9 +20,9 @@ export const configSchema = z.object({
   LOG_LEVEL: z.enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal']).default('info'),
 
   // Database configuration
-  // Can be either a file path for PGlite (e.g., './data/astrolabe.db')
+  // Can be either a file path for PGlite (e.g., './data/astrotask.db')
   // or a PostgreSQL connection string (e.g., 'postgresql://user:pass@host:port/db')
-  DATABASE_URI: z.string().default('./data/astrolabe.db'),
+  DATABASE_URI: z.string().default('./data/astrotask.db'),
 
   // Database performance and behavior settings
   DB_VERBOSE: z.coerce.boolean().default(false),
