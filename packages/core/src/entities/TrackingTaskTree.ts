@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { Task } from '../schemas/task.js';
+import type { Task, TaskStatus } from '../schemas/task.js';
 import { type ITaskTree, TaskTree, type TaskTreeData } from './TaskTree.js';
 import { ReconciliationError } from './TrackingErrors.js';
 import type { ITaskReconciliationService, TaskFlushResult } from './TrackingTypes.js';
@@ -589,6 +589,61 @@ export class TrackingTaskTree implements ITaskTree {
     }
 
     return markdown;
+  }
+
+  /**
+   * Get the effective status of this task considering parent hierarchy
+   * 
+   * Rules:
+   * - If any ancestor is 'done', effective status is 'done'
+   * - If any ancestor is 'cancelled', effective status is 'cancelled'  
+   * - If any ancestor is 'archived', effective status is 'archived'
+   * - Otherwise, return the task's actual status
+   * 
+   * @returns The effective status considering parent hierarchy
+   */
+  getEffectiveStatus(): TaskStatus {
+    // Check ancestors for overriding statuses
+    const doneAncestor = this.getAncestorWithStatus('done');
+    if (doneAncestor) return 'done';
+    
+    const cancelledAncestor = this.getAncestorWithStatus('cancelled');
+    if (cancelledAncestor) return 'cancelled';
+    
+    const archivedAncestor = this.getAncestorWithStatus('archived');
+    if (archivedAncestor) return 'archived';
+    
+    // No overriding ancestor status, return actual status
+    return this.status;
+  }
+
+  /**
+   * Check if this task has any ancestor with the specified status
+   * 
+   * @param status - The status to check for in ancestors
+   * @returns true if any ancestor has the specified status
+   */
+  hasAncestorWithStatus(status: TaskStatus): boolean {
+    return this.getAncestorWithStatus(status) !== null;
+  }
+
+  /**
+   * Find the first ancestor (walking up the tree) with the specified status
+   * 
+   * @param status - The status to search for
+   * @returns The first ancestor with the status, or null if none found
+   */
+  getAncestorWithStatus(status: TaskStatus): ITaskTree | null {
+    let current = this.getParent();
+    
+    while (current) {
+      if (current.status === status) {
+        return current;
+      }
+      current = current.getParent();
+    }
+    
+    return null;
   }
 }
 

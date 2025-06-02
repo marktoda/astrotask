@@ -10,20 +10,19 @@
  * - listTasks: List tasks with optional filters
  */
 
-import { createModuleLogger, TASK_IDENTIFIERS, validateTaskId } from '@astrolabe/core';
-import { TrackingTaskTree } from '@astrolabe/core';
+import type { Task, TaskStatus } from '@astrolabe/core';
+import type { TaskDependency, ContextSlice } from '@astrolabe/core';
+import { TASK_IDENTIFIERS } from '@astrolabe/core';
+import { validateTaskId } from '@astrolabe/core';
+import { createModuleLogger } from '@astrolabe/core';
+import type { HandlerContext, MCPHandler } from './types.js';
 import type {
   GetNextTaskInput,
   AddTaskInput,
-  AddTasksInput,
-  ListTasksInput,
   AddTaskContextInput,
   AddDependencyInput,
   UpdateStatusInput,
-  HandlerContext,
-  MCPHandler,
 } from './types.js';
-import type { Task, TaskDependency, TaskTree, ContextSlice } from '@astrolabe/core';
 
 export class MinimalHandlers implements MCPHandler {
   private logger = createModuleLogger('MinimalHandlers');
@@ -32,7 +31,6 @@ export class MinimalHandlers implements MCPHandler {
 
   /**
    * Get the next available task to work on
-   * Supports optional parent ID to get next subtask within a specific parent
    */
   async getNextTask(args: GetNextTaskInput = {}): Promise<{
     task: Task | null;
@@ -52,60 +50,27 @@ export class MinimalHandlers implements MCPHandler {
     };
   }> {
     try {
-      let availableTasks: Task[] = [];
-      let parentTask: Task | null = null;
-      let siblings: Task[] | undefined;
+      // For now, use the original getAvailableTasks method until our new methods are fully integrated
+      const availableTasks = await this.context.taskService.getAvailableTasks({
+        status: args.status,
+        priority: args.priority,
+      });
 
+      let filteredTasks = availableTasks;
+
+      // Apply parent filter if specified
       if (args.parentTaskId) {
-        // Get parent task and its children
-        parentTask = await this.context.store.getTask(args.parentTaskId);
-        if (!parentTask) {
-          throw new Error(`Parent task ${args.parentTaskId} not found`);
-        }
-
-        // Get all children of the parent
-        const tree = await this.context.taskService.getTaskTree(args.parentTaskId);
-        if (!tree) {
-          // No children exist, return empty
-          availableTasks = [];
-          siblings = [];
-        } else {
-          const children = tree.getChildren().map(child => child.task);
-          // Filter to available tasks (no incomplete dependencies)
-          availableTasks = await this.filterAvailableTasks(children, args);
-          siblings = children;
-        }
-      } else {
-        // Get all available tasks (no incomplete dependencies)
-        availableTasks = await this.context.taskService.getAvailableTasks({
-          status: args.status,
-          priority: args.priority,
-        });
+        filteredTasks = filteredTasks.filter((task: Task) => task.parentId === args.parentTaskId);
       }
 
-      // Find the highest priority pending task
-      const nextTask = availableTasks
-        .filter(task => task.status === 'pending')
-        .sort((a, b) => {
-          // Sort by priority (high > medium > low), then by ID
-          const priorityOrder = { high: 3, medium: 2, low: 1 };
-          const aPriority = priorityOrder[a.priority as keyof typeof priorityOrder] || 1;
-          const bPriority = priorityOrder[b.priority as keyof typeof priorityOrder] || 1;
-          
-          if (aPriority !== bPriority) {
-            return bPriority - aPriority;
-          }
-          
-          return a.id.localeCompare(b.id);
-        })[0] || null;
+      // Select next task (first one by priority/creation order)
+      const nextTask = filteredTasks.length > 0 ? filteredTasks[0] : null;
 
       const message = nextTask 
-        ? `Next task to work on: ${nextTask.title}`
-        : availableTasks.length > 0
-        ? 'No pending tasks available (all tasks are in progress or completed)'
-        : args.parentTaskId
-        ? `No tasks available under parent ${args.parentTaskId}`
-        : 'No tasks available';
+        ? `Found task: ${nextTask.title}` 
+        : filteredTasks.length === 0 
+          ? 'No available tasks found'
+          : 'No tasks match the specified criteria';
 
       let context = undefined;
 
@@ -117,15 +82,13 @@ export class MinimalHandlers implements MCPHandler {
           
           context = {
             ancestors: taskWithContext.ancestors,
-            descendants: taskWithContext.descendants.map(tree => tree.toPlainObject()), // Convert to plain objects
+            descendants: taskWithContext.descendants.map((tree: any) => tree.toPlainObject()), // Convert to plain objects
             root: taskWithContext.root ? taskWithContext.root.toPlainObject() : null, // Convert to plain object
             dependencies: taskWithContext.dependencies,
             dependents: taskWithContext.dependents,
             isBlocked: taskWithContext.isBlocked,
             blockedBy: taskWithContext.blockedBy,
             contextSlices,
-            ...(parentTask && { parentTask }),
-            ...(siblings && { siblings }),
           };
         }
       }
@@ -397,9 +360,10 @@ export class MinimalHandlers implements MCPHandler {
   /**
    * Update the status of an existing task
    */
-  async updateStatus(args: UpdateStatusInput): Promise<{
+  async updateStatus(args: UpdateStatusInput & { cascade?: boolean }): Promise<{
     task: Task;
     message: string;
+    cascadeCount?: number;
   }> {
     try {
       // Validate that the task exists
@@ -414,9 +378,30 @@ export class MinimalHandlers implements MCPHandler {
         throw new Error(`Failed to update task ${args.taskId} status`);
       }
 
+      let cascadeCount = 0;
+      let message = `Updated task ${args.taskId} status to ${args.status}`;
+
+      // Handle cascading if requested and status is final
+      if (args.cascade && (args.status === 'done' || args.status === 'cancelled' || args.status === 'archived')) {
+        try {
+          // Use TaskService for cascading updates
+          const taskService = this.context.taskService;
+          cascadeCount = await taskService.updateTreeStatus(args.taskId, args.status);
+          message = `Updated task ${args.taskId} status to ${args.status} and cascaded to ${cascadeCount} descendants`;
+        } catch (error) {
+          this.logger.warn('Cascade operation failed', {
+            error: error instanceof Error ? error.message : String(error),
+            taskId: args.taskId,
+            status: args.status,
+          });
+          // Don't fail the main operation if cascade fails
+        }
+      }
+
       return {
         task: updatedTask,
-        message: `Updated task ${args.taskId} status to ${args.status}`
+        message,
+        ...(args.cascade ? { cascadeCount } : {})
       };
     } catch (error) {
       this.logger.error('Updating task status failed', {
@@ -426,42 +411,4 @@ export class MinimalHandlers implements MCPHandler {
       throw error;
     }
   }
-
-  /**
-   * Helper to filter tasks by availability (respecting dependencies)
-   */
-  private async filterAvailableTasks(tasks: Task[], filters: GetNextTaskInput): Promise<Task[]> {
-    const availableTasks: Task[] = [];
-    
-    for (const task of tasks) {
-      // Apply status filter if provided
-      if (filters.status && task.status !== filters.status) {
-        continue;
-      }
-      
-      // Apply priority filter if provided
-      if (filters.priority && task.priority !== filters.priority) {
-        continue;
-      }
-
-      // Check if task has incomplete dependencies
-      const dependencies = await this.context.dependencyService.getDependencies(task.id);
-      let hasIncompleteDependencies = false;
-      
-      // Check each dependency
-      for (const depId of dependencies) {
-        const depTask = await this.context.store.getTask(depId);
-        if (depTask && depTask.status !== 'done' && depTask.status !== 'cancelled') {
-          hasIncompleteDependencies = true;
-          break;
-        }
-      }
-
-      if (!hasIncompleteDependencies) {
-        availableTasks.push(task);
-      }
-    }
-
-    return availableTasks;
-  }
-} 
+}

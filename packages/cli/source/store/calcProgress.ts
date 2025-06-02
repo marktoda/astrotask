@@ -7,6 +7,24 @@ export interface ProgressCalculationResult {
 	doneLeaves: number;
 }
 
+export interface ProgressCalculationOptions {
+	useEffectiveStatus?: boolean;
+}
+
+/**
+ * Get the status to use for calculations (actual or effective)
+ */
+function getStatusForCalculation(task: Task, useEffectiveStatus: boolean = false): Task['status'] {
+	if (!useEffectiveStatus) {
+		return task.status;
+	}
+	
+	// If using effective status, we would need access to the task tree
+	// For now, fall back to actual status
+	// TODO: This could be enhanced to accept TaskTree nodes instead of plain Task objects
+	return task.status;
+}
+
 /**
  * Calculate progress for a task based on its subtasks
  * Progress = (doneLeaves / totalLeaves) × 100
@@ -16,17 +34,20 @@ export function calculateTaskProgress(
 	taskId: string,
 	tasks: Task[],
 	childrenByParent: Map<string, string[]>,
+	options: ProgressCalculationOptions = {}
 ): ProgressCalculationResult {
 	const task = tasks.find((t) => t.id === taskId);
 	if (!task) {
 		return { taskId, progress: 0, totalLeaves: 0, doneLeaves: 0 };
 	}
 
+	const status = getStatusForCalculation(task, options.useEffectiveStatus);
+
 	// If task has no children, it's a leaf - calculate based on its own status
 	const children = childrenByParent.get(taskId) || [];
 	if (children.length === 0) {
-		const isDone = task.status === "done";
-		const isCancelled = task.status === "cancelled";
+		const isDone = status === "done";
+		const isCancelled = status === "cancelled";
 
 		// Cancelled tasks don't count towards progress
 		if (isCancelled) {
@@ -46,7 +67,7 @@ export function calculateTaskProgress(
 	let doneLeaves = 0;
 
 	for (const childId of children) {
-		const childResult = calculateTaskProgress(childId, tasks, childrenByParent);
+		const childResult = calculateTaskProgress(childId, tasks, childrenByParent, options);
 		totalLeaves += childResult.totalLeaves;
 		doneLeaves += childResult.doneLeaves;
 	}
@@ -68,12 +89,13 @@ export function calculateTaskProgress(
 export function calculateAllTaskProgress(
 	tasks: Task[],
 	childrenByParent: Map<string, string[]>,
+	options: ProgressCalculationOptions = {}
 ): Map<string, number> {
 	const progressMap = new Map<string, number>();
 
 	// Calculate progress for all tasks
 	for (const task of tasks) {
-		const result = calculateTaskProgress(task.id, tasks, childrenByParent);
+		const result = calculateTaskProgress(task.id, tasks, childrenByParent, options);
 		progressMap.set(task.id, result.progress);
 	}
 
@@ -89,6 +111,7 @@ export function recalculateProgressForDirtyTasks(
 	tasks: Task[],
 	childrenByParent: Map<string, string[]>,
 	currentProgress: Map<string, number>,
+	options: ProgressCalculationOptions = {}
 ): Map<string, number> {
 	const newProgress = new Map(currentProgress);
 	const processed = new Set<string>();
@@ -119,7 +142,7 @@ export function recalculateProgressForDirtyTasks(
 	// Recalculate progress for all dirty tasks
 	for (const taskId of expandedDirtySet) {
 		if (!processed.has(taskId)) {
-			const result = calculateTaskProgress(taskId, tasks, childrenByParent);
+			const result = calculateTaskProgress(taskId, tasks, childrenByParent, options);
 			newProgress.set(taskId, result.progress);
 			processed.add(taskId);
 		}
@@ -131,8 +154,10 @@ export function recalculateProgressForDirtyTasks(
 /**
  * Get the status icon for a task based on its status and progress
  */
-export function getTaskStatusIcon(task: Task, progress?: number): string {
-	switch (task.status) {
+export function getTaskStatusIcon(task: Task, progress?: number, useEffectiveStatus: boolean = false): string {
+	const status = getStatusForCalculation(task, useEffectiveStatus);
+	
+	switch (status) {
 		case "done":
 			return "✅";
 		case "in-progress":

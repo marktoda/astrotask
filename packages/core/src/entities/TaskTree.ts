@@ -35,6 +35,11 @@ export interface ITaskTree {
   isDescendantOf(other: ITaskTree): boolean;
   isSiblingOf(other: ITaskTree): boolean;
 
+  // Hierarchical status methods
+  getEffectiveStatus(): TaskStatus;
+  hasAncestorWithStatus(status: TaskStatus): boolean;
+  getAncestorWithStatus(status: TaskStatus): ITaskTree | null;
+
   // Transformation methods
   withTask(updates: Partial<Task>): ITaskTree;
   addChild(child: ITaskTree): ITaskTree;
@@ -260,6 +265,39 @@ export class TaskTree implements ITaskTree {
 
   isSiblingOf(other: TaskTree): boolean {
     return this._parent?.id === other._parent?.id && this.id !== other.id;
+  }
+
+  // Hierarchical status methods
+  getEffectiveStatus(): TaskStatus {
+    // Check ancestors for overriding statuses
+    const doneAncestor = this.getAncestorWithStatus('done');
+    if (doneAncestor) return 'done';
+    
+    const cancelledAncestor = this.getAncestorWithStatus('cancelled');
+    if (cancelledAncestor) return 'cancelled';
+    
+    const archivedAncestor = this.getAncestorWithStatus('archived');
+    if (archivedAncestor) return 'archived';
+    
+    // No overriding ancestor status, return actual status
+    return this.status;
+  }
+
+  hasAncestorWithStatus(status: TaskStatus): boolean {
+    return this.getAncestorWithStatus(status) !== null;
+  }
+
+  getAncestorWithStatus(status: TaskStatus): ITaskTree | null {
+    let current = this.getParent();
+    
+    while (current) {
+      if (current.status === status) {
+        return current;
+      }
+      current = current.getParent();
+    }
+    
+    return null;
   }
 
   // Immutable transformation methods

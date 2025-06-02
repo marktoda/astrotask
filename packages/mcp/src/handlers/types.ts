@@ -184,7 +184,11 @@ export const updateStatusSchema = z.object({
     .string()
     .describe("ID of the existing task to update. The task must already exist in the system."),
   status: taskStatus
-    .describe("New status for the task. Options: 'pending' (not started), 'in-progress' (currently active), 'done' (completed), 'cancelled' (abandoned), 'archived' (stored).")
+    .describe("New status for the task. Options: 'pending' (not started), 'in-progress' (currently active), 'done' (completed), 'cancelled' (abandoned), 'archived' (stored)."),
+  cascade: z
+    .boolean()
+    .optional()
+    .describe("Whether to cascade the status update to all descendant tasks. Only applies to final statuses like 'done', 'cancelled', or 'archived'.")
 }).describe("Update the status of an existing task, commonly used to mark tasks as done or in-progress");
 
 /**

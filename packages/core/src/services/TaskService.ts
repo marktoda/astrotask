@@ -23,6 +23,36 @@ import { DependencyService } from './DependencyService.js';
  * Now includes dependency-aware operations for task status management
  */
 
+/**
+ * Options for updating task status
+ */
+export interface StatusUpdateOptions {
+  /** Force status update even if blocked by dependencies */
+  force?: boolean;
+  /** Cascade status update to all descendants */
+  cascade?: boolean;
+}
+
+/**
+ * Result of status update operation
+ */
+export interface StatusUpdateResult {
+  success: boolean;
+  blocked?: Task[];
+  validation?: StatusTransitionResult;
+  cascadeCount?: number; // Number of descendant tasks updated when cascade=true
+}
+
+/**
+ * Filters for listing tasks with effective status support
+ */
+export interface TaskListFilters {
+  statuses?: TaskStatus[];
+  effectiveStatuses?: TaskStatus[];
+  parentId?: string | null;
+  includeProjectRoot?: boolean;
+}
+
 export class TaskService implements ITaskReconciliationService {
   private cache: TaskTreeCache;
   private cachedOps: CachedTaskTreeOperations;
@@ -642,14 +672,123 @@ export class TaskService implements ITaskReconciliationService {
   }
 
   /**
-   * Update task status with dependency validation.
-   * Prevents starting tasks that are blocked by incomplete dependencies.
+   * List tasks with support for effective status filtering
+   */
+  async listTasksWithEffectiveStatus(filters: TaskListFilters = {}): Promise<Task[]> {
+    // If only actual status filtering is requested, use existing method
+    if (!filters.effectiveStatuses) {
+      const storeFilters: {
+        statuses?: TaskStatus[];
+        parentId?: string | null;
+        includeProjectRoot?: boolean;
+      } = {};
+      
+      if (filters.statuses !== undefined) {
+        storeFilters.statuses = filters.statuses;
+      }
+      if (filters.parentId !== undefined) {
+        storeFilters.parentId = filters.parentId;
+      }
+      if (filters.includeProjectRoot !== undefined) {
+        storeFilters.includeProjectRoot = filters.includeProjectRoot;
+      }
+      
+      return this.store.listTasks(storeFilters);
+    }
+
+    // For effective status filtering, we need to get the tree and filter in memory
+    const tree = await this.getTaskTree();
+    if (!tree) return [];
+
+    const matchingTasks: Task[] = [];
+
+    tree.walkDepthFirst((node) => {
+      const task = node.task;
+      const effectiveStatus = node.getEffectiveStatus();
+
+      // Apply parent filter
+      if (filters.parentId !== undefined) {
+        if (filters.parentId === null && task.parentId !== TASK_IDENTIFIERS.PROJECT_ROOT) {
+          return;
+        }
+        if (filters.parentId !== null && task.parentId !== filters.parentId) {
+          return;
+        }
+      }
+
+      // Apply actual status filter
+      if (filters.statuses && !filters.statuses.includes(task.status)) {
+        return;
+      }
+
+      // Apply effective status filter
+      if (filters.effectiveStatuses && !filters.effectiveStatuses.includes(effectiveStatus)) {
+        return;
+      }
+
+      // Apply project root filter
+      if (!filters.includeProjectRoot && task.id === TASK_IDENTIFIERS.PROJECT_ROOT) {
+        return;
+      }
+
+      matchingTasks.push(task);
+    });
+
+    return matchingTasks;
+  }
+
+  /**
+   * Get available tasks considering effective status
+   * Returns tasks that are effectively 'pending' or 'in-progress' and not blocked by dependencies
+   */
+  async getAvailableTasksWithEffectiveStatus(filter?: { 
+    status?: TaskStatus; 
+    priority?: string;
+    useEffectiveStatus?: boolean;
+  }): Promise<Task[]> {
+    const useEffective = filter?.useEffectiveStatus ?? true;
+    
+    // Get all tasks that are effectively available for work
+    const candidateTasks = useEffective 
+      ? await this.listTasksWithEffectiveStatus({ 
+          effectiveStatuses: ['pending', 'in-progress'] 
+        })
+      : await this.store.listTasks({ 
+          statuses: ['pending', 'in-progress'] 
+        });
+
+    // Filter by additional criteria and check dependencies
+    const availableTasks: Task[] = [];
+
+    for (const task of candidateTasks) {
+      // Apply status filter
+      if (filter?.status && task.status !== filter.status) {
+        continue;
+      }
+
+      // Apply priority filter
+      if (filter?.priority && task.priority !== filter.priority) {
+        continue;
+      }
+
+      // Check if task has incomplete dependencies
+      const dependencyGraph = await this.dependencyService.getDependencyGraph(task.id);
+      if (!dependencyGraph.isBlocked) {
+        availableTasks.push(task);
+      }
+    }
+
+    return availableTasks;
+  }
+
+  /**
+   * Update task status with optional cascading to descendants
    */
   async updateTaskStatus(
     taskId: string,
     status: TaskStatus,
-    options?: { force?: boolean }
-  ): Promise<{ success: boolean; blocked?: Task[]; validation?: StatusTransitionResult }> {
+    options: StatusUpdateOptions = {}
+  ): Promise<StatusUpdateResult> {
     const task = await this.store.getTask(taskId);
     if (!task) {
       return { success: false };
@@ -667,7 +806,7 @@ export class TaskService implements ITaskReconciliationService {
     );
 
     // If validation fails and force is not enabled, return the validation result
-    if (!validation.allowed && !options?.force) {
+    if (!validation.allowed && !options.force) {
       const blockedByTasks = validation.blockedBy
         ? await Promise.all(validation.blockedBy.map((id) => this.store.getTask(id)))
         : [];
@@ -683,13 +822,46 @@ export class TaskService implements ITaskReconciliationService {
     const updatedTask = await this.store.updateTask(taskId, { status });
     const success = !!updatedTask;
 
-    if (success) {
-      // Clear cache for this task and its dependents (status change may unblock them)
-      const dependents = await this.dependencyService.getDependents(taskId);
-      this.cache.invalidateTreeFamily(taskId, [], dependents);
+    if (!success) {
+      return { success: false, validation };
     }
 
-    return { success, validation };
+    let cascadeCount = 0;
+
+    // Handle cascading if requested
+    if (options.cascade && (status === 'done' || status === 'cancelled' || status === 'archived')) {
+      cascadeCount = await this.cascadeStatusToDescendants(taskId, status);
+    }
+
+    // Clear cache for this task and its dependents (status change may unblock them)
+    const dependents = await this.dependencyService.getDependents(taskId);
+    this.cache.invalidateTreeFamily(taskId, [], dependents);
+
+    return { 
+      success: true, 
+      validation,
+      ...(options.cascade ? { cascadeCount } : {})
+    };
+  }
+
+  /**
+   * Cascade status update to all descendant tasks
+   */
+  private async cascadeStatusToDescendants(taskId: string, status: TaskStatus): Promise<number> {
+    const descendants = await this.getTaskDescendants(taskId);
+    let updateCount = 0;
+
+    for (const descendant of descendants) {
+      // Only cascade to tasks that aren't already in the target status
+      if (descendant.status !== status) {
+        const updated = await this.store.updateTask(descendant.id, { status });
+        if (updated) {
+          updateCount++;
+        }
+      }
+    }
+
+    return updateCount;
   }
 
   /**

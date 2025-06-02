@@ -193,6 +193,9 @@ export default function Tree({ options }: Props) {
 						<Text color="gray">
 							⏳ Pending 🔄 In Progress ✅ Done ❌ Cancelled
 						</Text>
+						<Text color="gray">
+							Status may be inherited from parent tasks (effective status)
+						</Text>
 					</Box>
 				</>
 			)}
@@ -221,6 +224,12 @@ function TreeNodeComponent({
 	const children = node.getChildren();
 	const hasChildren = children.length > 0;
 	const task = node.task;
+	
+	// Get both actual and effective status
+	const actualStatus = task.status;
+	// Fallback for effective status if method doesn't exist yet
+	const effectiveStatus = (node as any).getEffectiveStatus ? (node as any).getEffectiveStatus() : actualStatus;
+	const statusInherited = actualStatus !== effectiveStatus;
 
 	// Tree drawing characters
 	const connector = isLast ? "└── " : "├── ";
@@ -234,13 +243,20 @@ function TreeNodeComponent({
 					{prefix}
 					{connector}
 				</Text>
-				{showStatus && getStatusIcon(task.status)}
+				{showStatus && getStatusIcon(effectiveStatus)}
 				{showStatus && " "}
-				<Text bold color={getStatusColor(task.status)}>
+				<Text bold color={getStatusColor(effectiveStatus)}>
 					{task.title}
 				</Text>
 				<Text color="gray"> ({task.id})</Text>
-				{showStatus && <Text color="yellow"> [{task.status}]</Text>}
+				{showStatus && (
+					<>
+						<Text color="yellow"> [{effectiveStatus}]</Text>
+						{statusInherited && (
+							<Text color="gray"> (inherited from ancestor)</Text>
+						)}
+					</>
+				)}
 			</Text>
 
 			{/* Description if present */}
@@ -249,6 +265,15 @@ function TreeNodeComponent({
 					{prefix}
 					{isLast ? "    " : "│   "}
 					{task.description}
+				</Text>
+			)}
+
+			{/* Show actual status if different from effective */}
+			{showStatus && statusInherited && (
+				<Text color="gray">
+					{prefix}
+					{isLast ? "    " : "│   "}
+					Actual status: {actualStatus}
 				</Text>
 			)}
 
