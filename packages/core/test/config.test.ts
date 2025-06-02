@@ -7,20 +7,20 @@ describe('Configuration System', () => {
     expect(cfg.NODE_ENV).toBe('test'); // vitest sets NODE_ENV to 'test' in test environment
     expect(cfg.PORT).toBe(3000); // default from schema
     expect(cfg.LOG_LEVEL).toBe('info'); // default from schema
-    expect(cfg.DATABASE_PATH).toBe('./data/astrolabe.db'); // unified database path
+    expect(cfg.DATABASE_URI).toBe('./data/astrolabe.db'); // unified database path
   });
 
   it('should have proper types', () => {
     // These should not throw TypeScript errors
     const env: 'development' | 'production' | 'test' = cfg.NODE_ENV;
     const port: number = cfg.PORT;
-    const logLevel: 'debug' | 'info' | 'warn' | 'error' = cfg.LOG_LEVEL;
-    const databasePath: string = cfg.DATABASE_PATH;
+    const logLevel: 'trace' | 'debug' | 'info' | 'warn' | 'error' | 'fatal' = cfg.LOG_LEVEL;
+    const databaseUri: string = cfg.DATABASE_URI;
 
     expect(typeof env).toBe('string');
     expect(typeof port).toBe('number');
     expect(typeof logLevel).toBe('string');
-    expect(typeof databasePath).toBe('string');
+    expect(typeof databaseUri).toBe('string');
   });
 
   it('should validate enum values', () => {
@@ -38,7 +38,7 @@ describe('Configuration System', () => {
   });
 
   it('should validate database configuration', () => {
-    expect(cfg.DATABASE_PATH).toBe('./data/astrolabe.db');
+    expect(cfg.DATABASE_URI).toBe('./data/astrolabe.db');
     expect(typeof cfg.DB_VERBOSE).toBe('boolean');
     expect(cfg.DB_VERBOSE).toBe(false); // default
   });

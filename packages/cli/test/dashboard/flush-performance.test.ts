@@ -1,4 +1,4 @@
-import { beforeAll, afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeAll, afterAll, beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { createDatabase } from '@astrolabe/core';
 import type { Store } from '@astrolabe/core';
 import { createDashboardStore } from '../../source/dashboard/store/index.js';
@@ -10,27 +10,18 @@ describe('Dashboard Flush Performance', () => {
   let store: Store;
   let dbPath: string;
 
-  beforeAll(async () => {
-    dbPath = join(tmpdir(), `flush-perf-test-${Date.now()}.db`);
-    store = await createDatabase({ dbPath, verbose: false });
+  beforeEach(async () => {
+    // Create a fresh database for each test to avoid foreign key constraint issues
+    dbPath = join(tmpdir(), `flush-perf-test-${Date.now()}-${Math.random()}.db`);
+    store = await createDatabase({ dataDir: dbPath, verbose: false });
   });
 
-  afterAll(async () => {
+  afterEach(async () => {
     if (store) {
       await store.close();
     }
     if (dbPath && existsSync(dbPath)) {
       rmSync(dbPath, { recursive: true, force: true });
-    }
-  });
-
-  beforeEach(async () => {
-    // Clear any non-root tasks
-    const allTasks = await store.listTasks({});
-    for (const task of allTasks) {
-      if (task.id !== '__PROJECT_ROOT__') {
-        await store.deleteTask(task.id);
-      }
     }
   });
 
@@ -79,6 +70,9 @@ describe('Dashboard Flush Performance', () => {
       
       expect(dashboardStore.getState().isFlushingChanges).toBe(false);
       
+      // Clean up auto-flush before test ends
+      dashboardStore.getState().disableAutoFlush();
+      
       // Restore original method
       vi.restoreAllMocks();
     });
@@ -114,6 +108,9 @@ describe('Dashboard Flush Performance', () => {
       // Should have taken at least 50ms (the mock delay)
       expect(endTime - startTime).toBeGreaterThanOrEqual(45);
       expect(dashboardStore.getState().isFlushingChanges).toBe(false);
+      
+      // Clean up auto-flush before test ends
+      dashboardStore.getState().disableAutoFlush();
       
       vi.restoreAllMocks();
     });
@@ -161,6 +158,9 @@ describe('Dashboard Flush Performance', () => {
       
       // Parallel execution should be reasonably fast
       expect(endTime - startTime).toBeLessThan(1000);
+      
+      // Clean up auto-flush before test ends
+      dashboardStore.getState().disableAutoFlush();
     });
 
     it('should auto-flush more frequently with reduced interval', async () => {
@@ -207,6 +207,9 @@ describe('Dashboard Flush Performance', () => {
       // Should show error message and reset flush state
       expect(dashboardStore.getState().statusMessage).toContain('Error saving');
       expect(dashboardStore.getState().isFlushingChanges).toBe(false);
+      
+      // Clean up auto-flush before test ends
+      dashboardStore.getState().disableAutoFlush();
       
       vi.restoreAllMocks();
     });

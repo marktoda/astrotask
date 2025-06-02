@@ -55,7 +55,6 @@ describe('Database Configuration', () => {
     it('should create database with encryption disabled', async () => {
       const store = await createDatabase({
         dataDir: testDbPath,
-        enableEncryption: false,
         verbose: false,
       });
 
@@ -283,7 +282,7 @@ describe('Database Configuration', () => {
 
   describe('Database Configuration Constants', () => {
     it('should have correct default configuration', () => {
-      expect(cfg.DATABASE_PATH).toBe('./data/astrolabe.db');
+      expect(cfg.DATABASE_URI).toBe('./data/astrolabe.db');
       expect(cfg.DB_VERBOSE).toBe(false);
       expect(cfg.DB_TIMEOUT).toBe(5000);
     });
