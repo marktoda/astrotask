@@ -150,7 +150,7 @@ export class CommandPalette {
 
 					const title = matches[1]?.trim() || "";
 					const parentId = matches[2]?.trim() || null;
-					
+
 					if (!title) {
 						stateData.setStatusMessage("Error: Task title cannot be empty");
 						return;
@@ -160,7 +160,9 @@ export class CommandPalette {
 						await stateData.addTask(parentId, title);
 						stateData.setStatusMessage(`Task "${title}" added successfully`);
 					} catch (error) {
-						stateData.setStatusMessage(`Error adding task: ${error instanceof Error ? error.message : String(error)}`);
+						stateData.setStatusMessage(
+							`Error adding task: ${error instanceof Error ? error.message : String(error)}`,
+						);
 					} finally {
 						stateData.toggleCommandPalette();
 					}
@@ -175,11 +177,13 @@ export class CommandPalette {
 					if (!stateData) return;
 
 					const parentId = matches[1]?.trim() || null;
-					
+
 					try {
 						await stateData.addTaskWithEditor(parentId);
 					} catch (error) {
-						stateData.setStatusMessage(`Error opening editor: ${error instanceof Error ? error.message : String(error)}`);
+						stateData.setStatusMessage(
+							`Error opening editor: ${error instanceof Error ? error.message : String(error)}`,
+						);
 					} finally {
 						stateData.toggleCommandPalette();
 					}
@@ -197,7 +201,7 @@ export class CommandPalette {
 
 					const taskId = matches[1]?.trim() || "";
 					const newTitle = matches[2]?.trim() || "";
-					
+
 					if (!taskId || !newTitle) {
 						stateData.setStatusMessage("Error: Task ID and title are required");
 						return;
@@ -207,7 +211,9 @@ export class CommandPalette {
 						await stateData.renameTask(taskId, newTitle);
 						stateData.setStatusMessage(`Task "${taskId}" renamed successfully`);
 					} catch (error) {
-						stateData.setStatusMessage(`Error renaming task: ${error instanceof Error ? error.message : String(error)}`);
+						stateData.setStatusMessage(
+							`Error renaming task: ${error instanceof Error ? error.message : String(error)}`,
+						);
 					} finally {
 						stateData.toggleCommandPalette();
 					}
@@ -222,7 +228,7 @@ export class CommandPalette {
 					if (!stateData) return;
 
 					const taskId = matches[1]?.trim() || "";
-					
+
 					if (!taskId) {
 						stateData.setStatusMessage("Error: Task ID is required");
 						return;
@@ -231,7 +237,9 @@ export class CommandPalette {
 					try {
 						await stateData.editTaskWithEditor(taskId);
 					} catch (error) {
-						stateData.setStatusMessage(`Error editing task: ${error instanceof Error ? error.message : String(error)}`);
+						stateData.setStatusMessage(
+							`Error editing task: ${error instanceof Error ? error.message : String(error)}`,
+						);
 					} finally {
 						stateData.toggleCommandPalette();
 					}
@@ -246,7 +254,7 @@ export class CommandPalette {
 					if (!stateData) return;
 
 					const taskId = matches[1]?.trim() || "";
-					
+
 					if (!taskId) {
 						stateData.setStatusMessage("Error: Task ID is required");
 						return;
@@ -256,7 +264,9 @@ export class CommandPalette {
 						await stateData.deleteTask(taskId);
 						stateData.setStatusMessage(`Task "${taskId}" deleted successfully`);
 					} catch (error) {
-						stateData.setStatusMessage(`Error deleting task: ${error instanceof Error ? error.message : String(error)}`);
+						stateData.setStatusMessage(
+							`Error deleting task: ${error instanceof Error ? error.message : String(error)}`,
+						);
 					} finally {
 						stateData.toggleCommandPalette();
 					}
@@ -273,7 +283,7 @@ export class CommandPalette {
 					if (!stateData) return;
 
 					const taskId = matches[1]?.trim() || "";
-					
+
 					if (!taskId) {
 						stateData.setStatusMessage("Error: Task ID is required");
 						return;
@@ -281,9 +291,13 @@ export class CommandPalette {
 
 					try {
 						stateData.updateTaskStatus(taskId, "pending");
-						stateData.setStatusMessage(`Task "${taskId}" status set to pending`);
+						stateData.setStatusMessage(
+							`Task "${taskId}" status set to pending`,
+						);
 					} catch (error) {
-						stateData.setStatusMessage(`Error updating status: ${error instanceof Error ? error.message : String(error)}`);
+						stateData.setStatusMessage(
+							`Error updating status: ${error instanceof Error ? error.message : String(error)}`,
+						);
 					} finally {
 						stateData.toggleCommandPalette();
 					}
@@ -298,7 +312,7 @@ export class CommandPalette {
 					if (!stateData) return;
 
 					const taskId = matches[1]?.trim() || "";
-					
+
 					if (!taskId) {
 						stateData.setStatusMessage("Error: Task ID is required");
 						return;
@@ -306,9 +320,13 @@ export class CommandPalette {
 
 					try {
 						stateData.updateTaskStatus(taskId, "in-progress");
-						stateData.setStatusMessage(`Task "${taskId}" status set to in-progress`);
+						stateData.setStatusMessage(
+							`Task "${taskId}" status set to in-progress`,
+						);
 					} catch (error) {
-						stateData.setStatusMessage(`Error updating status: ${error instanceof Error ? error.message : String(error)}`);
+						stateData.setStatusMessage(
+							`Error updating status: ${error instanceof Error ? error.message : String(error)}`,
+						);
 					} finally {
 						stateData.toggleCommandPalette();
 					}
@@ -323,7 +341,7 @@ export class CommandPalette {
 					if (!stateData) return;
 
 					const taskId = matches[1]?.trim() || "";
-					
+
 					if (!taskId) {
 						stateData.setStatusMessage("Error: Task ID is required");
 						return;
@@ -333,7 +351,9 @@ export class CommandPalette {
 						stateData.updateTaskStatus(taskId, "done");
 						stateData.setStatusMessage(`Task "${taskId}" status set to done`);
 					} catch (error) {
-						stateData.setStatusMessage(`Error updating status: ${error instanceof Error ? error.message : String(error)}`);
+						stateData.setStatusMessage(
+							`Error updating status: ${error instanceof Error ? error.message : String(error)}`,
+						);
 					} finally {
 						stateData.toggleCommandPalette();
 					}
@@ -348,7 +368,7 @@ export class CommandPalette {
 					if (!stateData) return;
 
 					const taskId = matches[1]?.trim() || "";
-					
+
 					if (!taskId) {
 						stateData.setStatusMessage("Error: Task ID is required");
 						return;
@@ -356,9 +376,13 @@ export class CommandPalette {
 
 					try {
 						stateData.updateTaskStatus(taskId, "cancelled");
-						stateData.setStatusMessage(`Task "${taskId}" status set to cancelled`);
+						stateData.setStatusMessage(
+							`Task "${taskId}" status set to cancelled`,
+						);
 					} catch (error) {
-						stateData.setStatusMessage(`Error updating status: ${error instanceof Error ? error.message : String(error)}`);
+						stateData.setStatusMessage(
+							`Error updating status: ${error instanceof Error ? error.message : String(error)}`,
+						);
 					} finally {
 						stateData.toggleCommandPalette();
 					}
@@ -375,7 +399,7 @@ export class CommandPalette {
 					if (!stateData) return;
 
 					const taskId = matches[1]?.trim() || "";
-					
+
 					if (!taskId) {
 						stateData.setStatusMessage("Error: Task ID is required");
 						return;
@@ -385,7 +409,9 @@ export class CommandPalette {
 						stateData.selectTask(taskId);
 						stateData.setStatusMessage(`Selected task "${taskId}"`);
 					} catch (error) {
-						stateData.setStatusMessage(`Error selecting task: ${error instanceof Error ? error.message : String(error)}`);
+						stateData.setStatusMessage(
+							`Error selecting task: ${error instanceof Error ? error.message : String(error)}`,
+						);
 					} finally {
 						stateData.toggleCommandPalette();
 					}
@@ -403,7 +429,9 @@ export class CommandPalette {
 						stateData.setActivePanel("sidebar");
 						stateData.setStatusMessage("Focused on project sidebar");
 					} catch (error) {
-						stateData.setStatusMessage(`Error focusing sidebar: ${error instanceof Error ? error.message : String(error)}`);
+						stateData.setStatusMessage(
+							`Error focusing sidebar: ${error instanceof Error ? error.message : String(error)}`,
+						);
 					} finally {
 						stateData.toggleCommandPalette();
 					}
@@ -421,7 +449,9 @@ export class CommandPalette {
 						stateData.setActivePanel("tree");
 						stateData.setStatusMessage("Focused on task tree");
 					} catch (error) {
-						stateData.setStatusMessage(`Error focusing tree: ${error instanceof Error ? error.message : String(error)}`);
+						stateData.setStatusMessage(
+							`Error focusing tree: ${error instanceof Error ? error.message : String(error)}`,
+						);
 					} finally {
 						stateData.toggleCommandPalette();
 					}
@@ -439,7 +469,9 @@ export class CommandPalette {
 						stateData.setActivePanel("details");
 						stateData.setStatusMessage("Focused on details panel");
 					} catch (error) {
-						stateData.setStatusMessage(`Error focusing details: ${error instanceof Error ? error.message : String(error)}`);
+						stateData.setStatusMessage(
+							`Error focusing details: ${error instanceof Error ? error.message : String(error)}`,
+						);
 					} finally {
 						stateData.toggleCommandPalette();
 					}
@@ -463,7 +495,9 @@ export class CommandPalette {
 							: "Hiding completed tasks";
 						stateData.setStatusMessage(statusText);
 					} catch (error) {
-						stateData.setStatusMessage(`Error toggling completed tasks: ${error instanceof Error ? error.message : String(error)}`);
+						stateData.setStatusMessage(
+							`Error toggling completed tasks: ${error instanceof Error ? error.message : String(error)}`,
+						);
 					} finally {
 						stateData.toggleCommandPalette();
 					}
@@ -481,7 +515,9 @@ export class CommandPalette {
 						stateData.toggleDetailViewMode();
 						stateData.setStatusMessage("Toggled detail view mode");
 					} catch (error) {
-						stateData.setStatusMessage(`Error toggling detail view: ${error instanceof Error ? error.message : String(error)}`);
+						stateData.setStatusMessage(
+							`Error toggling detail view: ${error instanceof Error ? error.message : String(error)}`,
+						);
 					} finally {
 						stateData.toggleCommandPalette();
 					}
@@ -499,7 +535,9 @@ export class CommandPalette {
 						stateData.toggleTreeViewMode();
 						stateData.setStatusMessage("Toggled tree view mode");
 					} catch (error) {
-						stateData.setStatusMessage(`Error toggling tree view: ${error instanceof Error ? error.message : String(error)}`);
+						stateData.setStatusMessage(
+							`Error toggling tree view: ${error instanceof Error ? error.message : String(error)}`,
+						);
 					} finally {
 						stateData.toggleCommandPalette();
 					}
@@ -532,7 +570,7 @@ export class CommandPalette {
 
 					const taskId = matches[1]?.trim() || "";
 					const dependsOnId = matches[2]?.trim() || "";
-					
+
 					if (!taskId || !dependsOnId) {
 						stateData.setStatusMessage("Error: Both task IDs are required");
 						return;
@@ -540,9 +578,13 @@ export class CommandPalette {
 
 					try {
 						await stateData.addDependency(taskId, dependsOnId);
-						stateData.setStatusMessage(`Dependency added: ${taskId} -> ${dependsOnId}`);
+						stateData.setStatusMessage(
+							`Dependency added: ${taskId} -> ${dependsOnId}`,
+						);
 					} catch (error) {
-						stateData.setStatusMessage(`Error adding dependency: ${error instanceof Error ? error.message : String(error)}`);
+						stateData.setStatusMessage(
+							`Error adding dependency: ${error instanceof Error ? error.message : String(error)}`,
+						);
 					} finally {
 						stateData.toggleCommandPalette();
 					}
@@ -558,7 +600,7 @@ export class CommandPalette {
 
 					const taskId = matches[1]?.trim() || "";
 					const dependsOnId = matches[2]?.trim() || "";
-					
+
 					if (!taskId || !dependsOnId) {
 						stateData.setStatusMessage("Error: Both task IDs are required");
 						return;
@@ -566,9 +608,13 @@ export class CommandPalette {
 
 					try {
 						await stateData.removeDependency(taskId, dependsOnId);
-						stateData.setStatusMessage(`Dependency removed: ${taskId} -> ${dependsOnId}`);
+						stateData.setStatusMessage(
+							`Dependency removed: ${taskId} -> ${dependsOnId}`,
+						);
 					} catch (error) {
-						stateData.setStatusMessage(`Error removing dependency: ${error instanceof Error ? error.message : String(error)}`);
+						stateData.setStatusMessage(
+							`Error removing dependency: ${error instanceof Error ? error.message : String(error)}`,
+						);
 					} finally {
 						stateData.toggleCommandPalette();
 					}
@@ -588,7 +634,9 @@ export class CommandPalette {
 						stateData.expandAll();
 						stateData.setStatusMessage("All tasks expanded");
 					} catch (error) {
-						stateData.setStatusMessage(`Error expanding tasks: ${error instanceof Error ? error.message : String(error)}`);
+						stateData.setStatusMessage(
+							`Error expanding tasks: ${error instanceof Error ? error.message : String(error)}`,
+						);
 					} finally {
 						stateData.toggleCommandPalette();
 					}
@@ -606,7 +654,9 @@ export class CommandPalette {
 						stateData.collapseAll();
 						stateData.setStatusMessage("All tasks collapsed");
 					} catch (error) {
-						stateData.setStatusMessage(`Error collapsing tasks: ${error instanceof Error ? error.message : String(error)}`);
+						stateData.setStatusMessage(
+							`Error collapsing tasks: ${error instanceof Error ? error.message : String(error)}`,
+						);
 					} finally {
 						stateData.toggleCommandPalette();
 					}
@@ -626,7 +676,9 @@ export class CommandPalette {
 						await stateData.reloadFromDatabase();
 						stateData.setStatusMessage("Data reloaded successfully");
 					} catch (error) {
-						stateData.setStatusMessage(`Error reloading data: ${error instanceof Error ? error.message : String(error)}`);
+						stateData.setStatusMessage(
+							`Error reloading data: ${error instanceof Error ? error.message : String(error)}`,
+						);
 					} finally {
 						stateData.toggleCommandPalette();
 					}
@@ -644,7 +696,9 @@ export class CommandPalette {
 						await stateData.flushChanges();
 						stateData.setStatusMessage("Changes saved successfully");
 					} catch (error) {
-						stateData.setStatusMessage(`Error saving changes: ${error instanceof Error ? error.message : String(error)}`);
+						stateData.setStatusMessage(
+							`Error saving changes: ${error instanceof Error ? error.message : String(error)}`,
+						);
 					} finally {
 						stateData.toggleCommandPalette();
 					}
@@ -664,7 +718,9 @@ export class CommandPalette {
 						stateData.toggleHelpOverlay();
 						stateData.setStatusMessage("Help overlay toggled");
 					} catch (error) {
-						stateData.setStatusMessage(`Error showing help: ${error instanceof Error ? error.message : String(error)}`);
+						stateData.setStatusMessage(
+							`Error showing help: ${error instanceof Error ? error.message : String(error)}`,
+						);
 					} finally {
 						stateData.toggleCommandPalette();
 					}
@@ -679,10 +735,14 @@ export class CommandPalette {
 					if (!stateData) return;
 
 					try {
-						stateData.setStatusMessage(`Available commands: ${this.commands.length} total`);
+						stateData.setStatusMessage(
+							`Available commands: ${this.commands.length} total`,
+						);
 						// Note: In a real implementation, you might want to show this in a separate overlay
 					} catch (error) {
-						stateData.setStatusMessage(`Error listing commands: ${error instanceof Error ? error.message : String(error)}`);
+						stateData.setStatusMessage(
+							`Error listing commands: ${error instanceof Error ? error.message : String(error)}`,
+						);
 					} finally {
 						stateData.toggleCommandPalette();
 					}
@@ -693,7 +753,9 @@ export class CommandPalette {
 
 	private setupEventHandlers(): void {
 		if (!this.input || !this.results) {
-			console.error("Cannot setup event handlers: input or results not initialized");
+			console.error(
+				"Cannot setup event handlers: input or results not initialized",
+			);
 			return;
 		}
 
@@ -704,7 +766,9 @@ export class CommandPalette {
 					this.executeCommand(value || "");
 				} catch (error) {
 					console.error("Error in input submit handler:", error);
-					this.safeSetStatusMessage(`Command execution failed: ${error instanceof Error ? error.message : String(error)}`);
+					this.safeSetStatusMessage(
+						`Command execution failed: ${error instanceof Error ? error.message : String(error)}`,
+					);
 				}
 			});
 
@@ -727,7 +791,7 @@ export class CommandPalette {
 					} else {
 						(this.results as any).down(1);
 					}
-					
+
 					if (this.results.screen) {
 						this.results.screen.render();
 					}
@@ -752,7 +816,6 @@ export class CommandPalette {
 			};
 
 			this.input.on("keypress", updateSuggestions);
-
 		} catch (error) {
 			console.error("Error setting up event handlers:", error);
 		}
@@ -766,7 +829,7 @@ export class CommandPalette {
 
 		try {
 			let updateTimeout: NodeJS.Timeout;
-			
+
 			this.unsubscribe = this.store.subscribe((state) => {
 				// Debounce store updates to prevent rapid changes
 				clearTimeout(updateTimeout);
@@ -817,7 +880,10 @@ export class CommandPalette {
 							suggestions.push(`${cmd.name} - ${cmd.description}`);
 						}
 					} catch (patternError) {
-						console.error(`Error testing pattern for command ${cmd.name}:`, patternError);
+						console.error(
+							`Error testing pattern for command ${cmd.name}:`,
+							patternError,
+						);
 					}
 				});
 
@@ -827,7 +893,7 @@ export class CommandPalette {
 			}
 
 			this.results.setItems(suggestions);
-			
+
 			if (this.results.screen) {
 				this.results.screen.render();
 			}
@@ -851,7 +917,8 @@ export class CommandPalette {
 				if (matches) {
 					commandFound = true;
 					cmd.execute(matches).catch((err) => {
-						const errorMessage = err instanceof Error ? err.message : String(err);
+						const errorMessage =
+							err instanceof Error ? err.message : String(err);
 						console.error(`Error executing command ${cmd.name}:`, err);
 						this.safeSetStatusMessage(`Command failed: ${errorMessage}`);
 					});
@@ -903,7 +970,9 @@ export class CommandPalette {
 
 		try {
 			if (!this.box || !this.input) {
-				console.error("Cannot show command palette: UI components not initialized");
+				console.error(
+					"Cannot show command palette: UI components not initialized",
+				);
 				return;
 			}
 
@@ -911,7 +980,7 @@ export class CommandPalette {
 			this.input.clearValue();
 			this.updateSuggestions("");
 			this.state.isVisible = true;
-			
+
 			if (this.box.screen) {
 				this.box.screen.render();
 			}
@@ -945,7 +1014,7 @@ export class CommandPalette {
 			if (this.box) {
 				this.box.hide();
 				this.state.isVisible = false;
-				
+
 				if (this.box.screen) {
 					this.box.screen.render();
 				}
@@ -956,12 +1025,16 @@ export class CommandPalette {
 	}
 
 	focus(): void {
-		if (this.state.isDestroyed || !this.state.isInitialized || !this.state.isVisible) {
+		if (
+			this.state.isDestroyed ||
+			!this.state.isInitialized ||
+			!this.state.isVisible
+		) {
 			return;
 		}
 
 		try {
-			if (this.input && typeof this.input.focus === 'function') {
+			if (this.input && typeof this.input.focus === "function") {
 				// Add a small delay to prevent focus recursion issues with blessed
 				setTimeout(() => {
 					try {
@@ -981,7 +1054,7 @@ export class CommandPalette {
 	private safeCleanup(): void {
 		try {
 			this.state.isDestroyed = true;
-			
+
 			if (this.unsubscribe) {
 				this.unsubscribe();
 				this.unsubscribe = null;

@@ -191,6 +191,82 @@ astrolabe task generate --file ./requirements.md --verbose
 
 This command will analyze the PRD and generate actionable implementation tasks like "Implement user registration endpoint", "Create email verification service", "Design user database schema", etc.
 
+#### `astrolabe task expand <id> [options]`
+
+Expand a single task into multiple subtasks using AI-powered complexity analysis.
+
+```bash
+# Basic task expansion (uses complexity analysis to determine optimal subtask count)
+astrolabe task expand task_123
+
+# Expand with additional context for better AI generation
+astrolabe task expand task_123 --context "Focus on security and scalability requirements"
+
+# Expand with detailed output showing complexity analysis
+astrolabe task expand task_123 --verbose
+
+# Force replace existing subtasks (if any)
+astrolabe task expand task_123 --force
+
+# Expand all leaf tasks under a parent (root mode)
+astrolabe task expand task_123 --root parent_task_456
+
+# Use higher complexity threshold for expansion recommendations
+astrolabe task expand task_123 --threshold 7
+```
+
+**Options:**
+- `--context <text>`: Additional context to guide AI subtask generation
+- `--force`: Replace existing subtasks if they exist
+- `--threshold <n>`: Complexity threshold (1-10, default: 5) for expansion recommendations
+- `--root <root-id>`: Root task ID - expand all leaf tasks under this root
+- `--verbose`: Show detailed complexity analysis and expansion information
+
+**Features:**
+- **🧠 AI-Powered Complexity Analysis**: Automatically analyzes task complexity (1-10 scale)
+- **🎯 Intelligent Subtask Generation**: Creates optimal number of subtasks based on complexity
+- **🔬 Research Mode**: Always enabled for enhanced analysis and better results
+- **📊 Root Processing**: Expand multiple leaf tasks under a root in one operation
+- **✅ Quality Assurance**: Generates well-structured, actionable subtasks
+
+**How It Works:**
+1. **Complexity Analysis**: AI evaluates the task based on technical complexity, dependencies, risk factors, and implementation requirements
+2. **Subtask Recommendation**: Determines optimal number of subtasks (typically 2-12 based on complexity)
+3. **Intelligent Generation**: Creates detailed, actionable subtasks with clear descriptions and acceptance criteria
+4. **Hierarchy Creation**: Properly organizes subtasks with parent-child relationships
+
+**Example Output:**
+```
+✅ Task expansion complete: 8 subtasks created
+
+📋 Implement user authentication system (TASK-123)
+Created 8 subtasks using complexity-guided expansion
+  Complexity Score: 7/10
+  Reasoning: Complex system requiring security expertise, multiple integration points,
+  comprehensive testing, and proper error handling...
+  
+  • Design user authentication schema (TASK-123-A1)
+  • Implement user registration endpoint (TASK-123-A2)
+  • Create JWT token service (TASK-123-A3)
+  • Build password hashing utilities (TASK-123-A4)
+  • Develop login/logout functionality (TASK-123-A5)
+  • Implement password reset workflow (TASK-123-A6)
+  • Add email verification system (TASK-123-A7)
+  • Write comprehensive auth tests (TASK-123-A8)
+
+Total subtasks created: 8
+Context slices created: 1
+```
+
+**Root Mode Example:**
+```bash
+# Expand all leaf tasks under a feature
+astrolabe task expand any_task --root feature_authentication
+
+# This will find all tasks under "feature_authentication" that have no children
+# and expand each of them into subtasks automatically
+```
+
 #### `astrolabe show <id>`
 
 Show detailed information about a specific task.
