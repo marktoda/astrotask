@@ -14,7 +14,6 @@ export const description =
 	"Expand a task into subtasks using complexity analysis and AI-guided expansion";
 
 export const options = zod.object({
-	taskId: zod.string().describe("Task ID to expand"),
 	context: zod
 		.string()
 		.optional()
@@ -33,8 +32,7 @@ export const options = zod.object({
 		.describe("Complexity threshold for expansion recommendations"),
 	root: zod
 		.string()
-		.optional()
-		.describe("Root task ID - expand all leaf tasks under this root"),
+		.describe("Root task ID - if root is a leaf, expand it directly; otherwise expand all downstream leaf tasks"),
 	verbose: zod
 		.boolean()
 		.optional()
@@ -71,6 +69,12 @@ export default function Expand({ options }: Props) {
 				const logger = createModuleLogger("CLI-TaskExpansion");
 				const taskService = new TaskService(db);
 
+				// Ensure root is defined (it should be since it's required in schema)
+				if (!options.root) {
+					throw new Error("Root task ID is required");
+				}
+				const rootTaskId = options.root;
+
 				// Create expansion service with configuration
 				const expansionConfig: TaskExpansionConfig = {
 					useComplexityAnalysis: true, // Use complexity analysis
@@ -90,21 +94,57 @@ export default function Expand({ options }: Props) {
 					expansionConfig,
 				);
 
-				// Handle different expansion modes
-				if (options.root) {
-					// Batch expansion - expand all leaf tasks under parent
+				// Handle root expansion logic
+				setState((prev) => ({
+					...prev,
+					phase: "analyzing",
+					message: `Analyzing task ${rootTaskId} and finding targets for expansion...`,
+				}));
+
+				// Check if root task exists
+				const rootTask = await db.getTask(rootTaskId);
+				if (!rootTask) {
+					throw new Error(`Root task ${rootTaskId} not found`);
+				}
+
+				// Check if root is a leaf task (has no children)
+				const rootChildren = await db.listTasks({ parentId: rootTaskId });
+				const isRootLeaf = rootChildren.length === 0;
+
+				if (isRootLeaf) {
+					// Root is a leaf - expand it directly
+					setState((prev) => ({
+						...prev,
+						phase: "expanding",
+						message: `Root task is a leaf - expanding directly...`,
+					}));
+
+					const result = await expansionService.expandTask({
+						taskId: rootTaskId,
+						context: options.context,
+						force: options.force,
+					});
+
+					setState((prev) => ({
+						...prev,
+						phase: "complete",
+						message: `Task expansion complete: ${result.subtasks.length} subtasks created`,
+						results: [result],
+					}));
+				} else {
+					// Root is not a leaf - find all downstream leaf tasks and expand them
 					setState((prev) => ({
 						...prev,
 						phase: "analyzing",
-						message: `Finding leaf tasks under parent ${options.root}...`,
+						message: `Finding all downstream leaf tasks under ${rootTaskId}...`,
 					}));
 
-					// Get all tasks under the parent
-					const allTasks = await db.listTasks({ parentId: options.root });
+					// Get all descendant tasks using TaskService
+					const allDescendants = await taskService.getTaskDescendants(rootTaskId);
 
 					// Filter to only leaf tasks (tasks with no children)
 					const leafTasks: string[] = [];
-					for (const task of allTasks) {
+					for (const task of allDescendants) {
 						const children = await db.listTasks({ parentId: task.id });
 						if (children.length === 0) {
 							leafTasks.push(task.id);
@@ -114,13 +154,14 @@ export default function Expand({ options }: Props) {
 					setState((prev) => ({
 						...prev,
 						phase: "expanding",
-						message: `Expanding ${leafTasks.length} leaf tasks...`,
+						message: `Expanding ${leafTasks.length} downstream leaf tasks...`,
 						progress: { current: 0, total: leafTasks.length },
 					}));
 
 					// Expand each leaf task individually
 					const results: TaskExpansionResult[] = [];
-					for (const taskId of leafTasks) {
+					for (let i = 0; i < leafTasks.length; i++) {
+						const taskId = leafTasks[i]!; // Safe since we're iterating within bounds
 						try {
 							const result = await expansionService.expandTask({
 								taskId,
@@ -128,6 +169,12 @@ export default function Expand({ options }: Props) {
 								force: options.force,
 							});
 							results.push(result);
+
+							// Update progress
+							setState((prev) => ({
+								...prev,
+								progress: { current: i + 1, total: leafTasks.length },
+							}));
 						} catch (error) {
 							logger.error("Failed to expand leaf task", {
 								taskId,
@@ -141,26 +188,6 @@ export default function Expand({ options }: Props) {
 						phase: "complete",
 						message: `Batch expansion complete: ${results.length} tasks expanded`,
 						results,
-					}));
-				} else {
-					// Single task expansion
-					setState((prev) => ({
-						...prev,
-						phase: "analyzing",
-						message: `Analyzing complexity for task ${options.taskId}...`,
-					}));
-
-					const result = await expansionService.expandTask({
-						taskId: options.taskId,
-						context: options.context,
-						force: options.force,
-					});
-
-					setState((prev) => ({
-						...prev,
-						phase: "complete",
-						message: `Task expansion complete: ${result.subtasks.length} subtasks created`,
-						results: [result],
 					}));
 				}
 			} catch (err) {

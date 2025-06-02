@@ -11,6 +11,10 @@ export const description =
 export const options = zod.object({
 	status: taskStatus.optional().describe("Filter by task status"),
 	priority: taskPriority.optional().describe("Filter by task priority"),
+	root: zod
+		.string()
+		.optional()
+		.describe("Root task ID - limit search to direct children of this task. Use this to focus on a specific project or feature area."),
 });
 
 type Props = {
@@ -49,9 +53,15 @@ export default function Next({ options }: Props) {
 					priority: options.priority,
 				});
 
+				// Apply parent filter if specified (similar to MCP parentTaskId filtering)
+				let filteredTasks = availableTasks;
+				if (options.root) {
+					filteredTasks = availableTasks.filter((task) => task.parentId === options.root);
+				}
+
 				// Find the highest priority pending task (same logic as MCP)
 				const nextTask =
-					availableTasks
+					filteredTasks
 						.filter((task) => task.status === "pending")
 						.sort((a, b) => {
 							// Sort by priority (high > medium > low), then by ID
@@ -70,9 +80,11 @@ export default function Next({ options }: Props) {
 
 				const message = nextTask
 					? `Next task to work on: ${nextTask.title}`
-					: availableTasks.length > 0
+					: filteredTasks.length > 0
 						? "No pending tasks available (all tasks are in progress or completed)"
-						: "No tasks available";
+						: options.root
+							? `No tasks available under root ${options.root}`
+							: "No tasks available";
 
 				let context = undefined;
 
@@ -99,7 +111,7 @@ export default function Next({ options }: Props) {
 
 				setResult({
 					task: nextTask,
-					availableTasks,
+					availableTasks: filteredTasks,
 					message,
 					context,
 				});
@@ -184,7 +196,11 @@ export default function Next({ options }: Props) {
 				<Box marginTop={1}>
 					<Text color="green">
 						💡 Use <Text color="cyan">astrotask task list</Text> to see all
-						tasks or <Text color="cyan">astrotask start &lt;task-id&gt;</Text>{" "}
+						tasks{options.root ? (
+							<>
+								{" "}or <Text color="cyan">astrotask task list --parent {options.root}</Text> to see tasks under this root
+							</>
+						) : ""} or <Text color="cyan">astrotask start &lt;task-id&gt;</Text>{" "}
 						to begin a specific task
 					</Text>
 				</Box>
@@ -203,7 +219,7 @@ export default function Next({ options }: Props) {
 			padding={1}
 		>
 			<Text bold color="green">
-				Next Task
+				Next Task{options.root ? ` (under root ${options.root})` : ""}
 			</Text>
 
 			<Box flexDirection="column" marginTop={1}>

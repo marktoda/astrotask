@@ -1,9 +1,9 @@
 {
     "mcpServers": {
-        "astrolabe-task": {
+        "astrotask": {
             "command": "node",
             "args": [
-                "/home/toda/dev/astrolabe/packages/mcp/dist/packages/mcp/src/index.js"
+                "/home/toda/dev/astrotask/packages/mcp/dist/packages/mcp/src/index.js"
             ],
             "env": {
                 "OPENAI_API_KEY": "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",

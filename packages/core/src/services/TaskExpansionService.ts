@@ -215,7 +215,39 @@ export class TaskExpansionService {
 
     // Apply the generated subtasks
     const { updatedTree } = await generationResult.tree.flush(this.taskService);
-    const subtasks = updatedTree.getChildren().map((child) => child.task);
+    
+    // The PRDTaskGenerator creates an epic task with subtasks under it
+    // We need to extract the actual subtasks, not the epic task itself
+    let subtasks: Task[] = [];
+    const directChildren = updatedTree.getChildren();
+    
+    if (directChildren.length === 1) {
+      // If there's exactly one child (the epic task), get its children (the actual subtasks)
+      const epicTask = directChildren[0];
+      if (epicTask) {
+        const actualSubtasks = epicTask.getChildren();
+        subtasks = actualSubtasks.map((child) => child.task);
+        
+        // Move the actual subtasks to be direct children of the target task
+        // by updating their parentId and removing the epic task
+        for (const subtask of actualSubtasks) {
+          const updatedSubtask = { ...subtask.task, parentId: input.taskId };
+          await this.store.updateTask(subtask.task.id, updatedSubtask);
+        }
+        
+        // Remove the epic task since we don't want the extra layer
+        await this.taskService.deleteTaskTree(epicTask.task.id);
+        
+        this.logger.info('Removed epic task layer and moved subtasks to target task', {
+          epicTaskId: epicTask.task.id,
+          targetTaskId: input.taskId,
+          subtaskCount: subtasks.length,
+        });
+      }
+    } else {
+      // Fallback: use direct children if structure is different than expected
+      subtasks = directChildren.map((child) => child.task);
+    }
 
     // Create complexity context slice if enabled
     let contextSlicesCreated = 0;
