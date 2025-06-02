@@ -62,11 +62,13 @@ export async function createDatabase(options: DatabaseOptions = {}): Promise<Sto
     const baseStore = new DatabaseStore(backend.client, backend.drizzle, false, false);
 
     // Determine if we should use locking
+    // PostgreSQL should NEVER use file-based locking as it handles concurrency natively
     const shouldUseLocking =
-      options.enableLocking ??
-      (parsed.kind === 'pglite-file' ||
-        parsed.kind === 'pglite-mem' ||
-        parsed.kind === 'pglite-idb');
+      parsed.kind !== 'postgres' && // Never use locking for PostgreSQL
+      (options.enableLocking ??
+        (parsed.kind === 'pglite-file' ||
+          parsed.kind === 'pglite-mem' ||
+          parsed.kind === 'pglite-idb'));
 
     // Wrap with locking if needed
     const store = shouldUseLocking
