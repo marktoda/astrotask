@@ -101,7 +101,8 @@ export async function generateNextSubtaskId(store: Store, parentId: string): Pro
  * Generates the next available task ID based on whether it's a root task or subtask.
  */
 export async function generateNextTaskId(store: Store, parentId?: string): Promise<string> {
-  if (parentId) {
+  // Special handling: children of PROJECT_ROOT should get root-level IDs (e.g., ABCD, not __PROJECT_ROOT__-ABCD)
+  if (parentId && parentId !== TASK_IDENTIFIERS.PROJECT_ROOT) {
     return generateNextSubtaskId(store, parentId);
   }
   return generateNextRootTaskId(store);
@@ -117,7 +118,9 @@ export function validateTaskId(taskId: string): boolean {
     return true;
   }
 
-  // Handle subtasks of PROJECT_ROOT (e.g., __PROJECT_ROOT__-ABCD)
+  // Handle legacy subtasks of PROJECT_ROOT (e.g., __PROJECT_ROOT__-ABCD)
+  // NOTE: This format is deprecated. New tasks use simple root IDs (e.g., ABCD)
+  // but we keep this validation for backward compatibility with existing tasks.
   const projectRootPrefix = `${TASK_IDENTIFIERS.PROJECT_ROOT}-`;
   if (taskId.startsWith(projectRootPrefix)) {
     const suffix = taskId.substring(projectRootPrefix.length);
@@ -146,16 +149,20 @@ export function validateSubtaskId(taskId: string, parentId: string): boolean {
 
   // Special handling for PROJECT_ROOT parent
   if (parentId === TASK_IDENTIFIERS.PROJECT_ROOT) {
-    // Child of PROJECT_ROOT should start with PROJECT_ROOT- and be a valid task ID
-    const expectedPrefix = `${TASK_IDENTIFIERS.PROJECT_ROOT}-`;
-    if (!taskId.startsWith(expectedPrefix)) {
-      return false;
+    // Support both old format (__PROJECT_ROOT__-XXXX) for backward compatibility
+    // and new format (simple root IDs like ABCD) for new tasks
+    const legacyPrefix = `${TASK_IDENTIFIERS.PROJECT_ROOT}-`;
+    if (taskId.startsWith(legacyPrefix)) {
+      // Legacy format: validate the suffix after __PROJECT_ROOT__-
+      const suffix = taskId.substring(legacyPrefix.length);
+      const rootPattern = /^[A-Z]+$/;
+      const subtaskPattern = /^[A-Z]+(-[A-Z]+)+$/;
+      return rootPattern.test(suffix) || subtaskPattern.test(suffix);
+    } else {
+      // New format: should be a simple root task ID (e.g., ABCD)
+      const rootPattern = /^[A-Z]+$/;
+      return rootPattern.test(taskId);
     }
-
-    // The suffix after PROJECT_ROOT- should be a valid root task pattern
-    const suffix = taskId.substring(expectedPrefix.length);
-    const rootPattern = /^[A-Z]+$/;
-    return rootPattern.test(suffix);
   }
 
   const parsed = parseTaskId(taskId);

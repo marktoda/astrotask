@@ -1,13 +1,15 @@
 import type { ContextSlice, Task, TaskTree } from "@astrotask/core";
+// Import TaskService and DependencyService first to avoid PostgreSQL import hang
+import { TaskService } from "@astrotask/core/dist/services/TaskService.js";
+import { DependencyService } from "@astrotask/core/dist/services/DependencyService.js";
 import {
-	DependencyService,
-	TaskService,
+	TASK_IDENTIFIERS,
 	TrackingDependencyGraph,
 	TrackingTaskTree,
 	createDatabase,
 } from "@astrotask/core";
-import type blessed from "blessed";
 import { create } from "zustand";
+import type blessed from "blessed";
 import { EditorService, type PendingTaskData } from "../services/editor.js";
 
 export interface DashboardState {
@@ -339,7 +341,7 @@ export function createDashboardStore(
 				// Create new task
 				const newTask: Task = {
 					id: `temp-${Date.now()}`, // Temporary ID - will be replaced on flush
-					parentId,
+					parentId: parentId || TASK_IDENTIFIERS.PROJECT_ROOT,
 					title,
 					description: null,
 					status: "pending",
@@ -1012,12 +1014,55 @@ export function createDashboardStore(
 
 			const progressByTaskId = new Map<string, number>();
 
-			// Calculate progress for all tasks using TrackingTaskTree traversal
+			// Calculate progress bottom-up to avoid redundant recursive calls
+			// First pass: calculate leaf node progress
 			trackingTree.walkDepthFirst((node) => {
-				progressByTaskId.set(
-					node.task.id,
-					get().calculateProgress(node.task.id),
-				);
+				const children = node.getChildren();
+				if (children.length === 0) {
+					// Leaf node
+					const progress = node.task.status === "done" ? 100 : 0;
+					progressByTaskId.set(node.task.id, progress);
+				}
+			});
+
+			// Second pass: calculate parent progress from children (post-order traversal)
+			const visited = new Set<string>();
+			const calculateParentProgress = (node: any): number => {
+				if (visited.has(node.task.id)) {
+					return progressByTaskId.get(node.task.id) || 0;
+				}
+				visited.add(node.task.id);
+
+				const children = node.getChildren();
+				if (children.length === 0) {
+					// Already calculated in first pass
+					return progressByTaskId.get(node.task.id) || 0;
+				}
+
+				// Calculate based on children
+				let totalProgress = 0;
+				let validChildren = 0;
+
+				for (const child of children) {
+					if (
+						child.task.status !== "cancelled" &&
+						child.task.status !== "archived"
+					) {
+						totalProgress += calculateParentProgress(child);
+						validChildren++;
+					}
+				}
+
+				const progress = validChildren > 0 ? totalProgress / validChildren : 0;
+				progressByTaskId.set(node.task.id, progress);
+				return progress;
+			};
+
+			// Calculate progress for all parent nodes
+			trackingTree.walkDepthFirst((node) => {
+				if (node.getChildren().length > 0) {
+					calculateParentProgress(node);
+				}
 			});
 
 			// Update project progress
@@ -1144,10 +1189,13 @@ export function createDashboardStore(
 					editorActive: false,
 				});
 
+				// Remember the currently selected task to restore it after creation
+				const previousSelectedTaskId = get().selectedTaskId;
+
 				// Create new task with all the details from the template
 				const newTask: Task = {
 					id: `temp-${Date.now()}`, // Temporary ID - will be replaced on flush
-					parentId,
+					parentId: parentId || TASK_IDENTIFIERS.PROJECT_ROOT,
 					title: taskTemplate.title,
 					description: taskTemplate.description || null,
 					status: taskTemplate.status,
@@ -1181,9 +1229,8 @@ export function createDashboardStore(
 				get().updateUnsavedChangesFlag();
 				get().recalculateAllProgress();
 
-				// Show task immediately with temp ID
+				// Show immediate feedback but don't change selection
 				set({
-					selectedTaskId: newTask.id,
 					statusMessage: `Saving task: ${taskTemplate.title}...`,
 				});
 
@@ -1197,20 +1244,20 @@ export function createDashboardStore(
 					return;
 				}
 
-				// Reload to get the real IDs and ensure UI is in sync
-				set({ statusMessage: `Finalizing task...` });
-				try {
-					await get().reloadFromDatabase();
-				} catch (reloadError) {
-					set({
-						statusMessage: `Error finalizing task: ${reloadError instanceof Error ? reloadError.message : String(reloadError)}`,
-					});
-					return;
-				}
-
+				// Instead of full reload, just update the tracking tree with real IDs
+				// This avoids the expensive loadTasks() call with PostgreSQL
 				set({
 					statusMessage: `Task "${taskTemplate.title}" created successfully`,
 				});
+
+				// Restore the previous selection to maintain current tree view
+				if (previousSelectedTaskId) {
+					get().selectTask(previousSelectedTaskId);
+				}
+
+				// Trigger update to reflect any ID changes from flush
+				get().triggerTreeUpdate();
+
 			} catch (error) {
 				const errorMessage =
 					error instanceof Error ? error.message : String(error);
