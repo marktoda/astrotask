@@ -126,6 +126,16 @@ export default function Next({ options }: Props) {
 		getNextTask();
 	}, [options, taskService, store]);
 
+	// Exit the process after operation is complete (like expand command)
+	useEffect(() => {
+		if (!loading && (result || error)) {
+			// Use setTimeout to ensure the component has fully rendered
+			setTimeout(() => {
+				process.exit(error ? 1 : 0);
+			}, 100);
+		}
+	}, [loading, result, error]);
+
 	if (loading) return <Text>Loading next task...</Text>;
 	if (error) return <Text color="red">Error: {error}</Text>;
 	if (!result) return <Text color="red">No result available</Text>;
@@ -200,8 +210,8 @@ export default function Next({ options }: Props) {
 							<>
 								{" "}or <Text color="cyan">astrotask task list --parent {options.root}</Text> to see tasks under this root
 							</>
-						) : ""} or <Text color="cyan">astrotask start &lt;task-id&gt;</Text>{" "}
-						to begin a specific task
+						) : ""} or <Text color="cyan">astrotask task update &lt;task-id&gt; --status in-progress</Text>{" "}
+						to begin working on a specific task
 					</Text>
 				</Box>
 			</Box>
@@ -304,15 +314,15 @@ export default function Next({ options }: Props) {
 					Suggested Actions:
 				</Text>
 				<Text color="green">
-					• Start: <Text color="cyan">astrotask start {task.id}</Text>
+					• Start working: <Text color="cyan">astrotask task update {task.id} --status in-progress</Text>
 				</Text>
 				<Text color="green">
-					• View details:{" "}
+					• View hierarchy:{" "}
 					<Text color="cyan">astrotask task tree {task.id}</Text>
 				</Text>
 				{context?.dependents && context.dependents.length > 0 && (
 					<Text color="green">
-						• See blocked tasks:{" "}
+						• See available tasks:{" "}
 						<Text color="cyan">astrotask task available</Text>
 					</Text>
 				)}
