@@ -156,14 +156,12 @@ export class DashboardLayout {
 			// Handle overlays
 			if (state.commandPaletteOpen) {
 				this.commandPalette.show();
-				this.commandPalette.focus();
 			} else {
 				this.commandPalette.hide();
 			}
 
 			if (state.helpOverlayOpen) {
 				this.helpOverlay.show();
-				this.helpOverlay.focus();
 			} else {
 				this.helpOverlay.hide();
 			}
