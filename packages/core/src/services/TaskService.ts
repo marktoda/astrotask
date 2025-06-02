@@ -682,7 +682,7 @@ export class TaskService implements ITaskReconciliationService {
         parentId?: string | null;
         includeProjectRoot?: boolean;
       } = {};
-      
+
       if (filters.statuses !== undefined) {
         storeFilters.statuses = filters.statuses;
       }
@@ -692,7 +692,7 @@ export class TaskService implements ITaskReconciliationService {
       if (filters.includeProjectRoot !== undefined) {
         storeFilters.includeProjectRoot = filters.includeProjectRoot;
       }
-      
+
       return this.store.listTasks(storeFilters);
     }
 
@@ -741,20 +741,20 @@ export class TaskService implements ITaskReconciliationService {
    * Get available tasks considering effective status
    * Returns tasks that are effectively 'pending' or 'in-progress' and not blocked by dependencies
    */
-  async getAvailableTasksWithEffectiveStatus(filter?: { 
-    status?: TaskStatus; 
+  async getAvailableTasksWithEffectiveStatus(filter?: {
+    status?: TaskStatus;
     priority?: string;
     useEffectiveStatus?: boolean;
   }): Promise<Task[]> {
     const useEffective = filter?.useEffectiveStatus ?? true;
-    
+
     // Get all tasks that are effectively available for work
-    const candidateTasks = useEffective 
-      ? await this.listTasksWithEffectiveStatus({ 
-          effectiveStatuses: ['pending', 'in-progress'] 
+    const candidateTasks = useEffective
+      ? await this.listTasksWithEffectiveStatus({
+          effectiveStatuses: ['pending', 'in-progress'],
         })
-      : await this.store.listTasks({ 
-          statuses: ['pending', 'in-progress'] 
+      : await this.store.listTasks({
+          statuses: ['pending', 'in-progress'],
         });
 
     // Filter by additional criteria and check dependencies
@@ -837,10 +837,10 @@ export class TaskService implements ITaskReconciliationService {
     const dependents = await this.dependencyService.getDependents(taskId);
     this.cache.invalidateTreeFamily(taskId, [], dependents);
 
-    return { 
-      success: true, 
+    return {
+      success: true,
       validation,
-      ...(options.cascade ? { cascadeCount } : {})
+      ...(options.cascade ? { cascadeCount } : {}),
     };
   }
 

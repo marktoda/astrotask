@@ -1,4 +1,4 @@
-import { TaskService, createDatabase } from "@astrolabe/core";
+import { TaskService, cfg, createDatabase } from "@astrolabe/core";
 import { Text } from "ink";
 import type { AppProps } from "pastel";
 import React from "react";
@@ -14,20 +14,49 @@ export default function App({ Component, commandProps }: AppProps) {
 
 	// Run once; when the promise resolves we have the real Store and TaskService
 	React.useEffect(() => {
-		// Use the same configuration approach as the MCP server with locking enabled
+		let store: any = null;
+
+		// Use the centralized configuration system that loads .env files
 		const dbOptions = {
-			dataDir: process.env["DATABASE_PATH"] || "./data/astrolabe.db",
-			verbose: process.env["DB_VERBOSE"] === "true",
+			dataDir: cfg.DATABASE_URI,
+			verbose: cfg.DB_VERBOSE,
 			enableLocking: true,
 			lockOptions: {
 				processType: "cli", // Identify this as CLI process for lock debugging
 			},
 		};
 
+		// Cleanup function for graceful shutdown
+		const cleanup = async () => {
+			if (store) {
+				try {
+					await store.close();
+				} catch (err: any) {
+					console.error("Failed to close database connection:", err);
+				}
+			}
+		};
+
+		// Register process exit handlers
+		const exitHandler = () => {
+			cleanup().finally(() => process.exit(0));
+		};
+
+		process.on("SIGINT", exitHandler);
+		process.on("SIGTERM", exitHandler);
+		process.on("beforeExit", cleanup);
+
 		createDatabase(dbOptions)
-			.then((store: any) => {
+			.then((createdStore: any) => {
+				store = createdStore;
+
+				// Display appropriate connection info based on database type
+				const connectionInfo = store.pgLite.dataDir
+					? store.pgLite.dataDir
+					: "PostgreSQL database";
+
 				console.log(
-					`Initialized database at: ${store.pgLite.dataDir} (with locking)`,
+					`Initialized database at: ${connectionInfo} (with locking)`,
 				);
 				const taskService = new TaskService(store);
 				setContext({ store, taskService });
@@ -47,6 +76,16 @@ export default function App({ Component, commandProps }: AppProps) {
 				}
 				process.exit(1);
 			});
+
+		// Cleanup function to close database connection
+		return () => {
+			// Remove process handlers
+			process.off("SIGINT", exitHandler);
+			process.off("SIGTERM", exitHandler);
+			process.off("beforeExit", cleanup);
+
+			cleanup();
+		};
 	}, []);
 
 	if (!context) return <Text>Initialising database…</Text>;

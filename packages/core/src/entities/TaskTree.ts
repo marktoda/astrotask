@@ -272,13 +272,13 @@ export class TaskTree implements ITaskTree {
     // Check ancestors for overriding statuses
     const doneAncestor = this.getAncestorWithStatus('done');
     if (doneAncestor) return 'done';
-    
+
     const cancelledAncestor = this.getAncestorWithStatus('cancelled');
     if (cancelledAncestor) return 'cancelled';
-    
+
     const archivedAncestor = this.getAncestorWithStatus('archived');
     if (archivedAncestor) return 'archived';
-    
+
     // No overriding ancestor status, return actual status
     return this.status;
   }
@@ -289,14 +289,14 @@ export class TaskTree implements ITaskTree {
 
   getAncestorWithStatus(status: TaskStatus): ITaskTree | null {
     let current = this.getParent();
-    
+
     while (current) {
       if (current.status === status) {
         return current;
       }
       current = current.getParent();
     }
-    
+
     return null;
   }
 

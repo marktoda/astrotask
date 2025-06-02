@@ -6,10 +6,11 @@
  * performs the operation, and releases the lock.
  */
 
-import type { PGlite } from '@electric-sql/pglite';
 import type { PgliteDatabase } from 'drizzle-orm/pglite';
+import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import type { ContextSlice, CreateContextSlice } from '../schemas/contextSlice.js';
 import type { CreateTask, Task, TaskStatus } from '../schemas/task.js';
+import type { DatabaseClient } from '../types/database.js';
 import { createModuleLogger } from '../utils/logger.js';
 import { DatabaseLock, DatabaseLockError, type LockInfo, type LockOptions } from './lock.js';
 import type * as schema from './schema.js';
@@ -33,11 +34,11 @@ export class LockingStore implements Store {
   }
 
   // Expose underlying properties
-  get pgLite(): PGlite {
+  get pgLite(): DatabaseClient {
     return this.innerStore.pgLite;
   }
 
-  get sql(): PgliteDatabase<typeof schema> {
+  get sql(): PgliteDatabase<typeof schema> | PostgresJsDatabase<typeof schema> {
     return this.innerStore.sql;
   }
 

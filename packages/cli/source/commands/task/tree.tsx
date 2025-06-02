@@ -127,6 +127,16 @@ export default function Tree({ options }: Props) {
 		loadTree();
 	}, [db, rootId, maxDepth, options.showAll]);
 
+	// Exit the process after rendering is complete
+	useEffect(() => {
+		if (!loading) {
+			// Use setTimeout to ensure the component has fully rendered
+			setTimeout(() => {
+				process.exit(error ? 1 : 0);
+			}, 100);
+		}
+	}, [loading, error]);
+
 	if (loading) return <Text>Loading task tree...</Text>;
 	if (error) return <Text color="red">Error: {error}</Text>;
 
@@ -224,11 +234,13 @@ function TreeNodeComponent({
 	const children = node.getChildren();
 	const hasChildren = children.length > 0;
 	const task = node.task;
-	
+
 	// Get both actual and effective status
 	const actualStatus = task.status;
 	// Fallback for effective status if method doesn't exist yet
-	const effectiveStatus = (node as any).getEffectiveStatus ? (node as any).getEffectiveStatus() : actualStatus;
+	const effectiveStatus = (node as any).getEffectiveStatus
+		? (node as any).getEffectiveStatus()
+		: actualStatus;
 	const statusInherited = actualStatus !== effectiveStatus;
 
 	// Tree drawing characters

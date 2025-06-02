@@ -17,10 +17,12 @@ export const configSchema = z.object({
   PORT: z.coerce.number().int().min(1).max(65535).default(3000),
 
   // Log verbosity
-  LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
+  LOG_LEVEL: z.enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal']).default('info'),
 
-  // Database configuration (PGLite)
-  DATABASE_PATH: z.string().default('./data/astrolabe.db'),
+  // Database configuration
+  // Can be either a file path for PGlite (e.g., './data/astrolabe.db')
+  // or a PostgreSQL connection string (e.g., 'postgresql://user:pass@host:port/db')
+  DATABASE_URI: z.string().default('./data/astrolabe.db'),
 
   // Database performance and behavior settings
   DB_VERBOSE: z.coerce.boolean().default(false),
@@ -29,6 +31,13 @@ export const configSchema = z.object({
   // LLM/AI Configuration
   OPENAI_API_KEY: z.string().default(''),
   LLM_MODEL: z.string().default(DEFAULT_MODEL_ID),
+
+  // Optional Electric SQL configuration (deprecated)
+  ELECTRIC_URL: z.string().optional(),
+
+  // Development
+  DEV_SERVER_HOST: z.string().default('localhost'),
+  DEV_SERVER_PORT: z.coerce.number().int().min(1).max(65535).default(5173),
 });
 
 export type AppConfig = z.infer<typeof configSchema>;

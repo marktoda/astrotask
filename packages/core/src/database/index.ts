@@ -1,94 +1,95 @@
 /**
  * Database initialization and factory functions
  *
- * This module provides simplified database creation with plain PGlite.
- * Removed Electric SQL sync - now uses local-only PGlite database.
+ * This module provides database creation with support for both PGlite and PostgreSQL.
+ * PGlite is used for local-only file-based databases, while PostgreSQL is used
+ * for full PostgreSQL connection strings.
  */
 
-import { mkdirSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { PGlite } from '@electric-sql/pglite';
-import { eq } from 'drizzle-orm';
-import { drizzle } from 'drizzle-orm/pglite';
-import { migrate } from 'drizzle-orm/pglite/migrator';
-import { TASK_IDENTIFIERS } from '../entities/TaskTreeConstants.js';
 import { cfg } from '../utils/config.js';
 import { createModuleLogger } from '../utils/logger.js';
+import { openDatabase } from './factory.js';
 import type { LockOptions } from './lock.js';
-import { DatabaseLock, DatabaseLockError, withDatabaseLock } from './lock.js';
+import { DatabaseLockError } from './lock.js';
 import { LockingStore } from './lockingStore.js';
-import * as schema from './schema.js';
 import { DatabaseStore, type Store } from './store.js';
+import { parseDbUrl } from './url-parser.js';
 
 const logger = createModuleLogger('database');
 
-// Used for re-exports below
-// @ts-ignore - used for re-exports
-const _exportedSymbols = { DatabaseLock, DatabaseLockError, withDatabaseLock };
-
 // Get the directory of this file
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const MIGRATIONS_DIR = join(__dirname, '..', '..', 'migrations', 'drizzle');
+const DEFAULT_MIGRATIONS_DIR = resolve(__dirname, '..', '..', 'migrations', 'drizzle');
 
 export interface DatabaseOptions {
   /** Database file path or connection string */
   dataDir?: string;
-  /** Enable encryption */
-  enableEncryption?: boolean;
   /** Verbose logging */
   verbose?: boolean;
   /** Enable cooperative locking (wraps store with LockingStore) */
   enableLocking?: boolean;
   /** Lock options (only used when enableLocking is true) */
   lockOptions?: LockOptions;
+  /** Custom migrations directory (defaults to built-in migrations) */
+  migrationsDir?: string;
 }
 
 /**
- * Ensure the data directory exists
+ * Create a database connection with automatic backend detection
+ *
+ * If dataDir is a PostgreSQL connection string, uses PostgreSQL.
+ * Otherwise, uses PGLite for local file-based database.
  */
-function ensureDataDir(dataDir: string): void {
-  if (dataDir.startsWith('memory://') || dataDir.startsWith('idb://')) {
-    return; // In-memory databases don't need directory creation
-  }
+export async function createDatabase(options: DatabaseOptions = {}): Promise<Store> {
+  const dataDir = options.dataDir ?? cfg.DATABASE_URI;
+  const verbose = options.verbose ?? cfg.DB_VERBOSE;
+  const migrationsDir = options.migrationsDir ?? DEFAULT_MIGRATIONS_DIR;
 
   try {
-    const dir = dirname(dataDir);
-    mkdirSync(dir, { recursive: true });
+    // Parse URL once
+    const parsed = parseDbUrl(dataDir);
+
+    // Open database with the new factory
+    const backend = await openDatabase(parsed, {
+      migrationsDir,
+      debug: verbose,
+      ...(options.enableLocking !== undefined ? { useLocking: options.enableLocking } : {}),
+    });
+
+    // Create the store
+    const baseStore = new DatabaseStore(backend.client, backend.drizzle, false, false);
+
+    // Determine if we should use locking
+    const shouldUseLocking =
+      options.enableLocking ??
+      (parsed.kind === 'pglite-file' ||
+        parsed.kind === 'pglite-mem' ||
+        parsed.kind === 'pglite-idb');
+
+    // Wrap with locking if needed
+    const store = shouldUseLocking
+      ? new LockingStore(baseStore, dataDir, options.lockOptions)
+      : baseStore;
+
+    return store;
   } catch (error) {
-    logger.warn({ error, dataDir }, 'Failed to create data directory');
-  }
-}
+    // Handle lock errors with user-friendly messages
+    if (error instanceof DatabaseLockError) {
+      const lockHolder = error.lockInfo
+        ? `${error.lockInfo.process} (PID: ${error.lockInfo.pid})`
+        : 'another process';
 
-/**
- * Ensure PROJECT_ROOT task exists
- */
-async function ensureProjectRoot(db: ReturnType<typeof drizzle>): Promise<void> {
-  try {
-    const existingRoot = await db
-      .select()
-      .from(schema.tasks)
-      .where(eq(schema.tasks.id, TASK_IDENTIFIERS.PROJECT_ROOT))
-      .limit(1);
-
-    if (existingRoot.length === 0) {
-      await db.insert(schema.tasks).values({
-        id: TASK_IDENTIFIERS.PROJECT_ROOT,
-        title: 'Project Root',
-        description: 'Root container for all project tasks',
-        status: 'done',
-        priority: 'low',
-        prd: null,
-        contextDigest: null,
-        parentId: null,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      });
-
-      logger.info('Created PROJECT_ROOT task');
+      const friendlyError = new Error(
+        `Database is currently in use by ${lockHolder}. Please try again in a moment.`
+      );
+      // Preserve the original error for debugging
+      (friendlyError as Error & { cause?: unknown }).cause = error;
+      throw friendlyError;
     }
-  } catch (error) {
-    logger.warn({ error }, 'Failed to ensure PROJECT_ROOT task exists');
+
+    throw error;
   }
 }
 
@@ -97,8 +98,7 @@ async function ensureProjectRoot(db: ReturnType<typeof drizzle>): Promise<void> 
  */
 export async function createLocalDatabase(dataDir?: string): Promise<Store> {
   return createDatabase({
-    dataDir: dataDir ?? cfg.DATABASE_PATH,
-    enableEncryption: false,
+    dataDir: dataDir ?? cfg.DATABASE_URI,
   });
 }
 
@@ -110,8 +110,7 @@ export async function createLockedDatabase(
   lockOptions?: LockOptions
 ): Promise<Store> {
   const dbOptions: DatabaseOptions = {
-    dataDir: dataDir ?? cfg.DATABASE_PATH,
-    enableEncryption: false,
+    dataDir: dataDir ?? cfg.DATABASE_URI,
     enableLocking: true,
   };
 
@@ -155,60 +154,6 @@ export async function createDatabaseWithLocking(
 }
 
 /**
- * Create a local-only database with plain PGlite
- */
-export async function createDatabase(options: DatabaseOptions = {}): Promise<Store> {
-  const {
-    dataDir = cfg.DATABASE_PATH,
-    enableEncryption = false,
-    verbose = cfg.DB_VERBOSE,
-    enableLocking = false,
-    lockOptions,
-  } = options;
-
-  try {
-    // Ensure data directory exists
-    ensureDataDir(dataDir);
-
-    // Initialize plain PGlite without any extensions
-    const pgLite = await PGlite.create({
-      dataDir,
-      debug: verbose ? 1 : 0,
-    });
-
-    // Initialize Drizzle ORM
-    const db = drizzle(pgLite, { schema });
-
-    // Run migrations
-    await migrate(db, { migrationsFolder: MIGRATIONS_DIR });
-
-    // Ensure PROJECT_ROOT task exists
-    await ensureProjectRoot(db);
-
-    // Create base store
-    const baseStore = new DatabaseStore(pgLite, db, false, enableEncryption);
-
-    // Wrap with locking if requested
-    const store = enableLocking ? new LockingStore(baseStore, dataDir, lockOptions) : baseStore;
-
-    if (verbose) {
-      logger.info(
-        `Local PGlite database initialized successfully${enableLocking ? ' with locking' : ''}`,
-        {
-          dataDir,
-          locking: enableLocking,
-        }
-      );
-    }
-
-    return store;
-  } catch (error) {
-    logger.error({ error, dataDir }, `Failed to initialize database, ${(error as Error).message}`);
-    throw error;
-  }
-}
-
-/**
  * Create a synced database (now just creates local database since sync is removed)
  * @deprecated Electric SQL sync has been removed. This now creates a local-only database.
  */
@@ -226,5 +171,8 @@ export { DatabaseStore } from './store.js';
 export { LockingStore } from './lockingStore.js';
 export { DatabaseLock, DatabaseLockError, withDatabaseLock } from './lock.js';
 export type { LockOptions } from './lock.js';
+export type { DatabaseBackend, DbCapabilities } from './adapters.js';
+export { parseDbUrl, type DbUrl } from './url-parser.js';
+export { openDatabase } from './factory.js';
 
 export * from './schema.js';

@@ -2,7 +2,7 @@
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { createDatabase, type DatabaseOptions, TaskService, DependencyService, createModuleLogger, logShutdown } from '@astrolabe/core';
+import { createDatabase, type DatabaseOptions, TaskService, DependencyService, createModuleLogger, logShutdown, cfg } from '@astrolabe/core';
 import {
   MinimalHandlers,
   getNextTaskSchema,
@@ -29,22 +29,18 @@ async function main() {
     version: '0.3.0',
   });
 
-  // Initialize database options with cooperative locking
-  const dbOptions: DatabaseOptions = { 
-    dataDir: process.env.DATABASE_PATH || './data/astrolabe.db',
-    verbose: process.env.DB_VERBOSE === 'true',
+  // Use the centralized configuration system
+  const dbConfig = {
+    dataDir: cfg.DATABASE_URI,
+    verbose: cfg.DB_VERBOSE,
     enableLocking: true,
     lockOptions: {
       processType: 'mcp-server',
-      // MCP servers can use shorter timeouts since operations are typically brief
-      maxRetries: 30,  // 3 seconds total timeout (30 * 100ms)
-      retryDelay: 100,
-      staleTimeout: 45000,  // 45 seconds - longer for server processes
-    }
+    },
   };
 
   // Create connection manager for smart resource management
-  const connectionManager = createConnectionManager(dbOptions);
+  const connectionManager = createConnectionManager(dbConfig);
 
   // Create handler context factory that creates fresh services with each connection
   const createHandlerContext = (store: any) => ({

@@ -1,29 +1,30 @@
 import { randomUUID } from 'node:crypto';
-import type { PGlite } from '@electric-sql/pglite';
 import { and, desc, eq, inArray, isNull, ne } from 'drizzle-orm';
 import type { PgliteDatabase } from 'drizzle-orm/pglite';
+import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import { TASK_IDENTIFIERS } from '../entities/TaskTreeConstants.js';
 import type {
   ContextSlice,
   CreateContextSlice as NewContextSlice,
 } from '../schemas/contextSlice.js';
 import type { CreateTask as NewTask, Task, TaskStatus } from '../schemas/task.js';
+import type { DatabaseClient } from '../types/database.js';
 import { generateNextTaskId } from '../utils/taskId.js';
 import * as schema from './schema.js';
 
 /**
- * Store interface for local-first database operations
+ * Store interface for database operations
  *
- * Uses PGlite and Drizzle ORM for:
+ * Supports both PGlite and PostgreSQL backends:
  * - Type-safe database operations
- * - Local-first architecture
- * - Embedded SQLite database
+ * - Local-first architecture (PGlite)
+ * - Full PostgreSQL support
  */
 export interface Store {
-  /** Raw PGlite client for direct SQL operations */
-  readonly pgLite: PGlite;
+  /** Raw database client for direct SQL operations - can be PGlite or compatibility layer */
+  readonly pgLite: DatabaseClient;
   /** Type-safe Drizzle ORM instance */
-  readonly sql: PgliteDatabase<typeof schema>;
+  readonly sql: PgliteDatabase<typeof schema> | PostgresJsDatabase<typeof schema>;
   /** Whether encryption is enabled */
   readonly isEncrypted: boolean;
 
@@ -54,20 +55,20 @@ export interface Store {
 }
 
 /**
- * Database store implementation with business methods
+ * Generic database store implementation with business methods
  */
-export class DatabaseStore implements Store {
-  public readonly pgLite: PGlite;
-  public readonly sql: PgliteDatabase<typeof schema>;
+export class DatabaseStore<TClient extends DatabaseClient = DatabaseClient> implements Store {
+  public readonly pgLite: TClient;
+  public readonly sql: PgliteDatabase<typeof schema> | PostgresJsDatabase<typeof schema>;
   public readonly isEncrypted: boolean;
 
   constructor(
-    pgLite: PGlite,
-    sql: PgliteDatabase<typeof schema>,
+    client: TClient,
+    sql: PgliteDatabase<typeof schema> | PostgresJsDatabase<typeof schema>,
     _isSyncing = false,
     isEncrypted = false
   ) {
-    this.pgLite = pgLite;
+    this.pgLite = client;
     this.sql = sql;
     this.isEncrypted = isEncrypted;
   }
@@ -169,10 +170,7 @@ export class DatabaseStore implements Store {
   }
 
   async deleteTask(id: string): Promise<boolean> {
-    const result = await this.sql
-      .delete(schema.tasks)
-      .where(eq(schema.tasks.id, id))
-      .returning({ id: schema.tasks.id });
+    const result = await this.sql.delete(schema.tasks).where(eq(schema.tasks.id, id)).returning();
 
     return result.length > 0;
   }
@@ -221,7 +219,7 @@ export class DatabaseStore implements Store {
 
   // System operations
   async close(): Promise<void> {
-    // Close PGlite connection
+    // Close database connection
     await this.pgLite.close();
   }
 }

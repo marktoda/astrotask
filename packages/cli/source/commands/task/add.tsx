@@ -43,6 +43,16 @@ export default function Add({ options }: Props) {
 		createTask();
 	}, [options, db]);
 
+	// Exit the process after operation is complete
+	useEffect(() => {
+		if (result || error) {
+			// Use setTimeout to ensure the component has fully rendered
+			setTimeout(() => {
+				process.exit(error ? 1 : 0);
+			}, 100);
+		}
+	}, [result, error]);
+
 	if (error) return <Text color="red">Error: {error}</Text>;
 	if (result) return <Text color="green">{result}</Text>;
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { createDatabase } from "@astrolabe/core";
+import { cfg, createDatabase } from "@astrolabe/core";
 import blessed from "blessed";
 import { EditorService } from "./services/editor.js";
 import { KeymapService } from "./services/keymap.js";
@@ -27,10 +27,10 @@ async function main() {
 			process.env["TERM"] = originalTerm;
 		}
 
-		// Initialize database with consistent configuration
+		// Use the centralized configuration system
 		const dbOptions = {
-			dataDir: process.env["DATABASE_PATH"] || "./data/astrolabe.db",
-			verbose: process.env["DB_VERBOSE"] === "true",
+			dataDir: cfg.DATABASE_URI,
+			verbose: cfg.DB_VERBOSE,
 			enableLocking: true,
 			lockOptions: {
 				processType: "cli-dashboard", // Identify this as CLI dashboard process
