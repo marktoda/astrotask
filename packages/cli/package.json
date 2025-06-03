@@ -8,7 +8,7 @@
 		"node": ">=16"
 	},
 	"scripts": {
-		"build": "tsc",
+		"build": "tsc && cp -r templates dist/",
 		"dev": "tsc --watch",
 		"start": "node dist/cli.js",
 		"dashboard": "TERM=xterm-256color NODE_NO_WARNINGS=1 node dist/cli.js dashboard",

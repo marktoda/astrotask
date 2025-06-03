@@ -1,7 +1,7 @@
 import { dirname, join, resolve } from "path";
 import { fileURLToPath } from "url";
 import { createDatabase } from "@astrotask/core";
-import { access, mkdir, writeFile } from "fs/promises";
+import { access, mkdir, writeFile, readFile } from "fs/promises";
 import { Box, Text } from "ink";
 import SelectInput from "ink-select-input";
 import TextInput from "ink-text-input";
@@ -189,6 +189,101 @@ async function createStarterTasks(store: any): Promise<string[]> {
 	}
 
 	return createdTasks;
+}
+
+// Create astrotask rules file for supported editors
+async function createAstrotaskRules(editor: string): Promise<string | null> {
+	// Define rules configuration for different editors
+	const editorRulesConfig = {
+		cursor: {
+			rulesDir: ".cursor/rules",
+			fileName: "astrotask.mdc",
+		},
+		roo: {
+			rulesDir: ".roo/rules", 
+			fileName: "astrotask.mdc",
+		},
+		cline: {
+			rulesDir: ".vscode", // Cline uses VSCode configuration
+			fileName: "astrotask.md", // Use .md for VSCode compatibility
+		},
+		"claude-code": {
+			rulesDir: ".claude",
+			fileName: "astrotask.md",
+		},
+		"claude-desktop": {
+			rulesDir: ".claude",
+			fileName: "astrotask.md", 
+		},
+	};
+
+	const config = editorRulesConfig[editor as keyof typeof editorRulesConfig];
+	if (!config) {
+		return null; // Editor not supported for rules
+	}
+
+	const rulesDir = config.rulesDir;
+	const rulesPath = join(rulesDir, config.fileName);
+
+	// Check if rules file already exists
+	try {
+		await access(rulesPath);
+		return null; // File already exists, don't overwrite
+	} catch {
+		// File doesn't exist, create it
+	}
+
+	// Create rules directory if it doesn't exist
+	await mkdir(rulesDir, { recursive: true });
+
+	// Get the path to the astrotask rules template
+	const __filename = fileURLToPath(import.meta.url);
+	const __dirname = dirname(__filename);
+	const templatePath = resolve(__dirname, "../templates/astrotask-rules.mdc");
+
+	try {
+		// Try to read the template file
+		const rulesContent = await readFile(templatePath, "utf-8");
+		
+		// For non-.mdc editors, convert the frontmatter format
+		let finalContent = rulesContent;
+		if (config.fileName.endsWith('.md')) {
+			// Convert .mdc frontmatter to standard markdown for editors that don't support .mdc
+			finalContent = rulesContent.replace(
+				/^---\ndescription: ([^\n]*)\nglobs: ([^\n]*)\nalwaysApply: ([^\n]*)\n---/,
+				'# Astrotask Rules\n\n> **Description**: $1\n> **Applies to**: $2\n> **Always Apply**: $3'
+			);
+		}
+		
+		await writeFile(rulesPath, finalContent);
+		return rulesPath;
+	} catch (error) {
+		console.warn(`Failed to read template file: ${error}. Creating basic rules file.`);
+		
+		// Fallback: create a basic rules file if template is not available
+		const basicContent = config.fileName.endsWith('.mdc') ? 
+			`---
+description: Basic Astrotask integration guidelines
+globs: "**/*"
+alwaysApply: true
+---
+
+- **Astrotask Integration**: Use MCP functions getNextTask(), addTasks(), addTaskContext(), updateStatus(), listTasks(), addDependency()
+- **Workflow**: Always update task status when starting/completing work
+- **Best Practice**: Break down complex tasks and add context for decisions
+` :
+			`# Astrotask Rules
+
+> **Basic Astrotask integration guidelines**
+
+- **Astrotask Integration**: Use MCP functions getNextTask(), addTasks(), addTaskContext(), updateStatus(), listTasks(), addDependency()
+- **Workflow**: Always update task status when starting/completing work
+- **Best Practice**: Break down complex tasks and add context for decisions
+`;
+
+		await writeFile(rulesPath, basicContent);
+		return rulesPath;
+	}
 }
 
 // Interactive prompt component
@@ -385,19 +480,29 @@ export default function Init({ options }: Props) {
 
 				await writeFile(configPath, JSON.stringify(config, null, 2));
 
+				// Step 5.5: Create astrotask rules file for Cursor
+				const rulesPath = await createAstrotaskRules(finalOptions!.editor);
+
 				// Step 6: Close database connection
 				await store.close();
+
+				const details = [
+					`Database: ${resolve(databasePath)}`,
+					`Configuration: ${resolve(configPath)}`,
+					`MCP Server: ${mcpServerPath}`,
+				];
+
+				if (rulesPath) {
+					details.push(`Astrotask Rules: ${resolve(rulesPath)}`);
+				}
+
+				details.push(`Created ${createdTasks.length} starter tasks:`);
+				details.push(...createdTasks.map((task) => `  - ${task}`));
 
 				setResult({
 					success: true,
 					message: `Repository initialized successfully for ${finalOptions!.editor}!`,
-					details: [
-						`Database: ${resolve(databasePath)}`,
-						`Configuration: ${resolve(configPath)}`,
-						`MCP Server: ${mcpServerPath}`,
-						`Created ${createdTasks.length} starter tasks:`,
-						...createdTasks.map((task) => `  - ${task}`),
-					],
+					details,
 				});
 			} catch (error) {
 				setResult({
