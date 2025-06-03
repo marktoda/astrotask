@@ -6,14 +6,14 @@ import { type PostgresJsDatabase, drizzle as drizzlePostgres } from 'drizzle-orm
 import postgres from 'postgres';
 import { createModuleLogger } from '../../utils/logger.js';
 import * as schema from '../schema.js';
-import type { DatabaseBackend, DbCapabilities, DatabaseClient } from './types.js';
+import type { DatabaseBackend, DatabaseClient, DbCapabilities, SqlParam } from './types.js';
 
 const logger = createModuleLogger('PostgresAdapter');
 
 /**
  * PostgreSQL backend adapter
  */
-export class PostgresAdapter implements DatabaseBackend {
+export class PostgresAdapter implements DatabaseBackend<PostgresJsDatabase<typeof schema>> {
   public readonly type = 'postgres' as const;
   public readonly capabilities: DbCapabilities = {
     concurrentWrites: true,
@@ -53,9 +53,9 @@ export class PostgresAdapter implements DatabaseBackend {
 
   get client(): DatabaseClient {
     return {
-      query: async (sql, params) => {
+      query: async <T = Record<string, unknown>>(sql: string, params?: SqlParam[]) => {
         const result = await this.sql.unsafe(sql, params);
-        return { rows: result };
+        return { rows: result as unknown as T[] };
       },
       close: async () => {
         await this.close();
@@ -71,4 +71,4 @@ export class PostgresAdapter implements DatabaseBackend {
   async close(): Promise<void> {
     await this.sql.end();
   }
-} 
+}

@@ -5,12 +5,12 @@
 import { PGlite } from '@electric-sql/pglite';
 import { type PgliteDatabase, drizzle } from 'drizzle-orm/pglite';
 import * as schema from '../schema.js';
-import type { DatabaseBackend, DbCapabilities, DatabaseClient } from './types.js';
+import type { DatabaseBackend, DatabaseClient, DbCapabilities } from './types.js';
 
 /**
  * PGLite backend adapter
  */
-export class PgLiteAdapter implements DatabaseBackend {
+export class PgLiteAdapter implements DatabaseBackend<PgliteDatabase<typeof schema>> {
   public readonly type = 'pglite' as const;
   public readonly capabilities: DbCapabilities = {
     concurrentWrites: false,
@@ -60,4 +60,4 @@ export class PgLiteAdapter implements DatabaseBackend {
   async close(): Promise<void> {
     await this.pglite.close();
   }
-} 
+}

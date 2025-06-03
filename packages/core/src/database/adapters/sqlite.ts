@@ -6,14 +6,14 @@ import Database from 'better-sqlite3';
 import { type BetterSQLite3Database, drizzle as drizzleSqlite } from 'drizzle-orm/better-sqlite3';
 import { createModuleLogger } from '../../utils/logger.js';
 import * as sqliteSchema from '../schema-sqlite.js';
-import type { DatabaseBackend, DbCapabilities, DatabaseClient } from './types.js';
+import type { DatabaseBackend, DatabaseClient, DbCapabilities } from './types.js';
 
 const logger = createModuleLogger('SqliteAdapter');
 
 /**
  * SQLite backend adapter with WAL mode for better concurrency
  */
-export class SqliteAdapter implements DatabaseBackend {
+export class SqliteAdapter implements DatabaseBackend<BetterSQLite3Database<typeof sqliteSchema>> {
   public readonly type = 'sqlite' as const;
   public readonly capabilities: DbCapabilities = {
     concurrentWrites: false, // WAL mode allows multiple readers + 1 writer
@@ -60,6 +60,7 @@ export class SqliteAdapter implements DatabaseBackend {
         try {
           const stmt = this.sqlite.prepare(sql);
           const rows = params ? stmt.all(...params) : stmt.all();
+          // biome-ignore lint/suspicious/noExplicitAny: Better-sqlite3 returns unknown rows that need type assertion
           return { rows: rows as any[] };
         } catch (error) {
           logger.error({ error, sql, params }, 'SQLite query error');
@@ -73,8 +74,8 @@ export class SqliteAdapter implements DatabaseBackend {
     };
   }
 
-  async migrate(migrationsDir: string): Promise<void> {
-    // For SQLite, we'll use schema sync instead of migrations 
+  async migrate(_migrationsDir: string): Promise<void> {
+    // For SQLite, we'll use schema sync instead of migrations
     // This is more reliable than complex migration files
     try {
       // Try to create tables if they don't exist
@@ -100,7 +101,7 @@ export class SqliteAdapter implements DatabaseBackend {
           "context_digest" text,
           "created_at" integer NOT NULL,
           "updated_at" integer NOT NULL
-        )`
+        )`,
       },
       {
         name: 'task_dependencies',
@@ -111,7 +112,7 @@ export class SqliteAdapter implements DatabaseBackend {
           "created_at" integer NOT NULL,
           CONSTRAINT "unique_dependency" UNIQUE("dependent_task_id","dependency_task_id"),
           CONSTRAINT "no_self_dependency" CHECK ("task_dependencies"."dependent_task_id" != "task_dependencies"."dependency_task_id")
-        )`
+        )`,
       },
       {
         name: 'tasks',
@@ -128,8 +129,8 @@ export class SqliteAdapter implements DatabaseBackend {
           "updated_at" integer NOT NULL,
           CONSTRAINT "status_check" CHECK ("tasks"."status" IN ('pending', 'in-progress', 'done', 'cancelled', 'archived')),
           CONSTRAINT "priority_check" CHECK ("tasks"."priority" IN ('low', 'medium', 'high'))
-        )`
-      }
+        )`,
+      },
     ];
 
     const indexes = [
@@ -137,7 +138,7 @@ export class SqliteAdapter implements DatabaseBackend {
       'CREATE INDEX IF NOT EXISTS "idx_task_dependencies_dependent" ON "task_dependencies" ("dependent_task_id")',
       'CREATE INDEX IF NOT EXISTS "idx_task_dependencies_dependency" ON "task_dependencies" ("dependency_task_id")',
       'CREATE INDEX IF NOT EXISTS "idx_tasks_parent_id" ON "tasks" ("parent_id")',
-      'CREATE INDEX IF NOT EXISTS "idx_tasks_status" ON "tasks" ("status")'
+      'CREATE INDEX IF NOT EXISTS "idx_tasks_status" ON "tasks" ("status")',
     ];
 
     // Create tables
@@ -159,4 +160,4 @@ export class SqliteAdapter implements DatabaseBackend {
       this.sqlite.close();
     }
   }
-} 
+}

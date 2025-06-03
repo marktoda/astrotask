@@ -158,11 +158,10 @@ export function validateSubtaskId(taskId: string, parentId: string): boolean {
       const rootPattern = /^[A-Z]+$/;
       const subtaskPattern = /^[A-Z]+(-[A-Z]+)+$/;
       return rootPattern.test(suffix) || subtaskPattern.test(suffix);
-    } else {
-      // New format: should be a simple root task ID (e.g., ABCD)
-      const rootPattern = /^[A-Z]+$/;
-      return rootPattern.test(taskId);
     }
+    // New format: should be a simple root task ID (e.g., ABCD)
+    const rootPattern = /^[A-Z]+$/;
+    return rootPattern.test(taskId);
   }
 
   const parsed = parseTaskId(taskId);

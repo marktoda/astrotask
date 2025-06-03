@@ -7,8 +7,7 @@ import type {
 } from '../schemas/contextSlice.js';
 import type { CreateTask as NewTask, Task, TaskStatus } from '../schemas/task.js';
 import { generateNextTaskId } from '../utils/taskId.js';
-import type { DatabaseClient } from './adapters/types.js';
-import type { DrizzleOperations } from './adapters/types.js';
+import type { DatabaseClient, DrizzleOps } from './adapters/types.js';
 import * as schema from './schema.js';
 
 /**
@@ -19,11 +18,11 @@ import * as schema from './schema.js';
  * - Local-first architecture (PGlite)
  * - Full PostgreSQL support
  */
-export interface Store {
+export interface Store<TDrizzle extends DrizzleOps = DrizzleOps> {
   /** Raw database client for direct SQL operations - can be PGlite or compatibility layer */
   readonly pgLite: DatabaseClient;
-  /** Type-safe Drizzle ORM instance with common operations */
-  readonly sql: DrizzleOperations;
+  /** Native Drizzle ORM instance with dialect-specific typing */
+  readonly sql: TDrizzle;
   /** Whether encryption is enabled */
   readonly isEncrypted: boolean;
 
@@ -56,17 +55,17 @@ export interface Store {
 /**
  * Generic database store implementation with business methods
  */
-export class DatabaseStore<TClient extends DatabaseClient = DatabaseClient> implements Store {
+export class DatabaseStore<
+  TClient extends DatabaseClient = DatabaseClient,
+  TDrizzle extends DrizzleOps = DrizzleOps,
+> implements Store<TDrizzle>
+{
   public readonly pgLite: TClient;
-  public readonly sql: DrizzleOperations;
+  /** Native Drizzle ORM instance for the selected dialect */
+  public readonly sql: TDrizzle;
   public readonly isEncrypted: boolean;
 
-  constructor(
-    client: TClient,
-    sql: DrizzleOperations,
-    _isSyncing = false,
-    isEncrypted = false
-  ) {
+  constructor(client: TClient, sql: TDrizzle, _isSyncing = false, isEncrypted = false) {
     this.pgLite = client;
     this.sql = sql;
     this.isEncrypted = isEncrypted;

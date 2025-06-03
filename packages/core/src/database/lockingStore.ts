@@ -9,7 +9,7 @@
 import type { ContextSlice, CreateContextSlice } from '../schemas/contextSlice.js';
 import type { CreateTask, Task, TaskStatus } from '../schemas/task.js';
 import { createModuleLogger } from '../utils/logger.js';
-import type { DatabaseClient, DrizzleOperations } from './adapters/types.js';
+import type { DatabaseClient, DrizzleOps } from './adapters/types.js';
 import { DatabaseLock, DatabaseLockError, type LockInfo, type LockOptions } from './lock.js';
 import type { Store } from './store.js';
 
@@ -35,7 +35,7 @@ export class LockingStore implements Store {
     return this.innerStore.pgLite;
   }
 
-  get sql(): DrizzleOperations {
+  get sql(): DrizzleOps {
     return this.innerStore.sql;
   }
 

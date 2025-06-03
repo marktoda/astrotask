@@ -1,7 +1,7 @@
 import { dirname, join, resolve } from "path";
 import { fileURLToPath } from "url";
 import { createDatabase } from "@astrotask/core";
-import { access, mkdir, writeFile, readFile } from "fs/promises";
+import { access, mkdir, readFile, writeFile } from "fs/promises";
 import { Box, Text } from "ink";
 import SelectInput from "ink-select-input";
 import TextInput from "ink-text-input";
@@ -200,7 +200,7 @@ async function createAstrotaskRules(editor: string): Promise<string | null> {
 			fileName: "astrotask.mdc",
 		},
 		roo: {
-			rulesDir: ".roo/rules", 
+			rulesDir: ".roo/rules",
 			fileName: "astrotask.mdc",
 		},
 		cline: {
@@ -213,7 +213,7 @@ async function createAstrotaskRules(editor: string): Promise<string | null> {
 		},
 		"claude-desktop": {
 			rulesDir: ".claude",
-			fileName: "astrotask.md", 
+			fileName: "astrotask.md",
 		},
 	};
 
@@ -244,25 +244,27 @@ async function createAstrotaskRules(editor: string): Promise<string | null> {
 	try {
 		// Try to read the template file
 		const rulesContent = await readFile(templatePath, "utf-8");
-		
+
 		// For non-.mdc editors, convert the frontmatter format
 		let finalContent = rulesContent;
-		if (config.fileName.endsWith('.md')) {
+		if (config.fileName.endsWith(".md")) {
 			// Convert .mdc frontmatter to standard markdown for editors that don't support .mdc
 			finalContent = rulesContent.replace(
 				/^---\ndescription: ([^\n]*)\nglobs: ([^\n]*)\nalwaysApply: ([^\n]*)\n---/,
-				'# Astrotask Rules\n\n> **Description**: $1\n> **Applies to**: $2\n> **Always Apply**: $3'
+				"# Astrotask Rules\n\n> **Description**: $1\n> **Applies to**: $2\n> **Always Apply**: $3",
 			);
 		}
-		
+
 		await writeFile(rulesPath, finalContent);
 		return rulesPath;
 	} catch (error) {
-		console.warn(`Failed to read template file: ${error}. Creating basic rules file.`);
-		
+		console.warn(
+			`Failed to read template file: ${error}. Creating basic rules file.`,
+		);
+
 		// Fallback: create a basic rules file if template is not available
-		const basicContent = config.fileName.endsWith('.mdc') ? 
-			`---
+		const basicContent = config.fileName.endsWith(".mdc")
+			? `---
 description: Basic Astrotask integration guidelines
 globs: "**/*"
 alwaysApply: true
@@ -271,8 +273,8 @@ alwaysApply: true
 - **Astrotask Integration**: Use MCP functions getNextTask(), addTasks(), addTaskContext(), updateStatus(), listTasks(), addDependency()
 - **Workflow**: Always update task status when starting/completing work
 - **Best Practice**: Break down complex tasks and add context for decisions
-` :
-			`# Astrotask Rules
+`
+			: `# Astrotask Rules
 
 > **Basic Astrotask integration guidelines**
 

@@ -2,6 +2,10 @@
  * Shared types and interfaces for database adapters
  */
 
+import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
+import type { PgliteDatabase } from 'drizzle-orm/pglite';
+import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
+
 /**
  * Database capabilities that vary between backends
  */
@@ -12,24 +16,70 @@ export interface DbCapabilities {
 }
 
 /**
- * Common Drizzle database operations interface
- * Captures the methods we actually use without complex type unions
+ * Drizzle operations we rely on across dialects.
+ * We keep the signatures loose here because each dialect has its own overloads.
+ * Concrete dialect types (PostgresJsDatabase, PgliteDatabase, BetterSQLite3Database)
+ * will be compatible with this structure while still providing their richer types
+ * when a generic parameter is concrete.
  */
-export interface DrizzleOperations {
-  select(fields?: any): any;
-  insert(table: any): any;
-  update(table: any): any;
-  delete(table: any): any;
-  $with(name: string): any;
-  transaction<T>(fn: (tx: any) => Promise<T>): Promise<T>;
+export interface DrizzleOps {
+  // biome-ignore lint/suspicious/noExplicitAny: Drizzle types require any for cross-dialect compatibility
+  select: (...args: any[]) => any;
+  // biome-ignore lint/suspicious/noExplicitAny: Drizzle types require any for cross-dialect compatibility
+  insert: (...args: any[]) => any;
+  // biome-ignore lint/suspicious/noExplicitAny: Drizzle types require any for cross-dialect compatibility
+  update: (...args: any[]) => any;
+  // biome-ignore lint/suspicious/noExplicitAny: Drizzle types require any for cross-dialect compatibility
+  delete: (...args: any[]) => any;
 }
 
 /**
- * Common interface for database backends
+ * Type aliases for the actual Drizzle database types used by each adapter
+ * These are here for documentation and can be used for type assertions when needed
  */
-export interface DatabaseBackend {
-  /** Drizzle ORM instance with common operations */
-  readonly drizzle: DrizzleOperations;
+// biome-ignore lint/suspicious/noExplicitAny: Required for Drizzle schema compatibility
+export type PostgresDrizzle = PostgresJsDatabase<any>;
+// biome-ignore lint/suspicious/noExplicitAny: Required for Drizzle schema compatibility
+export type PgliteDrizzle = PgliteDatabase<any>;
+// biome-ignore lint/suspicious/noExplicitAny: Required for Drizzle schema compatibility
+export type SqliteDrizzle = BetterSQLite3Database<any>;
+
+/**
+ * SQL query parameters - can be various primitive types
+ */
+export type SqlParam = string | number | boolean | null | Date | Buffer;
+
+/**
+ * Result row from SQL query - record with unknown values
+ */
+export type SqlRow<T = Record<string, unknown>> = T;
+
+/**
+ * Query result with properly typed rows
+ */
+export interface QueryResult<T = Record<string, unknown>> {
+  rows: SqlRow<T>[];
+}
+
+/**
+ * Type-safe database client interface for SQL operations
+ */
+export interface DatabaseClient {
+  query<T = Record<string, unknown>>(sql: string, params?: SqlParam[]): Promise<QueryResult<T>>;
+  close(): Promise<void>;
+  dataDir?: string;
+}
+
+/**
+ * Common interface for database backends.
+ * Generic parameter preserves the exact Drizzle type for callers while ensuring
+ * we expose at least the shared DrizzleOps surface.
+ */
+export interface DatabaseBackend<TDrizzle extends DrizzleOps = DrizzleOps> {
+  /** Native Drizzle ORM instance. When TDrizzle is concrete (e.g. PostgresJsDatabase) callers
+   * get full dialect-specific typing.
+   */
+  readonly drizzle: TDrizzle;
 
   /** Raw client for escape hatch operations */
   readonly rawClient: unknown;
@@ -51,25 +101,6 @@ export interface DatabaseBackend {
 
   /** Close the database connection */
   close(): Promise<void>;
-}
-
-/**
- * SQL query parameters - can be various primitive types
- */
-export type SqlParam = string | number | boolean | null | Date | Buffer;
-
-/**
- * Result row from SQL query - record with unknown values
- */
-export type SqlRow = Record<string, unknown>;
-
-/**
- * Database client interface for SQL operations
- */
-export interface DatabaseClient {
-  query: (sql: string, params?: SqlParam[]) => Promise<{ rows: SqlRow[] }>;
-  close: () => Promise<void>;
-  dataDir?: string;
 }
 
 /**
@@ -95,4 +126,4 @@ export function isServerBased(backend: DatabaseBackend): boolean {
  */
 export function needsExternalLocking(backend: DatabaseBackend): boolean {
   return isFileBased(backend);
-} 
+}

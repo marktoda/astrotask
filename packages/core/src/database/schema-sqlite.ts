@@ -34,8 +34,12 @@ export const tasks = sqliteTable(
     contextDigest: text('context_digest'),
 
     // SQLite doesn't have built-in timestamp types, use INTEGER for Unix timestamps
-    createdAt: integer('created_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
-    updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
+    createdAt: integer('created_at', { mode: 'timestamp' })
+      .notNull()
+      .$defaultFn(() => new Date()),
+    updatedAt: integer('updated_at', { mode: 'timestamp' })
+      .notNull()
+      .$defaultFn(() => new Date()),
   },
   (table) => [
     foreignKey({
@@ -63,7 +67,9 @@ export const taskDependencies = sqliteTable(
     dependencyTaskId: text('dependency_task_id')
       .notNull()
       .references(() => tasks.id, { onDelete: 'cascade' }),
-    createdAt: integer('created_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
+    createdAt: integer('created_at', { mode: 'timestamp' })
+      .notNull()
+      .$defaultFn(() => new Date()),
   },
   (table) => [
     // Ensure no duplicate dependencies
@@ -84,8 +90,12 @@ export const contextSlices = sqliteTable('context_slices', {
   taskId: text('task_id').references(() => tasks.id),
   contextDigest: text('context_digest'),
 
-  createdAt: integer('created_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
-  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
+  createdAt: integer('created_at', { mode: 'timestamp' })
+    .notNull()
+    .$defaultFn(() => new Date()),
+  updatedAt: integer('updated_at', { mode: 'timestamp' })
+    .notNull()
+    .$defaultFn(() => new Date()),
 });
 
 // ---------------------------------------------------------------------------
@@ -142,4 +152,4 @@ export const schema = {
   taskRelations,
   taskDependencyRelations,
   contextSliceRelations,
-}; 
+};

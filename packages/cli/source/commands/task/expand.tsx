@@ -32,7 +32,9 @@ export const options = zod.object({
 		.describe("Complexity threshold for expansion recommendations"),
 	root: zod
 		.string()
-		.describe("Root task ID - if root is a leaf, expand it directly; otherwise expand all downstream leaf tasks"),
+		.describe(
+			"Root task ID - if root is a leaf, expand it directly; otherwise expand all downstream leaf tasks",
+		),
 	verbose: zod
 		.boolean()
 		.optional()
@@ -140,7 +142,8 @@ export default function Expand({ options }: Props) {
 					}));
 
 					// Get all descendant tasks using TaskService
-					const allDescendants = await taskService.getTaskDescendants(rootTaskId);
+					const allDescendants =
+						await taskService.getTaskDescendants(rootTaskId);
 
 					// Filter to only leaf tasks (tasks with no children)
 					const leafTasks: string[] = [];

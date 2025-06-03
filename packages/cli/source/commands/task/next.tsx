@@ -14,7 +14,9 @@ export const options = zod.object({
 	root: zod
 		.string()
 		.optional()
-		.describe("Root task ID - limit search to direct children of this task. Use this to focus on a specific project or feature area."),
+		.describe(
+			"Root task ID - limit search to direct children of this task. Use this to focus on a specific project or feature area.",
+		),
 });
 
 type Props = {
@@ -56,7 +58,9 @@ export default function Next({ options }: Props) {
 				// Apply parent filter if specified (similar to MCP parentTaskId filtering)
 				let filteredTasks = availableTasks;
 				if (options.root) {
-					filteredTasks = availableTasks.filter((task) => task.parentId === options.root);
+					filteredTasks = availableTasks.filter(
+						(task) => task.parentId === options.root,
+					);
 				}
 
 				// Find the highest priority pending task (same logic as MCP)
@@ -206,11 +210,23 @@ export default function Next({ options }: Props) {
 				<Box marginTop={1}>
 					<Text color="green">
 						💡 Use <Text color="cyan">astrotask task list</Text> to see all
-						tasks{options.root ? (
+						tasks
+						{options.root ? (
 							<>
-								{" "}or <Text color="cyan">astrotask task list --parent {options.root}</Text> to see tasks under this root
+								{" "}
+								or{" "}
+								<Text color="cyan">
+									astrotask task list --parent {options.root}
+								</Text>{" "}
+								to see tasks under this root
 							</>
-						) : ""} or <Text color="cyan">astrotask task update &lt;task-id&gt; --status in-progress</Text>{" "}
+						) : (
+							""
+						)}{" "}
+						or{" "}
+						<Text color="cyan">
+							astrotask task update &lt;task-id&gt; --status in-progress
+						</Text>{" "}
 						to begin working on a specific task
 					</Text>
 				</Box>
@@ -314,7 +330,10 @@ export default function Next({ options }: Props) {
 					Suggested Actions:
 				</Text>
 				<Text color="green">
-					• Start working: <Text color="cyan">astrotask task update {task.id} --status in-progress</Text>
+					• Start working:{" "}
+					<Text color="cyan">
+						astrotask task update {task.id} --status in-progress
+					</Text>
 				</Text>
 				<Text color="green">
 					• View hierarchy:{" "}

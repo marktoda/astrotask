@@ -1,15 +1,15 @@
 import type { ContextSlice, Task, TaskTree } from "@astrotask/core";
-// Import TaskService and DependencyService first to avoid PostgreSQL import hang
-import { TaskService } from "@astrotask/core/dist/services/TaskService.js";
-import { DependencyService } from "@astrotask/core/dist/services/DependencyService.js";
 import {
 	TASK_IDENTIFIERS,
 	TrackingDependencyGraph,
 	TrackingTaskTree,
 	createDatabase,
 } from "@astrotask/core";
-import { create } from "zustand";
+import { DependencyService } from "@astrotask/core/dist/services/DependencyService.js";
+// Import TaskService and DependencyService first to avoid PostgreSQL import hang
+import { TaskService } from "@astrotask/core/dist/services/TaskService.js";
 import type blessed from "blessed";
+import { create } from "zustand";
 import { EditorService, type PendingTaskData } from "../services/editor.js";
 
 export interface DashboardState {
@@ -1257,7 +1257,6 @@ export function createDashboardStore(
 
 				// Trigger update to reflect any ID changes from flush
 				get().triggerTreeUpdate();
-
 			} catch (error) {
 				const errorMessage =
 					error instanceof Error ? error.message : String(error);

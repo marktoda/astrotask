@@ -15,7 +15,7 @@ import type { LockOptions } from './lock.js';
 import { DatabaseLockError } from './lock.js';
 import { LockingStore } from './lockingStore.js';
 import { DatabaseStore, type Store } from './store.js';
-import { parseDbUrl, isFileBasedUrl } from './url-parser.js';
+import { isFileBasedUrl, parseDbUrl } from './url-parser.js';
 
 const logger = createModuleLogger('database');
 

@@ -20,9 +20,9 @@ describe('DependencyService', () => {
   beforeEach(async () => {
     // Initialize in-memory database for testing
     store = await createDatabase({ 
-      dbPath: 'memory://',
-      encrypted: false,
-      autoSync: false 
+      dataDir: 'memory://',
+      verbose: false,
+      enableLocking: false 
     });
     
     dependencyService = new DependencyService(store);
