@@ -4,7 +4,7 @@ A local-first, MCP-compatible task navigation platform for humans and AI agents.
 
 ## Overview
 
-Astrolabe is a modern task management and navigation platform that prioritizes **offline-first** functionality while maintaining seamless integration with **Model Context Protocol (MCP)** for AI agent collaboration. Built with TypeScript and featuring encrypted local storage, Astrolabe enables productive task management workflows both independently and with AI assistance.
+Astrolabe is a modern task management and navigation platform that prioritizes **offline-first** functionality while maintaining seamless integration with **Model Context Protocol (MCP)** for AI agent collaboration. Built with TypeScript and featuring multiple database backends including SQLite and PGLite, Astrolabe enables productive task management workflows both independently and with AI assistance.
 
 Whether you're a developer managing complex projects, a team coordinating work, or an AI agent assisting with task planning, Astrolabe provides the tools you need with complete data ownership and offline capabilities.
 
@@ -12,7 +12,7 @@ Whether you're a developer managing complex projects, a team coordinating work, 
 
 ### 🏠 **Local-First Architecture**
 
-- All data stored locally with SQLite database
+- Multiple database backends: **SQLite** (recommended) and PGLite
 - Full functionality without internet connectivity
 - Optional real-time sync with CRDT-based conflict resolution
 - Your data, your control - no vendor lock-in
@@ -33,7 +33,7 @@ Whether you're a developer managing complex projects, a team coordinating work, 
 
 ### 🔒 **Enterprise-Ready**
 
-- SQLCipher encryption for sensitive data
+- SQLite with WAL mode for better concurrency
 - Type-safe operations with Zod validation
 - Comprehensive audit logging
 - Performance optimized for large datasets
@@ -47,6 +47,80 @@ Whether you're a developer managing complex projects, a team coordinating work, 
 - Comprehensive testing and documentation
 - Hot-reload development environment
 
+## 🗄️ Database Configuration
+
+Astrolabe supports multiple database backends with seamless switching via configuration:
+
+### SQLite Backend (Recommended)
+
+**Best for:** CLI usage, MCP servers, production deployments
+
+```bash
+# SQLite with explicit protocol
+DATABASE_URI="sqlite://./astrotask.db"
+
+# Auto-detection via file extension  
+DATABASE_URI="./data/astrotask.sqlite"
+DATABASE_URI="./data/astrotask.db"
+
+# Relative paths supported
+DATABASE_URI="sqlite://./data/tasks.sqlite"
+```
+
+**Features:**
+- ✅ **Multiple concurrent readers** + 1 writer (WAL mode)
+- ✅ **Native performance** - no WASM overhead
+- ✅ **Process-safe** - fine-grained locking with 20-second timeout
+- ✅ **Optimized configuration** - 64MB cache, proper checkpointing
+- ✅ **Auto-migration** - schema synchronization on startup
+
+### PGLite Backend
+
+**Best for:** Browser applications, in-memory testing, development
+
+```bash
+# Browser storage (IndexedDB)
+DATABASE_URI="idb://astrotask"
+
+# In-memory (testing)
+DATABASE_URI="memory://test"
+
+# File-based PGLite
+DATABASE_URI="./data/astrotask-pglite"
+```
+
+**Features:**
+- ✅ **Browser compatibility** - works in web environments
+- ✅ **PostgreSQL compatibility** - full PostgreSQL feature set
+- ⚠️ **Single connection** - suitable for single-user scenarios
+- ⚠️ **WASM overhead** - slightly slower than native SQLite
+
+### Configuration Examples
+
+```bash
+# Production deployment (recommended)
+DATABASE_URI="sqlite://./data/astrotask.db"
+DB_VERBOSE=false
+DB_TIMEOUT=20000
+
+# Development with verbose logging
+DATABASE_URI="sqlite://./dev.db"
+DB_VERBOSE=true
+DB_TIMEOUT=5000
+
+# Testing with in-memory database
+DATABASE_URI="memory://test"
+DB_VERBOSE=false
+```
+
+### Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `DATABASE_URI` | `./data/astrotask.db` | Database connection URI |
+| `DB_VERBOSE` | `false` | Enable SQL query logging |
+| `DB_TIMEOUT` | `5000` | Query timeout in milliseconds |
+
 ## 🚀 Quick Start
 
 ### For End Users (CLI)
@@ -59,6 +133,9 @@ git clone https://github.com/marktoda/astrotask.git
 cd astrotask
 pnpm install
 pnpm build
+
+# Configure database (optional - defaults to SQLite)
+export DATABASE_URI="sqlite://./data/astrotask.db"
 
 # Use the CLI locally
 pnpm cli --help
@@ -76,24 +153,27 @@ pnpm cli dashboard                    # Launch interactive dashboard (press 'c' 
 **Note:** API is currently in development. Basic usage:
 
 ```typescript
-import { TaskService } from "@astrotask/core";
+import { createDatabase } from "@astrotask/core";
 
-// Initialize task service
-const taskService = new TaskService();
+// Initialize with SQLite (recommended)
+const store = await createDatabase({
+  dataDir: "./data/astrotask.db",
+  verbose: false
+});
 
 // Create hierarchical tasks
-const feature = await taskService.createTask({
+const feature = await store.addTask({
   title: "Build authentication system",
   description: "Implement JWT-based authentication",
 });
 
-const subtask = await taskService.createTask({
+const subtask = await store.addTask({
   title: "Design user schema",
   parentId: feature.id,
 });
 
 // Query with full context
-const context = await taskService.getTaskContext(feature.id);
+const context = await store.listContextSlices(feature.id);
 ```
 
 ### For AI Agents (MCP)
@@ -104,6 +184,9 @@ const context = await taskService.getTaskContext(feature.id);
 # Build and start MCP server locally
 cd packages/mcp
 pnpm build
+
+# Configure database for MCP
+export DATABASE_URI="sqlite://./data/astrotask-mcp.db"
 node dist/index.js
 ```
 
@@ -115,7 +198,10 @@ Configure in Cursor IDE (`.cursor/mcp.json`):
     "astrotask": {
       "command": "node",
       "args": ["path/to/astrotask/packages/mcp/dist/index.js"],
-      "env": { "DATABASE_PATH": "./tasks.db" }
+      "env": { 
+        "DATABASE_URI": "sqlite://./data/astrotask.db",
+        "DB_VERBOSE": "false"
+      }
     }
   }
 }
@@ -125,11 +211,13 @@ AI agents can then use structured tools:
 
 ```json
 {
-  "name": "createTask",
+  "name": "addTasks",
   "arguments": {
-    "title": "Refactor authentication module",
-    "description": "Improve error handling and add rate limiting",
-    "status": "pending"
+    "tasks": [{
+      "title": "Refactor authentication module",
+      "description": "Improve error handling and add rate limiting",
+      "status": "pending"
+    }]
   }
 }
 ```

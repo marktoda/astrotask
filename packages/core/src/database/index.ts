@@ -15,7 +15,7 @@ import type { LockOptions } from './lock.js';
 import { DatabaseLockError } from './lock.js';
 import { LockingStore } from './lockingStore.js';
 import { DatabaseStore, type Store } from './store.js';
-import { parseDbUrl } from './url-parser.js';
+import { parseDbUrl, isFileBasedUrl } from './url-parser.js';
 
 const logger = createModuleLogger('database');
 
@@ -62,13 +62,10 @@ export async function createDatabase(options: DatabaseOptions = {}): Promise<Sto
     const baseStore = new DatabaseStore(backend.client, backend.drizzle, false, false);
 
     // Determine if we should use locking
-    // PostgreSQL should NEVER use file-based locking as it handles concurrency natively
+    // Server-based databases should NEVER use file-based locking as they handle concurrency natively
     const shouldUseLocking =
-      parsed.kind !== 'postgres' && // Never use locking for PostgreSQL
-      (options.enableLocking ??
-        (parsed.kind === 'pglite-file' ||
-          parsed.kind === 'pglite-mem' ||
-          parsed.kind === 'pglite-idb'));
+      isFileBasedUrl(parsed) && // Only use locking for file-based databases
+      (options.enableLocking ?? true); // Default to true for file-based databases
 
     // Wrap with locking if needed
     const store = shouldUseLocking
@@ -173,7 +170,7 @@ export { DatabaseStore } from './store.js';
 export { LockingStore } from './lockingStore.js';
 export { DatabaseLock, DatabaseLockError, withDatabaseLock } from './lock.js';
 export type { LockOptions } from './lock.js';
-export type { DatabaseBackend, DbCapabilities } from './adapters.js';
+export type { DatabaseBackend, DbCapabilities } from './adapters/index.js';
 export { parseDbUrl, type DbUrl } from './url-parser.js';
 export { openDatabase } from './factory.js';
 

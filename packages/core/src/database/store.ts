@@ -1,15 +1,14 @@
 import { randomUUID } from 'node:crypto';
 import { and, desc, eq, inArray, isNull, ne } from 'drizzle-orm';
-import type { PgliteDatabase } from 'drizzle-orm/pglite';
-import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import { TASK_IDENTIFIERS } from '../entities/TaskTreeConstants.js';
 import type {
   ContextSlice,
   CreateContextSlice as NewContextSlice,
 } from '../schemas/contextSlice.js';
 import type { CreateTask as NewTask, Task, TaskStatus } from '../schemas/task.js';
-import type { DatabaseClient } from '../types/database.js';
 import { generateNextTaskId } from '../utils/taskId.js';
+import type { DatabaseClient } from './adapters/types.js';
+import type { DrizzleOperations } from './adapters/types.js';
 import * as schema from './schema.js';
 
 /**
@@ -23,8 +22,8 @@ import * as schema from './schema.js';
 export interface Store {
   /** Raw database client for direct SQL operations - can be PGlite or compatibility layer */
   readonly pgLite: DatabaseClient;
-  /** Type-safe Drizzle ORM instance */
-  readonly sql: PgliteDatabase<typeof schema> | PostgresJsDatabase<typeof schema>;
+  /** Type-safe Drizzle ORM instance with common operations */
+  readonly sql: DrizzleOperations;
   /** Whether encryption is enabled */
   readonly isEncrypted: boolean;
 
@@ -59,12 +58,12 @@ export interface Store {
  */
 export class DatabaseStore<TClient extends DatabaseClient = DatabaseClient> implements Store {
   public readonly pgLite: TClient;
-  public readonly sql: PgliteDatabase<typeof schema> | PostgresJsDatabase<typeof schema>;
+  public readonly sql: DrizzleOperations;
   public readonly isEncrypted: boolean;
 
   constructor(
     client: TClient,
-    sql: PgliteDatabase<typeof schema> | PostgresJsDatabase<typeof schema>,
+    sql: DrizzleOperations,
     _isSyncing = false,
     isEncrypted = false
   ) {

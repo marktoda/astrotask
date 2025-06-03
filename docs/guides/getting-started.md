@@ -6,7 +6,8 @@ Welcome to Astrolabe! This guide will help you get up and running with the local
 
 Astrolabe is a modern task management platform designed for both humans and AI agents. It features:
 
-- **Local-First Architecture**: All your data stays on your machine
+- **Local-First Architecture**: All your data stays on your machine with SQLite storage
+- **Multiple Database Backends**: SQLite (recommended) or PGLite for different use cases
 - **Offline Capabilities**: Full functionality without internet
 - **AI Agent Integration**: Native MCP support for AI collaboration
 - **Hierarchical Tasks**: Organize work with nested task structures
@@ -16,46 +17,51 @@ Astrolabe is a modern task management platform designed for both humans and AI a
 
 Before you begin, ensure you have:
 
-- **Node.js** 18.0.0 or higher
+- **Node.js** 22.0.0 or higher
 - **pnpm** (recommended) or npm/yarn
 - Basic familiarity with command-line tools
 
+## Database Configuration
+
+Astrolabe supports multiple database backends that you can configure via the `DATABASE_URI` environment variable:
+
+### SQLite (Recommended for CLI/MCP)
+
+```bash
+# SQLite with explicit protocol
+export DATABASE_URI="sqlite://./data/astrotask.db"
+
+# Auto-detection via file extension
+export DATABASE_URI="./data/astrotask.sqlite"
+export DATABASE_URI="./data/astrotask.db"
+```
+
+**Benefits:** Native performance, concurrent access, process-safe locking
+
+### PGLite (For Browser/Testing)
+
+```bash
+# Browser storage (IndexedDB)
+export DATABASE_URI="idb://astrotask"
+
+# In-memory for testing
+export DATABASE_URI="memory://test"
+
+# File-based PGLite
+export DATABASE_URI="./data/astrotask-pglite"
+```
+
+**Benefits:** Browser compatibility, PostgreSQL feature compatibility
+
 ## Installation Options
 
-### Option 1: Using the CLI (Recommended for Users)
+### Option 1: Development Setup (Currently Required)
 
-Install the CLI globally for the best user experience:
-
-```bash
-# Install globally with pnpm (recommended)
-pnpm add -g @astrotask/cli
-
-# Or with npm
-npm install -g @astrotask/cli
-
-# Or with yarn
-yarn global add @astrotask/cli
-```
-
-### Option 2: Using the Core Library (For Developers)
-
-If you're building applications with Astrolabe:
-
-```bash
-# Add to your project
-pnpm add @astrotask/core
-
-# For MCP server functionality
-pnpm add @astrotask/mcp
-```
-
-### Option 3: Development Setup
-
-To contribute or run from source:
+**Note:** Packages are not yet published to npm. Use development setup:
 
 ```bash
 # Clone the repository
-git clone https://github.com/astrotask/astrotask.git
+git clone https://github.com/marktoda/astrotask.git
 cd astrotask
 
 # Install dependencies
@@ -63,67 +69,71 @@ pnpm install
 
 # Build all packages
 pnpm build
+
+# Configure database (optional - uses SQLite by default)
+export DATABASE_URI="sqlite://./data/astrotask.db"
+```
+
+### Option 2: Using the Core Library (For Developers)
+
+Once published, you'll be able to install:
+
+```bash
+# Add to your project (future)
+pnpm add @astrotask/core
+
+# For MCP server functionality (future)
+pnpm add @astrotask/mcp
 ```
 
 ## Quick Start: CLI
 
-### 1. Initialize Your First Project
+### 1. Configure Your Environment
 
 ```bash
-# Create a new directory for your project
-mkdir my-project
-cd my-project
+# Set up database (optional - defaults to ./data/astrotask.db)
+export DATABASE_URI="sqlite://./data/astrotask.db"
+export DB_VERBOSE=false
 
-# Initialize Astrolabe
-astrotask init --name "My First Project"
+# Alternative: create .env file
+echo "DATABASE_URI=sqlite://./data/astrotask.db" > .env
+echo "DB_VERBOSE=false" >> .env
 ```
 
-This creates:
-- `.astrotask.json` - Configuration file
-- `tasks.db` - Local SQLite database
-- Basic project structure
-
-### 2. Create Your First Task
+### 2. Create Your First Tasks
 
 ```bash
-# Create a simple task
-astrotask create "Set up development environment"
+# Create a simple task (using development CLI)
+pnpm cli task add "Set up development environment"
 
 # Create a task with description
-astrotask create "Implement user authentication" \
+pnpm cli task add "Implement user authentication" \
   --description "Add JWT-based auth with refresh tokens"
 
-# Create a subtask
-astrotask create "Write unit tests" --parent task_123
+# Create a subtask with parent
+pnpm cli task add "Write unit tests" --parent-id TASK_ID
 ```
 
 ### 3. View and Manage Tasks
 
 ```bash
-# List all tasks
-astrotask list
+# List all active tasks (pending + in-progress)
+pnpm cli task list
+
+# Show all tasks including completed
+pnpm cli task list --show-all
+
+# Filter by status
+pnpm cli task list --status done
 
 # Show task details
-astrotask show task_123
+pnpm cli task show TASK_ID
 
 # Update task status
-astrotask update task_123 --status in-progress
+pnpm cli task update-status TASK_ID --status in-progress
 
-# Complete a task
-astrotask complete task_123
-```
-
-### 4. Organize with Projects
-
-```bash
-# Create a project
-astrotask project create "Mobile App Redesign"
-
-# Assign tasks to project
-astrotask create "Design new UI" --project proj_123
-
-# View project tasks
-astrotask project show proj_123
+# Launch interactive dashboard
+pnpm cli dashboard
 ```
 
 ## Quick Start: Programmatic Usage
@@ -131,69 +141,86 @@ astrotask project show proj_123
 ### 1. Basic Task Management
 
 ```typescript
-import { createDatabase, TaskService } from '@astrotask/core';
+import { createDatabase } from '@astrotask/core';
 
-// Initialize database and service
-const store = createDatabase({ path: './tasks.db' });
-const taskService = new TaskService(store);
+// Initialize database (defaults to SQLite)
+const store = await createDatabase({
+  dataDir: './data/astrotask.db',
+  verbose: false
+});
 
 // Create a task
-const task = await taskService.createTask({
+const task = await store.addTask({
   title: 'Implement user authentication',
   description: 'Add JWT-based authentication system',
-  status: 'pending'
+  status: 'pending',
+  priority: 'high'
 });
 
 console.log('Created task:', task.id);
 
 // List all tasks
-const tasks = await taskService.listTasks();
+const tasks = await store.listTasks();
 console.log('Total tasks:', tasks.length);
 
-// Update task
-await taskService.updateTask(task.id, {
-  status: 'in-progress'
-});
+// Update task status
+const updated = await store.updateTaskStatus(task.id, 'in-progress');
 
-// Get task with context
-const context = await taskService.getTaskContext(task.id, {
-  includeDescendants: true
-});
+// Get task details
+const taskDetails = await store.getTask(task.id);
 ```
 
 ### 2. Working with Hierarchical Tasks
 
 ```typescript
 // Create parent task
-const parentTask = await taskService.createTask({
-  title: 'Build authentication system'
+const parentTask = await store.addTask({
+  title: 'Build authentication system',
+  priority: 'high'
 });
 
 // Create subtasks
-const subtask1 = await taskService.createTask({
+const subtask1 = await store.addTask({
   title: 'Design user schema',
-  parentId: parentTask.id
+  parentId: parentTask.id,
+  priority: 'medium'
 });
 
-const subtask2 = await taskService.createTask({
+const subtask2 = await store.addTask({
   title: 'Implement JWT tokens',
-  parentId: parentTask.id
+  parentId: parentTask.id,
+  priority: 'medium'
 });
 
-// Get full task tree
-const tree = await taskService.getTaskTree(parentTask.id);
-console.log('Task hierarchy:', tree);
+// Get subtasks
+const subtasks = await store.listSubtasks(parentTask.id);
+console.log('Subtasks:', subtasks.length);
+
+// Add context to tasks
+await store.addContextSlice({
+  taskId: parentTask.id,
+  title: 'Implementation Notes',
+  description: 'Use bcrypt for password hashing, JWT for tokens'
+});
 ```
 
 ## Quick Start: MCP Integration
 
 ### 1. Set Up MCP Server
 
-For AI agent integration, set up the MCP server:
+For AI agent integration, build and start the MCP server:
 
 ```bash
+# Build the MCP server (development)
+cd packages/mcp
+pnpm build
+
+# Configure database for MCP
+export DATABASE_URI="sqlite://./data/astrotask-mcp.db"
+export DB_VERBOSE=false
+
 # Start MCP server
-npx @astrotask/mcp --database-path ./tasks.db
+node dist/index.js
 ```
 
 ### 2. Configure with Cursor IDE
@@ -204,10 +231,11 @@ Create `.cursor/mcp.json` in your project:
 {
   "mcpServers": {
     "astrotask": {
-      "command": "npx",
-      "args": ["@astrotask/mcp"],
+      "command": "node",
+      "args": ["path/to/astrotask/packages/mcp/dist/index.js"],
       "env": {
-        "DATABASE_PATH": "./tasks.db",
+        "DATABASE_URI": "sqlite://./data/astrotask.db",
+        "DB_VERBOSE": "false",
         "LOG_LEVEL": "info"
       }
     }
@@ -217,18 +245,29 @@ Create `.cursor/mcp.json` in your project:
 
 ### 3. Use with AI Agents
 
-Once configured, AI agents can interact with your tasks:
+Once configured, AI agents can interact with your tasks using these MCP tools:
 
 ```json
 {
-  "name": "createTask",
+  "name": "addTasks",
   "arguments": {
-    "title": "Refactor authentication module",
-    "description": "Improve code structure and add error handling",
-    "status": "pending"
+    "tasks": [{
+      "title": "Refactor authentication module",
+      "description": "Improve code structure and add error handling",
+      "status": "pending",
+      "priority": "medium"
+    }]
   }
 }
 ```
+
+Available MCP tools:
+- `getNextTask` - Get next available task to work on
+- `addTasks` - Create single or multiple tasks with hierarchy
+- `listTasks` - List tasks with filtering options
+- `updateStatus` - Update task status (pending, in-progress, done, etc.)
+- `addTaskContext` - Add context information to tasks
+- `addDependency` - Create dependencies between tasks
 
 ## Core Concepts
 
@@ -289,55 +328,55 @@ interface ContextSlice {
 
 ## Configuration
 
-### CLI Configuration
-
-The CLI can be configured through `.astrotask.json`:
-
-```json
-{
-  "database": {
-    "path": "./tasks.db",
-    "encrypted": false
-  },
-  "display": {
-    "theme": "dark",
-    "showIcons": true,
-    "dateFormat": "relative"
-  },
-  "defaults": {
-    "taskStatus": "pending",
-    "priority": "medium"
-  }
-}
-```
-
 ### Environment Variables
 
-Configure through environment variables:
+Configure Astrolabe through environment variables:
 
 ```bash
-# Database settings
-ASTROLABE_DATABASE_PATH=./tasks.db
-ASTROLABE_DATABASE_ENCRYPTED=true
+# Database Configuration
+DATABASE_URI="sqlite://./data/astrotask.db"    # SQLite database (recommended)
+# DATABASE_URI="idb://astrotask"              # PGLite browser storage  
+# DATABASE_URI="memory://test"                # PGLite in-memory (testing)
 
-# Display preferences
-ASTROLABE_THEME=dark
-ASTROLABE_LOG_LEVEL=info
+# Database Performance Settings
+DB_VERBOSE=false                              # Enable SQL query logging
+DB_TIMEOUT=5000                              # Query timeout in milliseconds
 
-# MCP server settings
-MCP_SERVER_NAME=astrotask
-MCP_SERVER_VERSION=1.0.0
+# Application Settings
+NODE_ENV=development                         # Runtime environment
+LOG_LEVEL=info                              # Log verbosity level
+PORT=3000                                   # Application port (if applicable)
+
+# MCP Server Settings (when using MCP)
+LOG_LEVEL=info                              # MCP server log level
 ```
 
-### Programmatic Configuration
+### Configuration File
 
-```typescript
-import { cfg } from '@astrotask/core';
+Create a `.env` file in your project root for persistent configuration:
 
-// Access current configuration
-console.log('Log level:', cfg.LOG_LEVEL);
-console.log('Environment:', cfg.NODE_ENV);
+```bash
+# .env file
+DATABASE_URI=sqlite://./data/astrotask.db
+DB_VERBOSE=false
+DB_TIMEOUT=20000
+LOG_LEVEL=info
+NODE_ENV=development
 ```
+
+### Database Selection Guide
+
+Choose the right database backend for your use case:
+
+**SQLite (Recommended for CLI/MCP):**
+- Best for: CLI usage, MCP servers, production deployments
+- Benefits: Native performance, concurrent access, process-safe
+- Configuration: `DATABASE_URI="sqlite://./path/to/database.db"`
+
+**PGLite (For Browser/Testing):**
+- Best for: Browser applications, development, testing
+- Benefits: Browser compatibility, PostgreSQL feature set
+- Configuration: `DATABASE_URI="idb://astrotask"` or `DATABASE_URI="memory://test"`
 
 ## Common Workflows
 

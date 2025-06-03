@@ -126,18 +126,10 @@ describe('Database Configuration', () => {
       });
 
       // Verify tables were created by migration
-      const result = await store.pgLite.query(`
-        SELECT table_name
-        FROM information_schema.tables
-        WHERE table_schema = 'public'
-        AND table_type = 'BASE TABLE'
-        ORDER BY table_name
-      `);
-
-      const tableNames = (result.rows as Array<{ table_name: string }>).map(row => row.table_name);
-      expect(tableNames).toContain('tasks');
-      expect(tableNames).toContain('context_slices');
-      expect(tableNames).toContain('task_dependencies');
+      // Use a simple query that works across all database types
+      await expect(store.pgLite.query('SELECT COUNT(*) FROM tasks')).resolves.toBeDefined();
+      await expect(store.pgLite.query('SELECT COUNT(*) FROM context_slices')).resolves.toBeDefined();
+      await expect(store.pgLite.query('SELECT COUNT(*) FROM task_dependencies')).resolves.toBeDefined();
 
       await store.close();
     });
