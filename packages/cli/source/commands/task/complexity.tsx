@@ -1,8 +1,8 @@
 import {
 	createComplexityAnalyzer,
 	createComplexityContextService,
-	createModuleLogger,
 	createLLMService,
+	createModuleLogger,
 } from "@astrotask/core";
 import { Box, Text } from "ink";
 import { useEffect, useState } from "react";
@@ -68,22 +68,31 @@ export default function Complexity({ options }: Props) {
 				});
 
 				// Create complexity analyzer
-				const analyzer = createComplexityAnalyzer(logger, {
-					threshold: options.threshold,
-					research: options.research,
-					batchSize: 5,
-					projectName: "Astrolabe",
-				}, llmService);
+				const analyzer = createComplexityAnalyzer(
+					logger,
+					{
+						threshold: options.threshold,
+						research: options.research,
+						batchSize: 5,
+						projectName: "Astrolabe",
+					},
+					llmService,
+				);
 
 				// Create complexity context service
-				const contextService = createComplexityContextService(logger, db, llmService, {
-					threshold: options.threshold,
-					research: options.research,
-					batchSize: 5,
-					projectName: "Astrolabe",
-					autoUpdate: true,
-					includeRecommendations: true,
-				});
+				const contextService = createComplexityContextService(
+					logger,
+					db,
+					llmService,
+					{
+						threshold: options.threshold,
+						research: options.research,
+						batchSize: 5,
+						projectName: "Astrolabe",
+						autoUpdate: true,
+						includeRecommendations: true,
+					},
+				);
 
 				let report;
 				let analysisMessage: string;

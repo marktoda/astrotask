@@ -3,9 +3,9 @@ import {
 	type GenerationError,
 	type Task,
 	TaskService,
+	createLLMService,
 	createModuleLogger,
 	createPRDTaskGenerator,
-	createLLMService,
 } from "@astrotask/core";
 import { Box, Text } from "ink";
 import { useEffect, useState } from "react";

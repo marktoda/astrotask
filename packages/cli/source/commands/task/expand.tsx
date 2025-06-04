@@ -2,9 +2,9 @@ import {
 	type TaskExpansionConfig,
 	type TaskExpansionResult,
 	TaskService,
+	createLLMService,
 	createModuleLogger,
 	createTaskExpansionService,
-	createLLMService,
 } from "@astrotask/core";
 import { Box, Text } from "ink";
 import { useEffect, useState } from "react";
