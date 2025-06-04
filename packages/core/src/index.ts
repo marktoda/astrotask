@@ -17,6 +17,16 @@ export { TaskService } from './services/TaskService.js';
 export { DependencyService } from './services/DependencyService.js';
 export { DependencyGraph } from './entities/DependencyGraph.js';
 
+// Astrotask SDK - Main entry point
+export {
+  Astrotask,
+  createAstrotask,
+  createAstrotaskWithDatabase,
+  createInMemoryAstrotask,
+  type AstrotaskConfig,
+  type InitializationResult,
+} from './Astrotask.js';
+
 // Schema exports
 export {
   taskSchema,

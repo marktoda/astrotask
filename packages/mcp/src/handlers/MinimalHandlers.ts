@@ -11,7 +11,7 @@
  */
 
 import type { Task, TaskStatus } from '@astrotask/core';
-import type { TaskDependency, ContextSlice } from '@astrotask/core';
+import type { TaskDependency, ContextSlice, TaskTreeData } from '@astrotask/core';
 import { TASK_IDENTIFIERS } from '@astrotask/core';
 import { validateTaskId } from '@astrotask/core';
 import { createModuleLogger } from '@astrotask/core';
@@ -38,8 +38,8 @@ export class MinimalHandlers implements MCPHandler {
     message: string;
     context?: {
       ancestors: Task[];
-      descendants: { task: Task; children: any[] }[]; // TaskTreeData[]
-      root: { task: Task; children: any[] } | null; // TaskTreeData | null
+      descendants: TaskTreeData[];
+      root: TaskTreeData | null;
       dependencies: Task[];
       dependents: Task[];
       isBlocked: boolean;
@@ -50,8 +50,8 @@ export class MinimalHandlers implements MCPHandler {
     };
   }> {
     try {
-      // For now, use the original getAvailableTasks method until our new methods are fully integrated
-      const availableTasks = await this.context.taskService.getAvailableTasks({
+      // Use the Astrotask SDK's task service
+      const availableTasks = await this.context.astrotask.tasks.getAvailableTasks({
         status: args.status,
         priority: args.priority,
       });
@@ -76,14 +76,14 @@ export class MinimalHandlers implements MCPHandler {
 
       // If we have a next task, get its full context
       if (nextTask) {
-        const taskWithContext = await this.context.taskService.getTaskWithContext(nextTask.id);
+        const taskWithContext = await this.context.astrotask.tasks.getTaskWithContext(nextTask.id);
         if (taskWithContext) {
-          const contextSlices = await this.context.store.listContextSlices(nextTask.id);
+          const contextSlices = await this.context.astrotask.store.listContextSlices(nextTask.id);
           
           context = {
             ancestors: taskWithContext.ancestors,
-            descendants: taskWithContext.descendants.map((tree: any) => tree.toPlainObject()), // Convert to plain objects
-            root: taskWithContext.root ? taskWithContext.root.toPlainObject() : null, // Convert to plain object
+            descendants: taskWithContext.descendants.map((tree) => tree.toPlainObject()),
+            root: taskWithContext.root ? taskWithContext.root.toPlainObject() : null,
             dependencies: taskWithContext.dependencies,
             dependents: taskWithContext.dependents,
             isBlocked: taskWithContext.isBlocked,
@@ -176,13 +176,13 @@ export class MinimalHandlers implements MCPHandler {
         let createdTask: Task;
         if (parentTaskId) {
           // Verify parent exists
-          const parentTask = await this.context.store.getTask(parentTaskId);
+          const parentTask = await this.context.astrotask.store.getTask(parentTaskId);
           if (!parentTask) {
             throw new Error(`Parent task ${parentTaskId} not found for task ${i}`);
           }
 
           // Create subtask using store directly for batch operations
-          createdTask = await this.context.store.addTask({
+          createdTask = await this.context.astrotask.store.addTask({
             title: taskInput.title,
             description: taskInput.description,
             status: taskInput.status || 'pending',
@@ -191,7 +191,7 @@ export class MinimalHandlers implements MCPHandler {
           });
         } else {
           // Create standalone task
-          createdTask = await this.context.store.addTask({
+          createdTask = await this.context.astrotask.store.addTask({
             title: taskInput.title,
             description: taskInput.description,
             status: taskInput.status || 'pending',
@@ -206,32 +206,27 @@ export class MinimalHandlers implements MCPHandler {
       for (let i = 0; i < args.tasks.length; i++) {
         const taskInput = args.tasks[i];
         if (taskInput.dependsOn && taskInput.dependsOn.length > 0) {
-          const dependentTask = createdTasks[i];
-          
           for (const depIndex of taskInput.dependsOn) {
             if (depIndex >= createdTasks.length || depIndex < 0) {
               throw new Error(`Invalid dependency index ${depIndex} for task ${i}`);
             }
             
-            const dependencyTask = createdTasks[depIndex];
-            const dependency = await this.context.taskService.addTaskDependency(
-              dependentTask.id,
-              dependencyTask.id
+            const dependency = await this.context.astrotask.tasks.addTaskDependency(
+              createdTasks[i].id,
+              createdTasks[depIndex].id
             );
             dependenciesCreated.push(dependency);
           }
         }
       }
 
-      const message = `Successfully created ${createdTasks.length} tasks with ${dependenciesCreated.length} dependencies`;
-
       return {
         tasks: createdTasks,
-        message,
+        message: `Successfully created ${createdTasks.length} tasks with ${dependenciesCreated.length} dependencies`,
         dependenciesCreated,
       };
     } catch (error) {
-      this.logger.error('Adding tasks batch failed', {
+      this.logger.error('Adding tasks failed', {
         error: error instanceof Error ? error.message : String(error),
         requestId: this.context.requestId,
       });
@@ -240,7 +235,7 @@ export class MinimalHandlers implements MCPHandler {
   }
 
   /**
-   * List tasks with optional filters
+   * List tasks with optional filtering
    */
   async listTasks(args: {
     statuses?: string[];
@@ -252,10 +247,15 @@ export class MinimalHandlers implements MCPHandler {
     message: string;
   }> {
     try {
-      const filters: any = {};
+      const filters: {
+        statuses?: TaskStatus[];
+        parentId?: string;
+        includeProjectRoot?: boolean;
+      } = {};
       
       if (args.statuses) {
-        filters.statuses = args.statuses;
+        // Cast string[] to TaskStatus[] since they come from schema validation
+        filters.statuses = args.statuses as TaskStatus[];
       }
       
       if (args.parentId !== undefined) {
@@ -266,12 +266,12 @@ export class MinimalHandlers implements MCPHandler {
         filters.includeProjectRoot = args.includeProjectRoot;
       }
 
-      const tasks = await this.context.store.listTasks(filters);
+      const tasks = await this.context.astrotask.store.listTasks(filters);
 
       return {
         tasks,
         total: tasks.length,
-        message: `Found ${tasks.length} tasks`
+        message: `Found ${tasks.length} tasks`,
       };
     } catch (error) {
       this.logger.error('Listing tasks failed', {
@@ -283,7 +283,7 @@ export class MinimalHandlers implements MCPHandler {
   }
 
   /**
-   * Add a context slice to a task
+   * Add context slice to a task
    */
   async addTaskContext(args: AddTaskContextInput): Promise<{
     contextSlice: ContextSlice;
@@ -292,13 +292,12 @@ export class MinimalHandlers implements MCPHandler {
   }> {
     try {
       // Verify task exists
-      const task = await this.context.store.getTask(args.taskId);
+      const task = await this.context.astrotask.store.getTask(args.taskId);
       if (!task) {
         throw new Error(`Task ${args.taskId} not found`);
       }
 
-      // Create context slice
-      const contextSlice = await this.context.store.addContextSlice({
+      const contextSlice = await this.context.astrotask.store.addContextSlice({
         taskId: args.taskId,
         title: args.title,
         description: args.description,
@@ -307,12 +306,11 @@ export class MinimalHandlers implements MCPHandler {
       return {
         contextSlice,
         task,
-        message: `Successfully added context slice "${args.title}" to task ${args.taskId}`
+        message: `Added context slice "${args.title}" to task "${task.title}"`,
       };
     } catch (error) {
       this.logger.error('Adding task context failed', {
         error: error instanceof Error ? error.message : String(error),
-        taskId: args.taskId,
         requestId: this.context.requestId,
       });
       throw error;
@@ -320,33 +318,32 @@ export class MinimalHandlers implements MCPHandler {
   }
 
   /**
-   * Add a dependency relationship between tasks
+   * Add dependency between tasks
    */
   async addDependency(args: AddDependencyInput): Promise<{
     dependency: TaskDependency;
     message: string;
   }> {
     try {
-      // Validate that both tasks exist
-      const dependentTask = await this.context.store.getTask(args.dependentTaskId);
+      // Verify both tasks exist
+      const dependentTask = await this.context.astrotask.store.getTask(args.dependentTaskId);
       if (!dependentTask) {
         throw new Error(`Dependent task ${args.dependentTaskId} not found`);
       }
-
-      const dependencyTask = await this.context.store.getTask(args.dependencyTaskId);
+      
+      const dependencyTask = await this.context.astrotask.store.getTask(args.dependencyTaskId);
       if (!dependencyTask) {
         throw new Error(`Dependency task ${args.dependencyTaskId} not found`);
       }
 
-      // Create the dependency
-      const dependency = await this.context.taskService.addTaskDependency(
+      const dependency = await this.context.astrotask.tasks.addTaskDependency(
         args.dependentTaskId,
         args.dependencyTaskId
       );
 
       return {
         dependency,
-        message: `Added dependency: ${args.dependentTaskId} depends on ${args.dependencyTaskId}`
+        message: `Added dependency: "${dependentTask.title}" depends on "${dependencyTask.title}"`,
       };
     } catch (error) {
       this.logger.error('Adding dependency failed', {
@@ -358,7 +355,7 @@ export class MinimalHandlers implements MCPHandler {
   }
 
   /**
-   * Update the status of an existing task
+   * Update task status
    */
   async updateStatus(args: UpdateStatusInput & { cascade?: boolean }): Promise<{
     task: Task;
@@ -366,42 +363,41 @@ export class MinimalHandlers implements MCPHandler {
     cascadeCount?: number;
   }> {
     try {
-      // Validate that the task exists
-      const existingTask = await this.context.store.getTask(args.taskId);
+      // Verify task exists
+      const existingTask = await this.context.astrotask.store.getTask(args.taskId);
       if (!existingTask) {
         throw new Error(`Task ${args.taskId} not found`);
       }
 
-      // Update the task status
-      const updatedTask = await this.context.store.updateTaskStatus(args.taskId, args.status);
+      const updatedTask = await this.context.astrotask.store.updateTaskStatus(args.taskId, args.status);
       if (!updatedTask) {
-        throw new Error(`Failed to update task ${args.taskId} status`);
+        throw new Error(`Failed to update task ${args.taskId}`);
       }
 
-      let cascadeCount = 0;
-      let message = `Updated task ${args.taskId} status to ${args.status}`;
-
-      // Handle cascading if requested and status is final
+      let cascadeCount: number | undefined;
+      
+      // Handle cascade if requested
       if (args.cascade && (args.status === 'done' || args.status === 'cancelled' || args.status === 'archived')) {
         try {
-          // Use TaskService for cascading updates
-          const taskService = this.context.taskService;
+          const taskService = this.context.astrotask.tasks;
           cascadeCount = await taskService.updateTreeStatus(args.taskId, args.status);
-          message = `Updated task ${args.taskId} status to ${args.status} and cascaded to ${cascadeCount} descendants`;
-        } catch (error) {
-          this.logger.warn('Cascade operation failed', {
-            error: error instanceof Error ? error.message : String(error),
+        } catch (cascadeError) {
+          this.logger.warn('Cascade update failed', {
+            error: cascadeError instanceof Error ? cascadeError.message : String(cascadeError),
             taskId: args.taskId,
             status: args.status,
           });
-          // Don't fail the main operation if cascade fails
         }
       }
+
+      const message = cascadeCount !== undefined 
+        ? `Updated task "${updatedTask.title}" to ${args.status} and cascaded to ${cascadeCount} descendants`
+        : `Updated task "${updatedTask.title}" to ${args.status}`;
 
       return {
         task: updatedTask,
         message,
-        ...(args.cascade ? { cascadeCount } : {})
+        cascadeCount,
       };
     } catch (error) {
       this.logger.error('Updating task status failed', {

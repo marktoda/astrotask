@@ -1,28 +1,18 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { MinimalHandlers } from '../../src/handlers/MinimalHandlers.js';
-import { createDatabase, type Store, TASK_IDENTIFIERS } from '@astrotask/core';
-import { mkdtemp, rm } from 'node:fs/promises';
-import { join } from 'node:path';
-import { tmpdir } from 'node:os';
+import { createInMemoryAstrotask, type Astrotask, TASK_IDENTIFIERS } from '@astrotask/core';
 
 describe('MCP Handler Task Validation', () => {
-  let store: Store;
-  let tempDir: string;
+  let astrotask: Astrotask;
   let handlers: MinimalHandlers;
 
   beforeEach(async () => {
-    // Create temporary directory for test database
-    tempDir = await mkdtemp(join(tmpdir(), 'mcp-validation-test-'));
-    const dbPath = join(tempDir, 'test.db');
-    
-    // Initialize database
-    store = await createDatabase({ dataDir: dbPath, verbose: false });
+    // Create in-memory Astrotask instance for testing
+    astrotask = await createInMemoryAstrotask();
     
     // Create handler context
     const context = {
-      store,
-      taskService: null as any, // Not needed for these tests
-      dependencyService: null as any, // Not needed for these tests
+      astrotask,
       requestId: 'test',
       timestamp: new Date().toISOString(),
     };
@@ -32,8 +22,7 @@ describe('MCP Handler Task Validation', () => {
 
   afterEach(async () => {
     // Clean up
-    await store.close();
-    await rm(tempDir, { recursive: true, force: true });
+    await astrotask.dispose();
   });
 
   describe('addTasks validation', () => {
@@ -43,6 +32,8 @@ describe('MCP Handler Task Validation', () => {
           tasks: [{
             title: 'Test Task',
             parentTaskId: '__PROJECT_ROOT__-ABCD',
+            priority: 'medium',
+            status: 'pending',
           }]
         })
       ).rejects.toThrow(/invalid parent ID containing PROJECT_ROOT/);
@@ -53,6 +44,8 @@ describe('MCP Handler Task Validation', () => {
         tasks: [{
           title: 'Test Task',
           parentTaskId: TASK_IDENTIFIERS.PROJECT_ROOT,
+          priority: 'medium',
+          status: 'pending',
         }]
       });
       
@@ -68,6 +61,8 @@ describe('MCP Handler Task Validation', () => {
           tasks: [{
             title: '',
             description: 'Test description',
+            priority: 'medium',
+            status: 'pending',
           }]
         })
       ).rejects.toThrow(/empty or missing title/);
@@ -80,6 +75,8 @@ describe('MCP Handler Task Validation', () => {
           tasks: [{
             title: longTitle,
             description: 'Test description',
+            priority: 'medium',
+            status: 'pending',
           }]
         })
       ).rejects.toThrow(/title is too long/);
@@ -92,6 +89,8 @@ describe('MCP Handler Task Validation', () => {
           tasks: [{
             title: 'Test Task',
             description: longDescription,
+            priority: 'medium',
+            status: 'pending',
           }]
         })
       ).rejects.toThrow(/description is too long/);
@@ -103,6 +102,8 @@ describe('MCP Handler Task Validation', () => {
           tasks: [{
             title: 'Test Task',
             parentTaskId: 'invalid-id-123',
+            priority: 'medium',
+            status: 'pending',
           }]
         })
       ).rejects.toThrow(/invalid parent ID format/);
@@ -114,11 +115,15 @@ describe('MCP Handler Task Validation', () => {
           {
             title: 'Parent Task',
             description: 'A parent task',
+            priority: 'medium',
+            status: 'pending',
           },
           {
             title: 'Child Task',
             description: 'A child task',
             parentIndex: 0,
+            priority: 'medium',
+            status: 'pending',
           }
         ]
       });
@@ -136,21 +141,27 @@ describe('MCP Handler Task Validation', () => {
             {
               title: 'Valid Task 1',
               description: 'Valid description',
+              priority: 'medium',
+              status: 'pending',
             },
             {
               title: 'Valid Task 2',
               description: 'Valid description',
+              priority: 'medium',
+              status: 'pending',
             },
             {
               title: '', // Invalid - empty title
               description: 'Valid description',
+              priority: 'medium',
+              status: 'pending',
             }
           ]
         })
       ).rejects.toThrow(/empty or missing title/);
       
       // Verify no tasks were created
-      const tasks = await store.listTasks();
+      const tasks = await astrotask.store.listTasks();
       // Should only have PROJECT_ROOT
       expect(tasks.filter(t => t.id !== TASK_IDENTIFIERS.PROJECT_ROOT)).toHaveLength(0);
     });

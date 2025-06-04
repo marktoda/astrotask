@@ -13,21 +13,17 @@ import {
   taskStatus,
   taskPriority,
   type TaskStatus,
-  type TaskPriority
+  type TaskPriority,
+  Astrotask
 } from '@astrotask/core';
-import type { Store, TaskService, DependencyService } from '@astrotask/core';
 
 /**
  * Context object passed to all MCP handlers containing shared dependencies
  * and request metadata.
  */
 export interface HandlerContext {
-  /** Database store instance for data persistence operations */
-  store: Store;
-  /** Task service instance for hierarchical task operations */
-  taskService: TaskService;
-  /** Dependency service instance for dependency management operations */
-  dependencyService: DependencyService;
+  /** Astrotask SDK instance providing unified access to all services */
+  astrotask: Astrotask;
   /** Unique identifier for the current request (for logging and tracing) */
   requestId: string;
   /** ISO timestamp when the request was initiated */

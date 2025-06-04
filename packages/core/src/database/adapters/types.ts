@@ -127,3 +127,9 @@ export function isServerBased(backend: DatabaseBackend): boolean {
 export function needsExternalLocking(backend: DatabaseBackend): boolean {
   return isFileBased(backend);
 }
+
+/**
+ * SDK-friendly alias for DatabaseBackend interface
+ * Provides a clean interface name for the Astrotask SDK
+ */
+export type IDatabaseAdapter<TDrizzle extends DrizzleOps = DrizzleOps> = DatabaseBackend<TDrizzle>;

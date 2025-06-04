@@ -5,7 +5,7 @@
  */
 
 // Export all types
-export type { DatabaseBackend, DbCapabilities, DatabaseClient, SqlParam, SqlRow } from './types.js';
+export type { DatabaseBackend, IDatabaseAdapter, DbCapabilities, DatabaseClient, SqlParam, SqlRow } from './types.js';
 
 // Export helper functions
 export { isFileBased, isServerBased, needsExternalLocking } from './types.js';

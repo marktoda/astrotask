@@ -1,4 +1,4 @@
-import { TaskService, cfg, createDatabase } from "@astrotask/core";
+import { createAstrotask, cfg, type Astrotask } from "@astrotask/core";
 import { Text } from "ink";
 import type { AppProps } from "pastel";
 import React from "react";
@@ -12,27 +12,17 @@ export default function App({ Component, commandProps }: AppProps) {
 		null,
 	);
 
-	// Run once; when the promise resolves we have the real Store and TaskService
+	// Run once; when the promise resolves we have the real Astrotask SDK instance
 	React.useEffect(() => {
-		let store: any = null;
-
-		// Use the centralized configuration system that loads .env files
-		const dbOptions = {
-			dataDir: cfg.DATABASE_URI,
-			verbose: cfg.DB_VERBOSE,
-			enableLocking: true,
-			lockOptions: {
-				processType: "cli", // Identify this as CLI process for lock debugging
-			},
-		};
+		let astrotask: Astrotask | null = null;
 
 		// Cleanup function for graceful shutdown
 		const cleanup = async () => {
-			if (store) {
+			if (astrotask) {
 				try {
-					await store.close();
-				} catch (err: any) {
-					console.error("Failed to close database connection:", err);
+					await astrotask.dispose();
+				} catch (err) {
+					console.error("Failed to dispose Astrotask SDK:", err instanceof Error ? err.message : String(err));
 				}
 			}
 		};
@@ -46,38 +36,41 @@ export default function App({ Component, commandProps }: AppProps) {
 		process.on("SIGTERM", exitHandler);
 		process.on("beforeExit", cleanup);
 
-		createDatabase(dbOptions)
-			.then((createdStore: any) => {
-				store = createdStore;
+		createAstrotask({
+			databaseUrl: cfg.DATABASE_URI,
+			debug: cfg.DB_VERBOSE,
+		})
+			.then((createdAstrotask: Astrotask) => {
+				astrotask = createdAstrotask;
 
 				// Display appropriate connection info based on database type
-				const connectionInfo = store.pgLite.dataDir
-					? store.pgLite.dataDir
-					: "PostgreSQL database";
+				const connectionInfo = astrotask.databaseType === 'sqlite' 
+					? `SQLite database at ${cfg.DATABASE_URI}`
+					: `${astrotask.databaseType} database`;
 
 				console.log(
-					`Initialized database at: ${connectionInfo} (with locking)`,
+					`Initialized Astrotask SDK with ${connectionInfo}`,
 				);
-				const taskService = new TaskService(store);
-				setContext({ store, taskService });
+				setContext({ astrotask });
 			})
-			.catch((err: any) => {
-				// Provide user-friendly error message for lock conflicts
-				if (err.message?.includes("Database is currently in use")) {
+			.catch((err) => {
+				// Provide user-friendly error message for initialization failures
+				const errorMessage = err instanceof Error ? err.message : String(err);
+				if (errorMessage.includes("Database is currently in use")) {
 					console.error("❌ Database is currently in use by another process.");
 					console.error(
 						"   Please wait a moment and try again, or check if the MCP server is running.",
 					);
 				} else {
 					console.error(
-						"❌ Database initialization failed:",
-						err.message || err,
+						"❌ Astrotask SDK initialization failed:",
+						errorMessage,
 					);
 				}
 				process.exit(1);
 			});
 
-		// Cleanup function to close database connection
+		// Cleanup function to dispose SDK
 		return () => {
 			// Remove process handlers
 			process.off("SIGINT", exitHandler);
@@ -88,7 +81,7 @@ export default function App({ Component, commandProps }: AppProps) {
 		};
 	}, []);
 
-	if (!context) return <Text>Initialising database…</Text>;
+	if (!context) return <Text>Initialising Astrotask SDK…</Text>;
 
 	return (
 		<DatabaseContext.Provider value={context}>

@@ -67,9 +67,20 @@ export async function createDatabase(options: DatabaseOptions = {}): Promise<Sto
       isFileBasedUrl(parsed) && // Only use locking for file-based databases
       (options.enableLocking ?? true); // Default to true for file-based databases
 
+    // Get the actual file path for locking (not the URL)
+    const lockPath = shouldUseLocking
+      ? parsed.kind === 'sqlite-file' || parsed.kind === 'pglite-file'
+        ? parsed.file
+        : parsed.kind === 'pglite-mem'
+          ? `memory-${parsed.label}.db`
+          : parsed.kind === 'pglite-idb'
+            ? `idb-${parsed.label}.db`
+            : dataDir
+      : dataDir;
+
     // Wrap with locking if needed
     const store = shouldUseLocking
-      ? new LockingStore(baseStore, dataDir, options.lockOptions)
+      ? new LockingStore(baseStore, lockPath, options.lockOptions)
       : baseStore;
 
     return store;
@@ -173,5 +184,14 @@ export type { LockOptions } from './lock.js';
 export type { DatabaseBackend, DbCapabilities } from './adapters/index.js';
 export { parseDbUrl, type DbUrl } from './url-parser.js';
 export { openDatabase } from './factory.js';
+
+// Migration runner exports
+export { 
+  MigrationRunner, 
+  runMigrations, 
+  createMigrationRunner,
+  type MigrationConfig,
+  type MigrationResult 
+} from './migrate.js';
 
 export * from './schema.js';
