@@ -17,8 +17,8 @@ COPY packages/ ./packages/
 # Install dependencies (workspace dependencies need source to be present)
 RUN pnpm install --no-frozen-lockfile
 
-# Build the workspace
-RUN pnpm build
+# Build only the required packages (core and mcp)
+RUN pnpm --filter @astrotask/mcp build
 
 # Create data directory for SQLite database
 RUN mkdir -p /app/data
@@ -31,4 +31,4 @@ ENV DATABASE_PATH=/app/data/astrotask.db
 ENV NODE_ENV=production
 
 # Start the MCP server
-CMD ["node", "packages/mcp/dist/index.js"] 
+CMD ["node", "packages/mcp/dist/index.js"]
