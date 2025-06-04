@@ -5,6 +5,7 @@ import {
 	TaskService,
 	createModuleLogger,
 	createPRDTaskGenerator,
+	createLLMService,
 } from "@astrotask/core";
 import { Box, Text } from "ink";
 import { useEffect, useState } from "react";
@@ -118,7 +119,15 @@ export default function Generate({ options }: Props) {
 
 				// Create logger and generator
 				const logger = createModuleLogger("CLI-TaskGeneration");
-				const generator = createPRDTaskGenerator(logger, db);
+
+				// Create LLM service
+				const llmService = createLLMService({
+					modelName: "gpt-4o-mini",
+					temperature: 0.1,
+					maxTokens: 2048,
+				});
+
+				const generator = createPRDTaskGenerator(logger, db, llmService);
 
 				// Validate input
 				setState((prev) => ({

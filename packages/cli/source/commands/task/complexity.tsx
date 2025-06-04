@@ -2,6 +2,7 @@ import {
 	createComplexityAnalyzer,
 	createComplexityContextService,
 	createModuleLogger,
+	createLLMService,
 } from "@astrotask/core";
 import { Box, Text } from "ink";
 import { useEffect, useState } from "react";
@@ -59,16 +60,23 @@ export default function Complexity({ options }: Props) {
 			try {
 				const logger = createModuleLogger("complexity-cli");
 
+				// Create LLM service
+				const llmService = createLLMService({
+					modelName: "gpt-4o-mini",
+					temperature: 0.1,
+					maxTokens: 2048,
+				});
+
 				// Create complexity analyzer
 				const analyzer = createComplexityAnalyzer(logger, {
 					threshold: options.threshold,
 					research: options.research,
 					batchSize: 5,
 					projectName: "Astrolabe",
-				});
+				}, llmService);
 
 				// Create complexity context service
-				const contextService = createComplexityContextService(logger, db, {
+				const contextService = createComplexityContextService(logger, db, llmService, {
 					threshold: options.threshold,
 					research: options.research,
 					batchSize: 5,

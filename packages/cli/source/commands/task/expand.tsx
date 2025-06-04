@@ -4,6 +4,7 @@ import {
 	TaskService,
 	createModuleLogger,
 	createTaskExpansionService,
+	createLLMService,
 } from "@astrotask/core";
 import { Box, Text } from "ink";
 import { useEffect, useState } from "react";
@@ -77,6 +78,13 @@ export default function Expand({ options }: Props) {
 				}
 				const rootTaskId = options.root;
 
+				// Create LLM service
+				const llmService = createLLMService({
+					modelName: "gpt-4o-mini",
+					temperature: 0.1,
+					maxTokens: 2048,
+				});
+
 				// Create expansion service with configuration
 				const expansionConfig: TaskExpansionConfig = {
 					useComplexityAnalysis: true, // Use complexity analysis
@@ -94,6 +102,7 @@ export default function Expand({ options }: Props) {
 					db,
 					taskService,
 					expansionConfig,
+					llmService,
 				);
 
 				// Handle root expansion logic
