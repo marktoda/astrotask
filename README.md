@@ -1,6 +1,7 @@
 # Astrotask
 
-**task manager built for humans _and_ AI agents**
+**Task manager built for humans _and_ AI agents**
+
 Offline‑ready · MCP‑compatible · Fully‑type‑safe · Extensible
 
 [![npm (scoped)](https://img.shields.io/npm/v/@astrotask/cli?label=npm%20%40astrotask%2Fcli)](https://www.npmjs.com/package/@astrotask/cli)
@@ -27,11 +28,9 @@ Astrotask is more than a to‑do list—it's a **shared brain** where developers
 - [Features](#features)
 - [Installation](#installation)
 - [Quick Start](#quick-start)
-
   - [CLI](#cli)
   - [Programmatic](#programmatic)
   - [AI / MCP](#ai--mcp)
-
 - [Adding Tasks](#adding-tasks)
 - [Operating & Running Tasks](#operating--running-tasks)
 - [Screenshots](#screenshots)
