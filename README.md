@@ -12,20 +12,18 @@ Offline‑ready · MCP‑compatible · Fully‑type‑safe · Extensible
 
 ## Why Astrotask?
 
-Astrotask is more than a to‑do list—it's a **shared brain** where developers and AI agents collaborate in real time.
+Astrotask keeps workstreams organised and agent‑ready:
 
-- **One database file, limitless context** – Every surface (CLI, TUI, SDK, MCP) reads & writes the _same_ local database, so long‑running agents never lose the bigger picture.
-- **Capture anywhere, even offline** – Jot ideas down on a plane; the file lives on your disk and syncs later
-- **Automatic project decomposition** – Built‑in generators break PRDs into nested tasks your agent can tackle autonomously.
-- **First‑class dependency graph** – Visualise blockers and let agents sequence their own work without stepping on each other.
-- **Multi‑agent friendly** – Run several specialised agents (or agent + developer) against the same store; SQLite WAL keeps writes safe.
-- **Human‑optimised CLI & dashboard** – Developers can triage, reprioritise, or inject tasks while agents churn through the backlog.
+- **Stay on track** – persistent workspace records every decision and status change.
+- **Parallel agent orchestration** – multiple agents can tackle non‑blocking tasks simultaneously; the dependency graph prevents collisions.
+- **Rich, evolving context** – attach arbitrary metadata, comments, and notes to improve recall and quality of work.
+- **Situational awareness** – agents can refetch the original task prompt at any time and understand where it fits in the wider roadmap.
+- **Offline‑first** – capture ideas without a network and sync when back online.
 
 ---
 
 ## Table of Contents
 
-- [Features](#features)
 - [Installation](#installation)
 - [Quick Start](#quick-start)
   - [CLI](#cli)
@@ -71,9 +69,20 @@ mkdir my-project && cd $_
 # 2. Initialise Astrotask (creates ./data/astrotask.db and starter rules)
 astro init
 
-# 3. Add a task and view it
-astro task add "Ship public launch"
-astro task tree
+# 3. Add tasks and view them
+❯ astro task add "Create README"
+❯ astro task generate --file docs/task-generation-implementation.md
+❯ astro task tree
+🌳 Task Tree (All Tasks) (pending and in-progress only)
+💡 Use --show-all to include completed and archived tasks
+├── ⏳ Create README (AFDR) [pending]
+├── ⏳ Task ID System and TaskTree Architecture (BXCQ) [pending]
+│   ├── ⏳ Create task creation logic (BXCQ-RKGO) [pending]
+│   ├── ⏳ Implement task tree structure (BXCQ-BTTS) [pending]
+│   ├── ⏳ Implement task ID validation functions (BXCQ-PDPT) [pending]
+│   ├── ⏳ Implement subtask ID generation function (BXCQ-ZGWZ) [pending]
+│   ├── ⏳ Implement task ID generation function (BXCQ-QDPA) [pending]
+│   └── ⏳ Design database schema for tasks (BXCQ-FUZS) [pending]
 
 # 4. Open the live dashboard (press <c> to toggle completed tasks)
 astro dashboard
@@ -118,7 +127,9 @@ astro init
 
 Configure your agent (Cursor, ChatGPT plug‑in, …) with the endpoint and start calling tools such as:
 
-```json
+```bash
+$ Start working on the next task and track your progress in astrotask
+
 {
   "name": "getNextTask",
   "arguments": { "priority": "high" }
@@ -217,11 +228,10 @@ We ♥ new contributors! See [CONTRIBUTING.md](CONTRIBUTING.md) and [AGENTS.md](
 
 ## Roadmap
 
-| Milestone | Focus                                       |
-| --------- | ------------------------------------------- |
-| **v0.2**  | Polished CLI & MCP, dependency UX           |
-| **v0.3**  | ElectricSQL synchronization + web dashboard |
-| **v1.0**  | Mobile apps, plug‑in ecosystem              |
+| Milestone | Focus                       |
+| --------- | --------------------------- |
+| **v0.2**  | ElectricSQL synchronization |
+| **v0.3**  | Web dashboard               |
 
 ---
 
