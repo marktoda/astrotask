@@ -105,7 +105,11 @@ export class TaskExpansionService {
     private config: TaskExpansionConfig,
     llmService?: ILLMService
   ) {
-    // Initialize complexity analyzer
+    if (!llmService) {
+      throw new Error('LLMService is required for TaskExpansionService. Please provide an ILLMService instance.');
+    }
+    
+    // Initialize complexity analyzer with provided config
     this.complexityAnalyzer = createComplexityAnalyzer(
       logger,
       {
@@ -118,7 +122,7 @@ export class TaskExpansionService {
     );
 
     // Initialize complexity context service
-    this.complexityContextService = createComplexityContextService(logger, store, {
+    this.complexityContextService = createComplexityContextService(logger, store, llmService, {
       threshold: config.complexityThreshold,
       research: config.research,
       autoUpdate: true,
@@ -575,6 +579,10 @@ export function createTaskExpansionService(
     createContextSlices: true,
     ...config,
   };
+
+  if (!llmService) {
+    throw new Error('LLMService is required for TaskExpansionService. Please provide an ILLMService instance.');
+  }
 
   return new TaskExpansionService(logger, store, taskService, defaultConfig, llmService);
 }

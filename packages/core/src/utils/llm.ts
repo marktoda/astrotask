@@ -1,11 +1,28 @@
 /**
  * @fileoverview LLM configuration utilities for task generation
  *
- * This module provides utilities for configuring and creating LLM instances
- * for task generation operations.
+ * ⚠️  DEPRECATION NOTICE:
+ * This module is deprecated. Use the enhanced LLMService instead:
+ * 
+ * ```typescript
+ * import { createLLMService, DefaultLLMService } from './services/LLMService.js';
+ * 
+ * // Instead of createLLM(config)
+ * const service = createLLMService(config);
+ * const llm = service.getChatModel();
+ * 
+ * // Access additional features
+ * const config = service.getConfig();
+ * const modelInfo = service.getModelConfig();
+ * const isValid = service.isConfigured();
+ * ```
+ *
+ * The LLMService provides better dependency injection support, enhanced
+ * configuration management, validation, and is more testable.
  *
  * @module utils/llm
  * @since 1.0.0
+ * @deprecated Use LLMService instead
  */
 
 import { ChatOpenAI } from '@langchain/openai';

@@ -1,12 +1,15 @@
 /**
  * Example demonstrating the new enum-based dependency injection system
+ * and the enhanced LLMService with configuration and validation features
  */
 
 import { 
   createAstrotask, 
   DependencyType, 
   Registry,
-  type AstrotaskConfig 
+  createLLMService,
+  type AstrotaskConfig,
+  type LLMConfig 
 } from '../src/index.js';
 
 // Example 1: Basic usage with default services
@@ -88,6 +91,27 @@ async function customLLMService() {
           
           return mockLLM as any;
         },
+        getConfig: () => ({
+          apiKey: 'mock-key',
+          modelName: 'gpt-4o-mini',
+          temperature: 0.1,
+          maxTokens: 1000,
+          timeout: 30000
+        }),
+        validateConfig: () => [],
+        isConfigured: () => true,
+        getModelConfig: () => ({
+          id: 'gpt-4o-mini',
+          name: 'GPT-4o Mini',
+          description: 'Mock model for testing',
+          provider: 'openai' as const,
+          temperature: 0.1,
+          maxTokens: 1000,
+          timeout: 30000,
+          supportsFunctionCalling: true,
+          inputCostPer1K: 0.00015,
+          outputCostPer1K: 0.0006,
+        })
       });
     },
   });
@@ -109,7 +133,45 @@ async function customLLMService() {
   await astrotask.dispose();
 }
 
-// Example 3: Feature flagging - use different services based on environment
+// Example 3: Enhanced LLM Service Configuration
+async function enhancedLLMConfiguration() {
+  console.log('\n=== Enhanced LLM Service Configuration ===');
+  
+  const astrotask = await createAstrotask({
+    databaseUrl: 'memory://example',
+    overrides(registry) {
+      // Create a custom LLM service with specific configuration
+      const customConfig: LLMConfig = {
+        modelName: 'gpt-4o-mini',
+        temperature: 0.2,
+        maxTokens: 2048,
+        timeout: 45000,
+        // Note: apiKey would typically come from environment
+      };
+      
+      const llmService = createLLMService(customConfig);
+      
+      // Log the configuration
+      console.log('LLM Service Configuration:', llmService.getConfig());
+      console.log('Model Information:', llmService.getModelConfig());
+      console.log('Configuration Valid:', llmService.isConfigured());
+      
+      registry.register(DependencyType.LLM_SERVICE, llmService);
+    },
+  });
+
+  const task = await astrotask.store.addTask({
+    title: 'Enhanced Configuration Test',
+    status: 'pending',
+    priority: 'medium',
+  });
+
+  console.log(`Created task: ${task.id} - ${task.title}`);
+  
+  await astrotask.dispose();
+}
+
+// Example 4: Feature flagging - use different services based on environment
 async function featureFlagging() {
   console.log('\n=== Feature Flagging ===');
   
@@ -138,6 +200,27 @@ async function featureFlagging() {
               maxTokens: 0,
             } as any;
           },
+          getConfig: () => ({
+            apiKey: 'disabled',
+            modelName: 'disabled-model',
+            temperature: 0,
+            maxTokens: 0,
+            timeout: 1000
+          }),
+          validateConfig: () => ['Features disabled'],
+          isConfigured: () => false,
+          getModelConfig: () => ({
+            id: 'disabled-model',
+            name: 'Disabled Model',
+            description: 'Features disabled',
+            provider: 'openai' as const,
+            temperature: 0,
+            maxTokens: 0,
+            timeout: 1000,
+            supportsFunctionCalling: false,
+            inputCostPer1K: 0,
+            outputCostPer1K: 0,
+          })
         });
       }
       // Otherwise use default services
@@ -162,18 +245,17 @@ async function featureFlagging() {
   await astrotask.dispose();
 }
 
-// Example 4: Registry merging for modular overrides
+// Example 5: Registry merging for modular overrides
 async function registryMerging() {
   console.log('\n=== Registry Merging ===');
   
   // Create a separate registry with testing overrides
   const testingRegistry = new Registry();
-  testingRegistry.register(DependencyType.LLM_SERVICE, {
-    getChatModel: () => {
-      console.log('Using testing LLM service');
-      return {} as any; // Minimal mock
-    },
-  });
+  testingRegistry.register(DependencyType.LLM_SERVICE, createLLMService({
+    modelName: 'gpt-3.5-turbo',
+    temperature: 0.5,
+    maxTokens: 1024,
+  }));
 
   const astrotask = await createAstrotask({
     databaseUrl: 'memory://example',
@@ -197,7 +279,7 @@ async function registryMerging() {
   await astrotask.dispose();
 }
 
-// Example 5: Production configuration with Azure OpenAI
+// Example 6: Production configuration with Azure OpenAI
 async function productionExample() {
   console.log('\n=== Production Example ===');
   
@@ -206,17 +288,16 @@ async function productionExample() {
     overrides(registry) {
       // Example: Switch to Azure OpenAI in production
       if (process.env.NODE_ENV === 'production') {
-        registry.register(DependencyType.LLM_SERVICE, () => {
-          console.log('Using Azure OpenAI service');
-          // In real code, you would import and use AzureOpenAI here
-          return {
-            getChatModel: () => {
-              // Return actual Azure OpenAI instance
-              console.log('Azure OpenAI configured');
-              return {} as any;
-            },
-          };
-        });
+        const productionConfig: LLMConfig = {
+          modelName: 'gpt-4o',
+          temperature: 0.1,
+          maxTokens: 4096,
+          timeout: 60000,
+          // In production, you might use Azure OpenAI or other providers
+        };
+        
+        registry.register(DependencyType.LLM_SERVICE, createLLMService(productionConfig));
+        console.log('Using production LLM configuration');
       }
     },
   });
@@ -234,11 +315,12 @@ async function productionExample() {
 
 // Run all examples
 async function runExamples() {
-  console.log('🚀 Dependency Injection Examples');
+  console.log('🚀 Enhanced Dependency Injection Examples');
   
   try {
     await basicUsage();
     await customLLMService();
+    await enhancedLLMConfiguration();
     await featureFlagging();
     await registryMerging();
     await productionExample();

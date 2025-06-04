@@ -21,7 +21,6 @@ import { TrackingDependencyGraph } from '../../entities/TrackingDependencyGraph.
 import { TrackingTaskTree } from '../../entities/TrackingTaskTree.js';
 import type { CreateTask, Task } from '../../schemas/task.js';
 import { TaskService } from '../../services/TaskService.js';
-import { createLLM } from '../../utils/llm.js';
 import { PRD_SYSTEM_PROMPT, generatePRDPrompt } from '../../utils/prompts.js';
 import type { ILLMService } from '../LLMService.js';
 import type { GenerationResult, TaskGenerator } from './TaskGenerator.js';
@@ -83,7 +82,10 @@ export class PRDTaskGenerator implements TaskGenerator {
     store: Store,
     llmService?: ILLMService
   ) {
-    this.llm = llmService?.getChatModel() ?? createLLM();
+    if (!llmService) {
+      throw new Error('LLMService is required for PRDTaskGenerator. Please provide an ILLMService instance.');
+    }
+    this.llm = llmService.getChatModel();
     this.taskService = new TaskService(store);
     this.initializeChain();
   }
@@ -511,5 +513,8 @@ export function createPRDTaskGenerator(
   store: Store,
   llmService?: ILLMService
 ): PRDTaskGenerator {
+  if (!llmService) {
+    throw new Error('LLMService is required for PRDTaskGenerator. Please provide an ILLMService instance.');
+  }
   return new PRDTaskGenerator(logger, store, llmService);
 }

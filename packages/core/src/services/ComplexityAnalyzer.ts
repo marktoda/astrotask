@@ -17,7 +17,6 @@ import type { Logger } from 'pino';
 import { z } from 'zod';
 
 import type { Task } from '../schemas/task.js';
-import { createLLM } from '../utils/llm.js';
 import type { ILLMService } from './LLMService.js';
 
 /**
@@ -80,7 +79,10 @@ export class ComplexityAnalyzer {
     private config: ComplexityAnalysisConfig,
     llmService?: ILLMService
   ) {
-    this.llm = llmService?.getChatModel() ?? createLLM();
+    if (!llmService) {
+      throw new Error('LLMService is required for ComplexityAnalyzer. Please provide an ILLMService instance.');
+    }
+    this.llm = llmService.getChatModel();
     this.initializeChain();
   }
 
@@ -489,6 +491,10 @@ export function createComplexityAnalyzer(
   config: Partial<ComplexityAnalysisConfig> = {},
   llmService?: ILLMService
 ): ComplexityAnalyzer {
+  if (!llmService) {
+    throw new Error('LLMService is required for ComplexityAnalyzer. Please provide an ILLMService instance.');
+  }
+  
   const defaultConfig: ComplexityAnalysisConfig = {
     threshold: 5,
     research: false,
