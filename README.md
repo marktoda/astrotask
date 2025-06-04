@@ -6,7 +6,7 @@ Offline‑ready · MCP‑compatible · Fully‑type‑safe · Extensible
 
 [![npm (scoped)](https://img.shields.io/npm/v/@astrotask/cli?label=npm%20%40astrotask%2Fcli)](https://www.npmjs.com/package/@astrotask/cli)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![CI](https://github.com/astrotask/astrotask/actions/workflows/ci.yml/badge.svg)](https://github.com/astrotask/astrotask/actions)
+[![CI](https://github.com/marktoda/astrotask/actions/workflows/ci.yml/badge.svg)](https://github.com/marktoda/astrotask/actions)
 
 ---
 
@@ -194,7 +194,7 @@ All commands accept `--help`.
 
 ## Screenshots
 
-![Astrotask Dashboard screenshot](./docs/assets/dashboard.png)
+![Astrotask Dashboard screenshot](./assets/dashboard.png)
 
 ---
 
