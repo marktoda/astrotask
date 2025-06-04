@@ -35,17 +35,24 @@ async function customLLMService() {
   const astrotask = await createAstrotask({
     databaseUrl: 'memory://example',
     overrides(registry) {
-      // Replace LLM service with a mock for testing
+      // Replace LLM service with a proper mock for testing
       registry.register(DependencyType.LLM_SERVICE, {
         getChatModel: () => {
           console.log('Using custom LLM service!');
-          return {
-            pipe: () => ({
-              pipe: () => ({
-                invoke: async (input) => {
-                  console.log('Mock LLM called with:', input.prompt.substring(0, 50) + '...');
-                  return [{ 
-                    taskId: 'test',
+          const mockLLM = {
+            // LangChain Runnable interface methods
+            invoke: async (input: any) => {
+              console.log('Mock LLM called with:', JSON.stringify(input).substring(0, 50) + '...');
+              return { content: 'Mock response for testing', role: 'assistant' };
+            },
+            
+            pipe: (nextRunnable: any) => {
+              // Return mock runnable that implements the chain
+              return {
+                invoke: async (input: any) => {
+                  // Return mock complexity analysis results
+                  return [{
+                    taskId: 'test-task',
                     taskTitle: 'Mock Task',
                     complexityScore: 5,
                     recommendedSubtasks: 3,
@@ -53,9 +60,33 @@ async function customLLMService() {
                     reasoning: 'Mock reasoning'
                   }];
                 },
-              }),
-            }),
-          } as any;
+                
+                pipe: (nextNextRunnable: any) => {
+                  return {
+                    invoke: async (input: any) => {
+                      return [{
+                        taskId: 'test-task',
+                        taskTitle: 'Mock Task',
+                        complexityScore: 5,
+                        recommendedSubtasks: 3,
+                        expansionPrompt: 'Mock expansion',
+                        reasoning: 'Mock reasoning'
+                      }];
+                    }
+                  };
+                }
+              };
+            },
+            
+            // Add LangChain-specific properties
+            lc_runnable: true,
+            lc_namespace: ['langchain', 'chat_models', 'openai'],
+            modelName: 'test-model',
+            temperature: 0,
+            maxTokens: 100,
+          };
+          
+          return mockLLM as any;
         },
       });
     },
@@ -72,7 +103,7 @@ async function customLLMService() {
     const analysis = await astrotask.complexity.analyzeTask(task);
     console.log('Complexity analysis result:', analysis);
   } catch (error) {
-    console.log('Expected error with mock service:', error instanceof Error ? error.message : error);
+    console.log('Error with mock service:', error instanceof Error ? error.message : error);
   }
   
   await astrotask.dispose();
@@ -91,7 +122,21 @@ async function featureFlagging() {
         // Disable advanced features by providing minimal implementations
         registry.register(DependencyType.LLM_SERVICE, {
           getChatModel: () => {
-            throw new Error('Advanced features disabled');
+            // Return a mock that works but indicates features are disabled
+            return {
+              invoke: async (_input: any) => ({ content: 'Advanced features disabled', role: 'assistant' }),
+              pipe: (_nextRunnable: any) => ({
+                invoke: async (_input: any) => [],
+                pipe: (_nextNextRunnable: any) => ({
+                  invoke: async (_input: any) => []
+                })
+              }),
+              lc_runnable: true,
+              lc_namespace: ['langchain', 'chat_models', 'mock'],
+              modelName: 'disabled-model',
+              temperature: 0,
+              maxTokens: 0,
+            } as any;
           },
         });
       }
@@ -109,6 +154,10 @@ async function featureFlagging() {
 
   console.log(`Advanced features enabled: ${useAdvancedFeatures}`);
   console.log(`Created task: ${task.id} - ${task.title}`);
+  
+  if (!useAdvancedFeatures) {
+    console.log('Complexity analysis disabled in this mode');
+  }
   
   await astrotask.dispose();
 }

@@ -416,8 +416,75 @@ export async function createTestAstrotask(
     ...config,
     databaseUrl: TEST_CONFIG.DATABASE_URL,
     overrides(reg) {
+      // Override LLM service with a mock that doesn't require OpenAI API key
       reg.register(DependencyType.LLM_SERVICE, {
-        getChatModel: () => ({}) as unknown as import('@langchain/openai').ChatOpenAI,
+        getChatModel: () => {
+          // Create a mock that extends a minimal base class
+          // This is a hack to avoid the LangChain type checking issues
+          const mockLLM = {
+            // LangChain Runnable interface methods
+            invoke: async (_input: unknown) => {
+              return { content: 'Mock response for testing', role: 'assistant' };
+            },
+
+            stream: async function* (_input: unknown) {
+              yield { content: 'Mock response for testing', role: 'assistant' };
+            },
+
+            pipe: (_nextRunnable: unknown) => {
+              // Return another mock runnable that implements the chain
+              return {
+                invoke: async (_input: unknown) => {
+                  // Return mock complexity analysis results
+                  return [
+                    {
+                      taskId: 'test-task',
+                      taskTitle: 'Test Task',
+                      complexityScore: 5,
+                      recommendedSubtasks: 3,
+                      expansionPrompt: 'Test expansion prompt',
+                      reasoning: 'Test reasoning for complexity analysis',
+                    },
+                  ];
+                },
+
+                pipe: (_nextNextRunnable: unknown) => {
+                  return {
+                    invoke: async (_input: unknown) => {
+                      // This handles the final parser in the chain
+                      return [
+                        {
+                          taskId: 'test-task',
+                          taskTitle: 'Test Task',
+                          complexityScore: 5,
+                          recommendedSubtasks: 3,
+                          expansionPrompt: 'Test expansion prompt',
+                          reasoning: 'Test reasoning for complexity analysis',
+                        },
+                      ];
+                    },
+                  };
+                },
+              };
+            },
+
+            // Mock ChatOpenAI specific properties
+            modelName: 'gpt-4',
+            temperature: 0.7,
+            maxTokens: 1000,
+
+            // Add minimal Runnable interface properties that LangChain expects
+            lc_runnable: true,
+            lc_namespace: ['langchain', 'chat_models', 'openai'],
+
+            // Mock additional methods that might be called
+            batch: async (inputs: unknown[]) => {
+              return inputs.map(() => ({ content: 'Mock batch response', role: 'assistant' }));
+            },
+          };
+
+          return mockLLM as unknown as import('@langchain/openai').ChatOpenAI;
+        },
       });
     },
   });
