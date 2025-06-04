@@ -18,6 +18,7 @@ import {
   createComplexityAnalyzer,
 } from './services/ComplexityAnalyzer.js';
 import { DependencyService } from './services/DependencyService.js';
+import { DefaultLLMService, type ILLMService } from './services/LLMService.js';
 import {
   type TaskExpansionService,
   createTaskExpansionService,
@@ -47,6 +48,8 @@ export interface AstrotaskConfig {
   skipMigrations?: boolean;
   /** Custom adapter instance (advanced usage) */
   adapter?: IDatabaseAdapter;
+  /** Optional LLM service to use (dependency-injection). */
+  llmService?: ILLMService;
 }
 
 /**
@@ -301,25 +304,42 @@ export class Astrotask {
     // Create services
     this._taskService = new TaskService(this._store);
     this._dependencyService = new DependencyService(this._store);
-    this._complexityAnalyzer = createComplexityAnalyzer(logger, {
-      threshold: 7,
-      research: false,
-      batchSize: 5,
-    });
-    this._taskExpansionService = createTaskExpansionService(
-      logger,
-      this._store,
-      this._taskService,
-      {
-        useComplexityAnalysis: true,
-        research: false,
-        complexityThreshold: 7,
-        defaultSubtasks: 3,
-        maxSubtasks: 10,
-        forceReplace: false,
-        createContextSlices: true,
+
+    // Decide which LLM service to use (dependency-injection)
+    const llmService: ILLMService = this.config.llmService ?? new DefaultLLMService();
+
+    // Build built-in services when an LLM provider is available
+    if (llmService) {
+      if (!this._complexityAnalyzer) {
+        this._complexityAnalyzer = createComplexityAnalyzer(
+          logger,
+          {
+            threshold: 7,
+            research: false,
+            batchSize: 5,
+          },
+          llmService
+        );
       }
-    );
+
+      if (!this._taskExpansionService) {
+        this._taskExpansionService = createTaskExpansionService(
+          logger,
+          this._store,
+          this._taskService,
+          {
+            useComplexityAnalysis: true,
+            research: false,
+            complexityThreshold: 7,
+            defaultSubtasks: 3,
+            maxSubtasks: 10,
+            forceReplace: false,
+            createContextSlices: true,
+          },
+          llmService
+        );
+      }
+    }
   }
 
   private async _cleanup(): Promise<void> {
@@ -386,4 +406,20 @@ export async function createInMemoryAstrotask(
   config: Omit<AstrotaskConfig, 'databaseUrl'> = {}
 ): Promise<Astrotask> {
   return createAstrotask({ ...config, databaseUrl: 'memory://test' });
+}
+
+/**
+ * Create an in-memory Astrotask SDK instance for testing without LLM services
+ * This avoids requiring OpenAI API keys in test environments
+ */
+export async function createTestAstrotask(
+  config: Omit<AstrotaskConfig, 'databaseUrl' | 'llmService'> = {}
+): Promise<Astrotask> {
+  return createAstrotask({
+    ...config,
+    databaseUrl: 'memory://test',
+    llmService: {
+      getChatModel: () => ({}) as unknown as import('@langchain/openai').ChatOpenAI,
+    },
+  });
 }

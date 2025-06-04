@@ -22,6 +22,7 @@ import {
   type ComplexityContextService,
   createComplexityContextService,
 } from './ComplexityContextService.js';
+import type { ILLMService } from './LLMService.js';
 import type { TaskService } from './TaskService.js';
 import { type PRDTaskGenerator, createPRDTaskGenerator } from './generators/PRDTaskGenerator.js';
 
@@ -101,15 +102,20 @@ export class TaskExpansionService {
     private logger: Logger,
     private store: Store,
     private taskService: TaskService,
-    private config: TaskExpansionConfig
+    private config: TaskExpansionConfig,
+    llmService?: ILLMService
   ) {
     // Initialize complexity analyzer
-    this.complexityAnalyzer = createComplexityAnalyzer(logger, {
-      threshold: config.complexityThreshold,
-      research: config.research,
-      batchSize: 5,
-      ...(config.projectName && { projectName: config.projectName }),
-    });
+    this.complexityAnalyzer = createComplexityAnalyzer(
+      logger,
+      {
+        threshold: config.complexityThreshold,
+        research: config.research,
+        batchSize: 5,
+        ...(config.projectName && { projectName: config.projectName }),
+      },
+      llmService
+    );
 
     // Initialize complexity context service
     this.complexityContextService = createComplexityContextService(logger, store, {
@@ -121,7 +127,7 @@ export class TaskExpansionService {
     });
 
     // Initialize PRD task generator
-    this.prdGenerator = createPRDTaskGenerator(logger, store);
+    this.prdGenerator = createPRDTaskGenerator(logger, store, llmService);
   }
 
   /**
@@ -556,7 +562,8 @@ export function createTaskExpansionService(
   logger: Logger,
   store: Store,
   taskService: TaskService,
-  config: Partial<TaskExpansionConfig> = {}
+  config: Partial<TaskExpansionConfig> = {},
+  llmService?: ILLMService
 ): TaskExpansionService {
   const defaultConfig: TaskExpansionConfig = {
     useComplexityAnalysis: true,
@@ -569,5 +576,5 @@ export function createTaskExpansionService(
     ...config,
   };
 
-  return new TaskExpansionService(logger, store, taskService, defaultConfig);
+  return new TaskExpansionService(logger, store, taskService, defaultConfig, llmService);
 }

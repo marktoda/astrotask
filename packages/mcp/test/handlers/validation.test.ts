@@ -1,14 +1,14 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { MinimalHandlers } from '../../src/handlers/MinimalHandlers.js';
-import { createInMemoryAstrotask, type Astrotask, TASK_IDENTIFIERS } from '@astrotask/core';
+import { createTestAstrotask, type Astrotask, TASK_IDENTIFIERS } from '@astrotask/core';
 
 describe('MCP Handler Task Validation', () => {
   let astrotask: Astrotask;
   let handlers: MinimalHandlers;
 
   beforeEach(async () => {
-    // Create in-memory Astrotask instance for testing
-    astrotask = await createInMemoryAstrotask();
+    // Create test Astrotask instance without LLM services
+    astrotask = await createTestAstrotask();
     
     // Create handler context
     const context = {

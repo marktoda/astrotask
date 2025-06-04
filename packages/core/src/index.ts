@@ -23,6 +23,7 @@ export {
   createAstrotask,
   createAstrotaskWithDatabase,
   createInMemoryAstrotask,
+  createTestAstrotask,
   type AstrotaskConfig,
   type InitializationResult,
 } from './Astrotask.js';
@@ -173,6 +174,9 @@ export {
   type TaskExpansionInput,
   type TaskExpansionResult,
 } from './services/TaskExpansionService.js';
+
+// LLM service exports
+export { type ILLMService, DefaultLLMService } from './services/LLMService.js';
 
 // Configuration and models
 export * from './utils/config.js';

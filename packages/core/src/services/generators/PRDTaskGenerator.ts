@@ -23,6 +23,7 @@ import type { CreateTask, Task } from '../../schemas/task.js';
 import { TaskService } from '../../services/TaskService.js';
 import { createLLM } from '../../utils/llm.js';
 import { PRD_SYSTEM_PROMPT, generatePRDPrompt } from '../../utils/prompts.js';
+import type { ILLMService } from '../LLMService.js';
 import type { GenerationResult, TaskGenerator } from './TaskGenerator.js';
 import type {
   GenerationInput,
@@ -74,12 +75,16 @@ export class PRDTaskGenerator implements TaskGenerator {
     }>;
     childTaskIds: string[];
   } | null = null;
+  private llm: ChatOpenAI;
+  private taskService: TaskService;
 
   constructor(
-    private llm: ChatOpenAI,
     private logger: Logger,
-    private taskService: TaskService
+    store: Store,
+    llmService?: ILLMService
   ) {
+    this.llm = llmService?.getChatModel() ?? createLLM();
+    this.taskService = new TaskService(store);
     this.initializeChain();
   }
 
@@ -496,32 +501,15 @@ export class PRDTaskGenerator implements TaskGenerator {
 /**
  * Factory function to create a PRDTaskGenerator instance
  *
- * @param llm - Configured ChatOpenAI instance for task generation
- * @param logger - Logger instance for operation tracking
- * @param taskService - TaskService instance for task operations
- * @returns Configured PRDTaskGenerator instance
- */
-export function createPRDTaskGeneratorWithDeps(
-  llm: ChatOpenAI,
-  logger: Logger,
-  taskService: TaskService
-): PRDTaskGenerator {
-  return new PRDTaskGenerator(llm, logger, taskService);
-}
-
-/**
- * Factory function to create a PRDTaskGenerator instance with automatic dependency creation
- *
  * @param logger - Logger instance for operation tracking
  * @param store - Database store instance for task operations
+ * @param llmService - Optional LLMService instance for task generation
  * @returns Configured PRDTaskGenerator instance
  */
-export function createPRDTaskGenerator(logger: Logger, store: Store): PRDTaskGenerator {
-  // Create LLM instance using default configuration
-  const llm = createLLM();
-
-  // Create TaskService instance
-  const taskService = new TaskService(store);
-
-  return new PRDTaskGenerator(llm, logger, taskService);
+export function createPRDTaskGenerator(
+  logger: Logger,
+  store: Store,
+  llmService?: ILLMService
+): PRDTaskGenerator {
+  return new PRDTaskGenerator(logger, store, llmService);
 }

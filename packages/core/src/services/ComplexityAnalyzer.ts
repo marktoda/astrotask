@@ -18,6 +18,7 @@ import { z } from 'zod';
 
 import type { Task } from '../schemas/task.js';
 import { createLLM } from '../utils/llm.js';
+import type { ILLMService } from './LLMService.js';
 
 /**
  * Schema for individual task complexity analysis
@@ -76,9 +77,10 @@ export class ComplexityAnalyzer {
 
   constructor(
     private logger: Logger,
-    private config: ComplexityAnalysisConfig
+    private config: ComplexityAnalysisConfig,
+    llmService?: ILLMService
   ) {
-    this.llm = createLLM();
+    this.llm = llmService?.getChatModel() ?? createLLM();
     this.initializeChain();
   }
 
@@ -484,7 +486,8 @@ PRD Context: ${task.prd || 'No PRD context available'}
  */
 export function createComplexityAnalyzer(
   logger: Logger,
-  config: Partial<ComplexityAnalysisConfig> = {}
+  config: Partial<ComplexityAnalysisConfig> = {},
+  llmService?: ILLMService
 ): ComplexityAnalyzer {
   const defaultConfig: ComplexityAnalysisConfig = {
     threshold: 5,
@@ -493,5 +496,5 @@ export function createComplexityAnalyzer(
     ...config,
   };
 
-  return new ComplexityAnalyzer(logger, defaultConfig);
+  return new ComplexityAnalyzer(logger, defaultConfig, llmService);
 }
