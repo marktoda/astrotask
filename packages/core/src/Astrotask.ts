@@ -23,7 +23,9 @@ const logger = createModuleLogger('Astrotask');
 
 // Get the directory of this file for default migrations
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const DEFAULT_MIGRATIONS_DIR = resolve(__dirname, '..', '..', 'migrations');
+// The migrations folder lives in packages/core/migrations relative to this source file (packages/core/src)
+// We only need to go up one level to reach the package root and then enter migrations
+const DEFAULT_MIGRATIONS_DIR = resolve(__dirname, '..', 'migrations');
 
 /**
  * Configuration options for Astrotask SDK
