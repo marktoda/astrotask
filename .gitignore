@@ -16,6 +16,13 @@ dist/
 coverage/
 .vercel/
 
+# Test data directories and files
+test-data/
+**/test-data/
+*.test.sqlite*
+memory:/
+**/memory:/
+
 # Added by Claude Task Master
 # Logs
 logs

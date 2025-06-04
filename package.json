@@ -1,11 +1,13 @@
 {
   "name": "astrotask",
   "version": "0.1.0",
+  "type": "module",
   "private": true,
   "description": "Task manager",
   "scripts": {
     "build": "pnpm -r build",
     "test": "pnpm -r test",
+    "test:clean": "node scripts/cleanup-test-data.js",
     "lint": "pnpm -r lint",
     "lint:fix": "pnpm -r lint:fix",
     "format": "pnpm -r format",

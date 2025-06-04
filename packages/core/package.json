@@ -19,6 +19,7 @@
     "verify": "pnpm type-check && pnpm lint:fix && pnpm format:fix && pnpm build && pnpm test",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:clean": "node scripts/cleanup-test-data.js",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio"
