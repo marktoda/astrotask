@@ -195,11 +195,11 @@ export {
 } from './services/TaskExpansionService.js';
 
 // LLM service exports
-export { 
-  type ILLMService, 
+export {
+  type ILLMService,
   type LLMConfig,
   DefaultLLMService,
-  createLLMService 
+  createLLMService,
 } from './services/LLMService.js';
 
 // Configuration and models

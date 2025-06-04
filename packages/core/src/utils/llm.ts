@@ -3,14 +3,14 @@
  *
  * ⚠️  DEPRECATION NOTICE:
  * This module is deprecated. Use the enhanced LLMService instead:
- * 
+ *
  * ```typescript
  * import { createLLMService, DefaultLLMService } from './services/LLMService.js';
- * 
+ *
  * // Instead of createLLM(config)
  * const service = createLLMService(config);
  * const llm = service.getChatModel();
- * 
+ *
  * // Access additional features
  * const config = service.getConfig();
  * const modelInfo = service.getModelConfig();

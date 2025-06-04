@@ -152,7 +152,7 @@ export class DefaultLLMService implements ILLMService {
 
 /**
  * Factory function to create an LLM service with configuration
- * 
+ *
  * @param config - Optional configuration overrides
  * @returns Configured LLM service instance
  */
@@ -171,7 +171,7 @@ export function getLLMConfig(overrides: Partial<LLMConfig> = {}): Required<LLMCo
 
 /**
  * Create a configured OpenAI LLM instance
- * @deprecated Use DefaultLLMService.getChatModel() instead  
+ * @deprecated Use DefaultLLMService.getChatModel() instead
  */
 export function createLLM(config: Partial<LLMConfig> = {}): ChatOpenAI {
   const service = new DefaultLLMService(config);

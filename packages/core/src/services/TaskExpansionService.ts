@@ -106,9 +106,11 @@ export class TaskExpansionService {
     llmService?: ILLMService
   ) {
     if (!llmService) {
-      throw new Error('LLMService is required for TaskExpansionService. Please provide an ILLMService instance.');
+      throw new Error(
+        'LLMService is required for TaskExpansionService. Please provide an ILLMService instance.'
+      );
     }
-    
+
     // Initialize complexity analyzer with provided config
     this.complexityAnalyzer = createComplexityAnalyzer(
       logger,
@@ -581,7 +583,9 @@ export function createTaskExpansionService(
   };
 
   if (!llmService) {
-    throw new Error('LLMService is required for TaskExpansionService. Please provide an ILLMService instance.');
+    throw new Error(
+      'LLMService is required for TaskExpansionService. Please provide an ILLMService instance.'
+    );
   }
 
   return new TaskExpansionService(logger, store, taskService, defaultConfig, llmService);

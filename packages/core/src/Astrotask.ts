@@ -418,7 +418,7 @@ export async function createTestAstrotask(
     overrides(reg) {
       // Apply user-provided overrides first
       config.overrides?.(reg);
-      
+
       // Then apply our test-specific overrides (these will not replace user overrides due to registry behavior)
       reg.register(DependencyType.LLM_SERVICE, {
         getChatModel: () => {

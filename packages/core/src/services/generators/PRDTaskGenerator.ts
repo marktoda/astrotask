@@ -83,7 +83,9 @@ export class PRDTaskGenerator implements TaskGenerator {
     llmService?: ILLMService
   ) {
     if (!llmService) {
-      throw new Error('LLMService is required for PRDTaskGenerator. Please provide an ILLMService instance.');
+      throw new Error(
+        'LLMService is required for PRDTaskGenerator. Please provide an ILLMService instance.'
+      );
     }
     this.llm = llmService.getChatModel();
     this.taskService = new TaskService(store);
@@ -514,7 +516,9 @@ export function createPRDTaskGenerator(
   llmService?: ILLMService
 ): PRDTaskGenerator {
   if (!llmService) {
-    throw new Error('LLMService is required for PRDTaskGenerator. Please provide an ILLMService instance.');
+    throw new Error(
+      'LLMService is required for PRDTaskGenerator. Please provide an ILLMService instance.'
+    );
   }
   return new PRDTaskGenerator(logger, store, llmService);
 }

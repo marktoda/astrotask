@@ -14,7 +14,7 @@ import type { Store } from '../database/store.js';
 import type { ContextSlice, CreateContextSlice, Task } from '../schemas/index.js';
 import {
   type ComplexityAnalysisConfig,
-  ComplexityAnalyzer,
+  type ComplexityAnalyzer,
   type TaskComplexity,
   createComplexityAnalyzer,
 } from './ComplexityAnalyzer.js';
@@ -43,14 +43,20 @@ export class ComplexityContextService {
     private config: ComplexityContextConfig = {}
   ) {
     if (!llmService) {
-      throw new Error('LLMService is required for ComplexityContextService. Please provide an ILLMService instance.');
+      throw new Error(
+        'LLMService is required for ComplexityContextService. Please provide an ILLMService instance.'
+      );
     }
-    this.analyzer = createComplexityAnalyzer(logger, {
-      threshold: config.threshold || 5,
-      research: config.research || false,
-      batchSize: config.batchSize || 5,
-      ...(config.projectName && { projectName: config.projectName }),
-    }, llmService);
+    this.analyzer = createComplexityAnalyzer(
+      logger,
+      {
+        threshold: config.threshold || 5,
+        research: config.research || false,
+        batchSize: config.batchSize || 5,
+        ...(config.projectName && { projectName: config.projectName }),
+      },
+      llmService
+    );
   }
 
   /**
@@ -243,7 +249,9 @@ export function createComplexityContextService(
   config: ComplexityContextConfig = {}
 ): ComplexityContextService {
   if (!llmService) {
-    throw new Error('LLMService is required for ComplexityContextService. Please provide an ILLMService instance.');
+    throw new Error(
+      'LLMService is required for ComplexityContextService. Please provide an ILLMService instance.'
+    );
   }
   return new ComplexityContextService(logger, store, llmService, config);
 }

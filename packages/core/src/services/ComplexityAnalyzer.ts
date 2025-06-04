@@ -80,7 +80,9 @@ export class ComplexityAnalyzer {
     llmService?: ILLMService
   ) {
     if (!llmService) {
-      throw new Error('LLMService is required for ComplexityAnalyzer. Please provide an ILLMService instance.');
+      throw new Error(
+        'LLMService is required for ComplexityAnalyzer. Please provide an ILLMService instance.'
+      );
     }
     this.llm = llmService.getChatModel();
     this.initializeChain();
@@ -492,9 +494,11 @@ export function createComplexityAnalyzer(
   llmService?: ILLMService
 ): ComplexityAnalyzer {
   if (!llmService) {
-    throw new Error('LLMService is required for ComplexityAnalyzer. Please provide an ILLMService instance.');
+    throw new Error(
+      'LLMService is required for ComplexityAnalyzer. Please provide an ILLMService instance.'
+    );
   }
-  
+
   const defaultConfig: ComplexityAnalysisConfig = {
     threshold: 5,
     research: false,
