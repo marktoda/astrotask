@@ -17,9 +17,11 @@ import { parseDbUrl } from './database/url-parser.js';
 import type { ComplexityAnalyzer } from './services/ComplexityAnalyzer.js';
 import type { DependencyService } from './services/DependencyService.js';
 import type { ILLMService } from './services/LLMService.js';
-import { type ServiceContainer, createServices } from './services/ServiceFactory.js';
 import type { TaskExpansionService } from './services/TaskExpansionService.js';
 import type { TaskService } from './services/TaskService.js';
+import { type RegistryConfig, createDefaultRegistry } from './services/default-registry.js';
+import { DependencyType } from './services/dependency-type.js';
+import { Registry } from './services/registry.js';
 import { createModuleLogger } from './utils/logger.js';
 
 const logger = createModuleLogger('Astrotask');
@@ -44,8 +46,8 @@ export interface AstrotaskConfig {
   skipMigrations?: boolean;
   /** Custom adapter instance (advanced usage) */
   adapter?: IDatabaseAdapter;
-  /** Optional LLM service to use (dependency-injection). */
-  llmService?: ILLMService;
+  /** Hook for replacing or extending the DI registry */
+  overrides?: (reg: Registry) => void;
   /** Complexity analysis configuration */
   complexityConfig?: {
     threshold?: number;
@@ -62,6 +64,15 @@ export interface AstrotaskConfig {
     forceReplace?: boolean;
     createContextSlices?: boolean;
   };
+}
+
+export interface ServiceContainer {
+  store: Store;
+  llmService: ILLMService;
+  complexityAnalyzer: ComplexityAnalyzer;
+  taskService: TaskService;
+  dependencyService: DependencyService;
+  taskExpansionService: TaskExpansionService;
 }
 
 /**
@@ -85,6 +96,7 @@ export interface InitializationResult {
  */
 export class Astrotask {
   private _adapter?: IDatabaseAdapter | undefined;
+  private registry = new Registry();
   private _services?: ServiceContainer | undefined;
   private _initialized = false;
   private _disposed = false;
@@ -125,8 +137,8 @@ export class Astrotask {
       }
       await initializeDatabase(this._adapter);
 
-      // Step 4: Create store and services
-      this._setupServices();
+      // Step 4: Create registry and services
+      await this._setupServices();
 
       this._initialized = true;
       const duration = Date.now() - startTime;
@@ -296,17 +308,39 @@ export class Astrotask {
     return runner.runMigrations(this._adapter, parsed);
   }
 
-  private _setupServices(): void {
+  private async _setupServices(): Promise<void> {
     if (!this._adapter) {
       throw new Error('Adapter not available for service setup');
     }
 
-    this._services = createServices({
+    // Create the default registry with configuration
+    const registryConfig: RegistryConfig = {
       adapter: this._adapter,
-      llmService: this.config.llmService,
       complexityConfig: this.config.complexityConfig,
       expansionConfig: this.config.expansionConfig,
-    });
+    };
+
+    const { registry, store } = createDefaultRegistry(registryConfig);
+    this.registry = registry;
+
+    // Apply caller overrides *before* any service is resolved
+    this.config.overrides?.(this.registry);
+
+    // Resolve all services
+    this._services = {
+      store,
+      llmService: await this.registry.resolve<ILLMService>(DependencyType.LLM_SERVICE),
+      complexityAnalyzer: await this.registry.resolve<ComplexityAnalyzer>(
+        DependencyType.COMPLEXITY_ANALYZER
+      ),
+      taskService: await this.registry.resolve<TaskService>(DependencyType.TASK_SERVICE),
+      dependencyService: await this.registry.resolve<DependencyService>(
+        DependencyType.DEPENDENCY_SERVICE
+      ),
+      taskExpansionService: await this.registry.resolve<TaskExpansionService>(
+        DependencyType.TASK_EXPANSION_SERVICE
+      ),
+    };
   }
 
   private async _cleanup(): Promise<void> {
@@ -376,13 +410,15 @@ export async function createInMemoryAstrotask(
  * This avoids requiring OpenAI API keys in test environments
  */
 export async function createTestAstrotask(
-  config: Omit<AstrotaskConfig, 'databaseUrl' | 'llmService'> = {}
+  config: Omit<AstrotaskConfig, 'databaseUrl' | 'overrides'> = {}
 ): Promise<Astrotask> {
   return createAstrotask({
     ...config,
     databaseUrl: TEST_CONFIG.DATABASE_URL,
-    llmService: {
-      getChatModel: () => ({}) as unknown as import('@langchain/openai').ChatOpenAI,
+    overrides(reg) {
+      reg.register(DependencyType.LLM_SERVICE, {
+        getChatModel: () => ({}) as unknown as import('@langchain/openai').ChatOpenAI,
+      });
     },
   });
 }

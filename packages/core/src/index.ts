@@ -17,7 +17,16 @@ export { TaskService } from './services/TaskService.js';
 export { DependencyService } from './services/DependencyService.js';
 export { DependencyGraph } from './entities/DependencyGraph.js';
 
-// Service composition
+// Dependency Injection system
+export { Registry, type Provider } from './services/registry.js';
+export { DependencyType } from './services/dependency-type.js';
+export {
+  createDefaultRegistry,
+  type RegistryConfig,
+  type DefaultRegistryResult,
+} from './services/default-registry.js';
+
+// Service composition (legacy)
 export {
   createServices,
   type ServiceContainer,
