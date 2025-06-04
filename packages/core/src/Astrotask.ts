@@ -7,23 +7,19 @@
 
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { DEFAULT_CONFIG, TEST_CONFIG } from './constants/defaults.js';
 import type { IDatabaseAdapter } from './database/adapters/index.js';
 import { createAdapter } from './database/adapters/index.js';
 import { initializeDatabase } from './database/initialization.js';
 import { type MigrationResult, createMigrationRunner } from './database/migrate.js';
-import { DatabaseStore, type Store } from './database/store.js';
+import type { Store } from './database/store.js';
 import { parseDbUrl } from './database/url-parser.js';
-import {
-  type ComplexityAnalyzer,
-  createComplexityAnalyzer,
-} from './services/ComplexityAnalyzer.js';
-import { DependencyService } from './services/DependencyService.js';
-import { DefaultLLMService, type ILLMService } from './services/LLMService.js';
-import {
-  type TaskExpansionService,
-  createTaskExpansionService,
-} from './services/TaskExpansionService.js';
-import { TaskService } from './services/TaskService.js';
+import type { ComplexityAnalyzer } from './services/ComplexityAnalyzer.js';
+import type { DependencyService } from './services/DependencyService.js';
+import type { ILLMService } from './services/LLMService.js';
+import { type ServiceContainer, createServices } from './services/ServiceFactory.js';
+import type { TaskExpansionService } from './services/TaskExpansionService.js';
+import type { TaskService } from './services/TaskService.js';
 import { createModuleLogger } from './utils/logger.js';
 
 const logger = createModuleLogger('Astrotask');
@@ -50,6 +46,22 @@ export interface AstrotaskConfig {
   adapter?: IDatabaseAdapter;
   /** Optional LLM service to use (dependency-injection). */
   llmService?: ILLMService;
+  /** Complexity analysis configuration */
+  complexityConfig?: {
+    threshold?: number;
+    research?: boolean;
+    batchSize?: number;
+  };
+  /** Task expansion configuration */
+  expansionConfig?: {
+    useComplexityAnalysis?: boolean;
+    research?: boolean;
+    complexityThreshold?: number;
+    defaultSubtasks?: number;
+    maxSubtasks?: number;
+    forceReplace?: boolean;
+    createContextSlices?: boolean;
+  };
 }
 
 /**
@@ -73,11 +85,7 @@ export interface InitializationResult {
  */
 export class Astrotask {
   private _adapter?: IDatabaseAdapter | undefined;
-  private _store?: Store | undefined;
-  private _taskService?: TaskService | undefined;
-  private _dependencyService?: DependencyService | undefined;
-  private _complexityAnalyzer?: ComplexityAnalyzer | undefined;
-  private _taskExpansionService?: TaskExpansionService | undefined;
+  private _services?: ServiceContainer | undefined;
   private _initialized = false;
   private _disposed = false;
 
@@ -184,10 +192,10 @@ export class Astrotask {
    */
   get store(): Store {
     this._ensureInitialized();
-    if (!this._store) {
-      throw new Error('Store not initialized');
+    if (!this._services) {
+      throw new Error('Services not initialized');
     }
-    return this._store;
+    return this._services.store;
   }
 
   /**
@@ -195,10 +203,10 @@ export class Astrotask {
    */
   get tasks(): TaskService {
     this._ensureInitialized();
-    if (!this._taskService) {
-      throw new Error('Task service not initialized');
+    if (!this._services) {
+      throw new Error('Services not initialized');
     }
-    return this._taskService;
+    return this._services.taskService;
   }
 
   /**
@@ -206,10 +214,10 @@ export class Astrotask {
    */
   get dependencies(): DependencyService {
     this._ensureInitialized();
-    if (!this._dependencyService) {
-      throw new Error('Dependency service not initialized');
+    if (!this._services) {
+      throw new Error('Services not initialized');
     }
-    return this._dependencyService;
+    return this._services.dependencyService;
   }
 
   /**
@@ -217,10 +225,10 @@ export class Astrotask {
    */
   get complexity(): ComplexityAnalyzer {
     this._ensureInitialized();
-    if (!this._complexityAnalyzer) {
+    if (!this._services?.complexityAnalyzer) {
       throw new Error('Complexity analyzer not initialized');
     }
-    return this._complexityAnalyzer;
+    return this._services.complexityAnalyzer;
   }
 
   /**
@@ -228,10 +236,10 @@ export class Astrotask {
    */
   get expansion(): TaskExpansionService {
     this._ensureInitialized();
-    if (!this._taskExpansionService) {
+    if (!this._services?.taskExpansionService) {
       throw new Error('Task expansion service not initialized');
     }
-    return this._taskExpansionService;
+    return this._services.taskExpansionService;
   }
 
   /**
@@ -264,7 +272,7 @@ export class Astrotask {
       await this._adapter.init();
     } else {
       // Create adapter from URL
-      const databaseUrl = this.config.databaseUrl ?? 'memory://default';
+      const databaseUrl = this.config.databaseUrl ?? DEFAULT_CONFIG.DATABASE_URL;
       const parsed = parseDbUrl(databaseUrl);
 
       this._adapter = createAdapter(parsed, {
@@ -293,53 +301,12 @@ export class Astrotask {
       throw new Error('Adapter not available for service setup');
     }
 
-    // Create store
-    this._store = new DatabaseStore(
-      this._adapter.client,
-      this._adapter.drizzle,
-      false, // isSyncing - deprecated
-      false // isEncrypted - not implemented yet
-    );
-
-    // Create services
-    this._taskService = new TaskService(this._store);
-    this._dependencyService = new DependencyService(this._store);
-
-    // Decide which LLM service to use (dependency-injection)
-    const llmService: ILLMService = this.config.llmService ?? new DefaultLLMService();
-
-    // Build built-in services when an LLM provider is available
-    if (llmService) {
-      if (!this._complexityAnalyzer) {
-        this._complexityAnalyzer = createComplexityAnalyzer(
-          logger,
-          {
-            threshold: 7,
-            research: false,
-            batchSize: 5,
-          },
-          llmService
-        );
-      }
-
-      if (!this._taskExpansionService) {
-        this._taskExpansionService = createTaskExpansionService(
-          logger,
-          this._store,
-          this._taskService,
-          {
-            useComplexityAnalysis: true,
-            research: false,
-            complexityThreshold: 7,
-            defaultSubtasks: 3,
-            maxSubtasks: 10,
-            forceReplace: false,
-            createContextSlices: true,
-          },
-          llmService
-        );
-      }
-    }
+    this._services = createServices({
+      adapter: this._adapter,
+      llmService: this.config.llmService,
+      complexityConfig: this.config.complexityConfig,
+      expansionConfig: this.config.expansionConfig,
+    });
   }
 
   private async _cleanup(): Promise<void> {
@@ -354,11 +321,7 @@ export class Astrotask {
 
     // Clear references
     this._adapter = undefined;
-    this._store = undefined;
-    this._taskService = undefined;
-    this._dependencyService = undefined;
-    this._complexityAnalyzer = undefined;
-    this._taskExpansionService = undefined;
+    this._services = undefined;
     this._initialized = false;
   }
 
@@ -405,7 +368,7 @@ export async function createAstrotaskWithDatabase(
 export async function createInMemoryAstrotask(
   config: Omit<AstrotaskConfig, 'databaseUrl'> = {}
 ): Promise<Astrotask> {
-  return createAstrotask({ ...config, databaseUrl: 'memory://test' });
+  return createAstrotask({ ...config, databaseUrl: TEST_CONFIG.DATABASE_URL });
 }
 
 /**
@@ -417,7 +380,7 @@ export async function createTestAstrotask(
 ): Promise<Astrotask> {
   return createAstrotask({
     ...config,
-    databaseUrl: 'memory://test',
+    databaseUrl: TEST_CONFIG.DATABASE_URL,
     llmService: {
       getChatModel: () => ({}) as unknown as import('@langchain/openai').ChatOpenAI,
     },

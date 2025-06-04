@@ -17,6 +17,16 @@ export { TaskService } from './services/TaskService.js';
 export { DependencyService } from './services/DependencyService.js';
 export { DependencyGraph } from './entities/DependencyGraph.js';
 
+// Service composition
+export {
+  createServices,
+  type ServiceContainer,
+  type ServiceFactoryConfig,
+} from './services/ServiceFactory.js';
+
+// Configuration constants
+export { DEFAULT_CONFIG, TEST_CONFIG } from './constants/defaults.js';
+
 // Astrotask SDK - Main entry point
 export {
   Astrotask,
