@@ -1,6 +1,6 @@
 {
 	"name": "@astrotask/cli",
-	"version": "0.0.0",
+	"version": "1.0.0",
 	"license": "MIT",
 	"bin": "dist/cli.js",
 	"type": "module",
@@ -72,5 +72,8 @@
 			"react/prop-types": "off"
 		}
 	},
-	"prettier": "@vdemedes/prettier-config"
+	"prettier": "@vdemedes/prettier-config",
+	"publishConfig": {
+		"access": "public"
+	}
 }

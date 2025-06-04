@@ -5,9 +5,12 @@
   "description": "MCP Server for Taskmaster AI",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "bin": {
+    "astrotask-mcp": "dist/index.js"
+  },
   "scripts": {
     "build": "rimraf dist && tsc",
-    "start": "node dist/packages/mcp/src/index.js",
+    "start": "node dist/index.js",
     "type-check": "tsc --noEmit",
     "lint": "biome lint src/",
     "lint:fix": "biome lint --write src/",
@@ -20,7 +23,8 @@
   "keywords": [
     "mcp",
     "taskmaster",
-    "ai"
+    "ai",
+    "astrotask"
   ],
   "author": "Astrolabe Team",
   "license": "MIT",
@@ -45,5 +49,8 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     }
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

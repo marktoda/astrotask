@@ -67,5 +67,12 @@
     "tiktoken": "^1.0.3",
     "zod": "^3.25.28",
     "zod-config": "^1.0.2"
+  },
+  "files": [
+    "dist",
+    "migrations"
+  ],
+  "publishConfig": {
+    "access": "public"
   }
 }

@@ -1,10 +1,10 @@
 # @astrotask/mcp
 
-MCP (Model Context Protocol) server for Astrolabe, enabling AI agents to interact with the task management system through standardized tools and interfaces.
+MCP (Model Context Protocol) server for Astrotask task management.
 
 ## Overview
 
-The `@astrotask/mcp` package implements a Model Context Protocol server that exposes Astrolabe's task management capabilities to AI agents. It provides a set of well-defined tools that agents can use to create, update, query, and manage tasks in a structured and type-safe manner.
+The `@astrotask/mcp` package implements a Model Context Protocol server that exposes Astrotask's task management capabilities to AI agents. It provides a set of well-defined tools that agents can use to create, update, query, and manage tasks in a structured and type-safe manner.
 
 ## Features
 
@@ -15,60 +15,57 @@ The `@astrotask/mcp` package implements a Model Context Protocol server that exp
 - **🔄 Real-time Operations**: Live task management with immediate feedback
 - **📋 Hierarchical Support**: Full support for nested tasks and complex relationships
 
-## Installation
+## Installation & Usage
+
+### Using npx (Recommended)
+
+Run the MCP server directly without installation:
 
 ```bash
-pnpm add @astrotask/mcp
-
-# Or with npm
-npm install @astrotask/mcp
-
-# Or with yarn
-yarn add @astrotask/mcp
-```
-
-## Quick Start
-
-### As a Standalone Server
-
-```bash
-# Start the MCP server
 npx @astrotask/mcp
-
-# Or with custom configuration
-npx @astrotask/mcp --database-path ./custom-tasks.db --port 3001
 ```
 
-### Programmatic Usage
+### Global Installation
 
-```typescript
-import { createMCPServer } from '@astrotask/mcp';
-import { createDatabase } from '@astrotask/core';
-
-// Create database and MCP server
-const store = createDatabase({ path: './tasks.db' });
-const server = createMCPServer({ store });
-
-// Start the server
-await server.start();
-console.log('MCP server running on stdio');
+```bash
+npm install -g @astrotask/mcp
+astrotask-mcp
 ```
 
-### With Cursor IDE
+## Configuration
 
-Add to your `.cursor/mcp.json`:
+The MCP server uses environment variables for configuration:
+
+```bash
+# Database configuration
+DATABASE_URI=sqlite://./data/astrotask.db
+
+# Optional: Enable verbose database logging
+DB_VERBOSE=true
+
+# Run the server
+npx @astrotask/mcp
+```
+
+## MCP Tools
+
+The server provides 6 essential tools for AI agent task management:
+
+- `getNextTask` - Get the next available task to work on
+- `addTasks` - Create multiple tasks with hierarchies and dependencies
+- `listTasks` - List tasks with optional filtering
+- `addTaskContext` - Add context information to tasks
+- `addDependency` - Create dependency relationships between tasks
+- `updateStatus` - Update task status (pending, in-progress, done, etc.)
+
+## Integration with AI Agents
+
+Configure your AI agent (Cursor, ChatGPT, etc.) to use this MCP server:
 
 ```json
 {
-  "mcpServers": {
-    "astrotask": {
-      "command": "npx",
-      "args": ["@astrotask/mcp"],
-      "env": {
-        "DATABASE_PATH": "./tasks.db"
-      }
-    }
-  }
+  "name": "getNextTask",
+  "arguments": { "priority": "high" }
 }
 ```
 
@@ -244,7 +241,7 @@ Options:
 
 ### Cursor IDE Integration
 
-Configure Cursor to use Astrolabe MCP server:
+Configure Cursor to use Astrotask MCP server:
 
 1. Create `.cursor/mcp.json` in your project root:
 
