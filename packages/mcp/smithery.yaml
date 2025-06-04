@@ -1,7 +1,7 @@
 runtime: "container"
 
 startCommand:
-  type: "stdio"
+  type: "http"
   configSchema:
     type: "object"
     properties:
