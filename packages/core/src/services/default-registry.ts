@@ -1,6 +1,6 @@
-import { DEFAULT_CONFIG } from '../constants/defaults.js';
 import type { IDatabaseAdapter } from '../database/adapters/index.js';
 import { DatabaseStore, type Store } from '../database/store.js';
+import { cfg } from '../utils/config.js';
 import { createModuleLogger } from '../utils/logger.js';
 import { createComplexityAnalyzer } from './ComplexityAnalyzer.js';
 import { DependencyService } from './DependencyService.js';
@@ -46,8 +46,8 @@ export function createDefaultRegistry(config: RegistryConfig): DefaultRegistryRe
   const store = new DatabaseStore(
     config.adapter.client,
     config.adapter.drizzle,
-    DEFAULT_CONFIG.STORE.IS_SYNCING,
-    DEFAULT_CONFIG.STORE.IS_ENCRYPTED
+    cfg.STORE_IS_SYNCING,
+    cfg.STORE_IS_ENCRYPTED
   );
 
   reg
@@ -57,9 +57,9 @@ export function createDefaultRegistry(config: RegistryConfig): DefaultRegistryRe
       return createComplexityAnalyzer(
         logger,
         {
-          threshold: config.complexityConfig?.threshold ?? DEFAULT_CONFIG.COMPLEXITY.THRESHOLD,
-          research: config.complexityConfig?.research ?? DEFAULT_CONFIG.COMPLEXITY.RESEARCH,
-          batchSize: config.complexityConfig?.batchSize ?? DEFAULT_CONFIG.COMPLEXITY.BATCH_SIZE,
+          threshold: config.complexityConfig?.threshold ?? cfg.COMPLEXITY_THRESHOLD,
+          research: config.complexityConfig?.research ?? cfg.COMPLEXITY_RESEARCH,
+          batchSize: config.complexityConfig?.batchSize ?? cfg.COMPLEXITY_BATCH_SIZE,
         },
         llmService
       );
@@ -74,20 +74,16 @@ export function createDefaultRegistry(config: RegistryConfig): DefaultRegistryRe
         await reg.resolve<TaskService>(DT.TASK_SERVICE),
         {
           useComplexityAnalysis:
-            config.expansionConfig?.useComplexityAnalysis ??
-            DEFAULT_CONFIG.EXPANSION.USE_COMPLEXITY_ANALYSIS,
-          research: config.expansionConfig?.research ?? DEFAULT_CONFIG.EXPANSION.RESEARCH,
+            config.expansionConfig?.useComplexityAnalysis ?? cfg.EXPANSION_USE_COMPLEXITY_ANALYSIS,
+          research: config.expansionConfig?.research ?? cfg.EXPANSION_RESEARCH,
           complexityThreshold:
-            config.expansionConfig?.complexityThreshold ??
-            DEFAULT_CONFIG.EXPANSION.COMPLEXITY_THRESHOLD,
+            config.expansionConfig?.complexityThreshold ?? cfg.EXPANSION_COMPLEXITY_THRESHOLD,
           defaultSubtasks:
-            config.expansionConfig?.defaultSubtasks ?? DEFAULT_CONFIG.EXPANSION.DEFAULT_SUBTASKS,
-          maxSubtasks: config.expansionConfig?.maxSubtasks ?? DEFAULT_CONFIG.EXPANSION.MAX_SUBTASKS,
-          forceReplace:
-            config.expansionConfig?.forceReplace ?? DEFAULT_CONFIG.EXPANSION.FORCE_REPLACE,
+            config.expansionConfig?.defaultSubtasks ?? cfg.EXPANSION_DEFAULT_SUBTASKS,
+          maxSubtasks: config.expansionConfig?.maxSubtasks ?? cfg.EXPANSION_MAX_SUBTASKS,
+          forceReplace: config.expansionConfig?.forceReplace ?? cfg.EXPANSION_FORCE_REPLACE,
           createContextSlices:
-            config.expansionConfig?.createContextSlices ??
-            DEFAULT_CONFIG.EXPANSION.CREATE_CONTEXT_SLICES,
+            config.expansionConfig?.createContextSlices ?? cfg.EXPANSION_CREATE_CONTEXT_SLICES,
         },
         llmService
       );

@@ -7,7 +7,6 @@
 
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { DEFAULT_CONFIG, TEST_CONFIG } from './constants/defaults.js';
 import type { IDatabaseAdapter } from './database/adapters/index.js';
 import { createAdapter } from './database/adapters/index.js';
 import { initializeDatabase } from './database/initialization.js';
@@ -22,6 +21,7 @@ import type { TaskService } from './services/TaskService.js';
 import { type RegistryConfig, createDefaultRegistry } from './services/default-registry.js';
 import { DependencyType } from './services/dependency-type.js';
 import { Registry } from './services/registry.js';
+import { TEST_CONFIG, cfg } from './utils/config.js';
 import { createModuleLogger } from './utils/logger.js';
 
 const logger = createModuleLogger('Astrotask');
@@ -284,7 +284,7 @@ export class Astrotask {
       await this._adapter.init();
     } else {
       // Create adapter from URL
-      const databaseUrl = this.config.databaseUrl ?? DEFAULT_CONFIG.DATABASE_URL;
+      const databaseUrl = this.config.databaseUrl ?? cfg.DATABASE_URI;
       const parsed = parseDbUrl(databaseUrl);
 
       this._adapter = createAdapter(parsed, {

@@ -41,6 +41,25 @@ export const configSchema = z.object({
   // Development
   DEV_SERVER_HOST: z.string().default('localhost'),
   DEV_SERVER_PORT: z.coerce.number().int().min(1).max(65535).default(5173),
+
+  // Service-specific configuration defaults
+  // Complexity analysis settings
+  COMPLEXITY_THRESHOLD: z.coerce.number().default(7),
+  COMPLEXITY_RESEARCH: z.coerce.boolean().default(false),
+  COMPLEXITY_BATCH_SIZE: z.coerce.number().int().min(1).default(5),
+
+  // Task expansion settings
+  EXPANSION_USE_COMPLEXITY_ANALYSIS: z.coerce.boolean().default(true),
+  EXPANSION_RESEARCH: z.coerce.boolean().default(false),
+  EXPANSION_COMPLEXITY_THRESHOLD: z.coerce.number().default(7),
+  EXPANSION_DEFAULT_SUBTASKS: z.coerce.number().int().min(1).default(3),
+  EXPANSION_MAX_SUBTASKS: z.coerce.number().int().min(1).default(10),
+  EXPANSION_FORCE_REPLACE: z.coerce.boolean().default(false),
+  EXPANSION_CREATE_CONTEXT_SLICES: z.coerce.boolean().default(true),
+
+  // Store settings
+  STORE_IS_SYNCING: z.coerce.boolean().default(false), // deprecated
+  STORE_IS_ENCRYPTED: z.coerce.boolean().default(false), // not implemented yet
 });
 
 export type AppConfig = z.infer<typeof configSchema>;
@@ -56,3 +75,7 @@ export const cfg = (await loadConfig({
     envAdapter(), // process.env
   ],
 })) as unknown as AppConfig;
+
+export const TEST_CONFIG = {
+  DATABASE_URL: 'memory://test',
+} as const;

@@ -34,7 +34,7 @@ export {
 } from './services/ServiceFactory.js';
 
 // Configuration constants
-export { DEFAULT_CONFIG, TEST_CONFIG } from './constants/defaults.js';
+export { TEST_CONFIG } from './utils/config.js';
 
 // Astrotask SDK - Main entry point
 export {
