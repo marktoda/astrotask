@@ -1,6 +1,6 @@
 {
   "mcpServers": {
-    "astrotask-task": {
+    "astrotask": {
       "command": "npx",
       "args": [
         "@astrotask/mcp"

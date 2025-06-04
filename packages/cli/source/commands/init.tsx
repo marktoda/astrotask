@@ -68,7 +68,7 @@ function generateMcpConfig(
 		case "cursor":
 			return {
 				mcpServers: {
-					"astrotask-task": {
+					astrotask: {
 						command: "npx",
 						args: [mcpServerPath],
 						env: {
@@ -81,7 +81,7 @@ function generateMcpConfig(
 		case "roo":
 			return {
 				mcpServers: {
-					"astrotask-task": {
+					astrotask: {
 						command: "npx",
 						args: [mcpServerPath],
 						env: {
@@ -95,7 +95,7 @@ function generateMcpConfig(
 			// Cline configuration format (research needed)
 			return {
 				mcpServers: {
-					"astrotask-task": {
+					astrotask: {
 						command: "npx",
 						args: [mcpServerPath],
 						env: {
@@ -109,7 +109,7 @@ function generateMcpConfig(
 		case "claude-desktop":
 			return {
 				mcpServers: {
-					"astrotask-task": {
+					astrotask: {
 						command: "npx",
 						args: [mcpServerPath],
 						env: {

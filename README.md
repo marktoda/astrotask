@@ -41,17 +41,6 @@ Astrotask is more than a to‑do list—it's a **shared brain** where developers
 
 ---
 
-## Features
-
-|     | Feature                               | Details                                                                                                                                                            |
-| --: | :------------------------------------ | :----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-|  🏠 | **Local‑first**                       | Works 100 % offline on SQLite (or WASM‑powered _PGLite_ in the browser). ElectricSQL replication coming soon.                                                      |
-|  🤖 | **AI‑native**                         | Ships with an MCP server so LLM agents can `listTasks`, `addTasks`, `updateStatus`, … Context bundling ensures agents only receive the relevant slice of the tree. |
-|  🌲 | **Hierarchical tasks & dependencies** | Unlimited depth, rich metadata, first‑class dependency graph & smart filters.                                                                                      |
-|  🚀 | **DX that just works**                | Fully‑typed TypeScript SDK (`@astrotask/core`), zero‑config CLI/TUI **`astro`** built with React‑Ink, batteries‑included templates & tests.                        |
-
----
-
 ## Installation
 
 ```bash
@@ -95,8 +84,8 @@ astro dashboard
 ```ts
 import { createAstrotask } from "@astrotask/core";
 
-const astrotask = await createAstrotask({ 
-  databaseUrl: "./data/astrotask.db" 
+const astrotask = await createAstrotask({
+  databaseUrl: "./data/astrotask.db",
 });
 
 await astrotask.tasks.addTask({
