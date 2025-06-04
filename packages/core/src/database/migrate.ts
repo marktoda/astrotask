@@ -1,6 +1,6 @@
 /**
  * Migration runner system for Astrotask database adapters
- * 
+ *
  * Provides a unified interface for running migrations across different database backends
  * with support for adapter-specific migration directories and locking strategies.
  */
@@ -50,25 +50,22 @@ export class MigrationRunner {
   /**
    * Run migrations for a database adapter
    */
-  async runMigrations(
-    adapter: IDatabaseAdapter,
-    parsed?: DbUrl
-  ): Promise<MigrationResult> {
+  async runMigrations(adapter: IDatabaseAdapter, parsed?: DbUrl): Promise<MigrationResult> {
     const startTime = Date.now();
-    
+
     try {
       // Determine the appropriate migrations directory for this adapter
       const migrationsDir = this.getMigrationsDir(adapter.type);
-      
+
       logger.debug(
-        { 
-          adapterType: adapter.type, 
+        {
+          adapterType: adapter.type,
           migrationsDir,
           capabilities: {
             concurrentWrites: adapter.capabilities.concurrentWrites,
             listenNotify: adapter.capabilities.listenNotify,
-          }
-        }, 
+          },
+        },
         'Starting migrations'
       );
 
@@ -80,7 +77,7 @@ export class MigrationRunner {
         // File-based databases need external locking
         const lockPath = AdapterHelpers.getLockPath(parsed);
         lockUsed = true;
-        
+
         await withDatabaseLock(lockPath, { processType: 'migration' }, async () => {
           migrationsApplied = await this.executeMigrations(adapter, migrationsDir);
         });
@@ -91,11 +88,11 @@ export class MigrationRunner {
 
       const duration = Date.now() - startTime;
       logger.info(
-        { 
-          adapterType: adapter.type, 
-          migrationsApplied, 
-          duration, 
-          lockUsed 
+        {
+          adapterType: adapter.type,
+          migrationsApplied,
+          duration,
+          lockUsed,
         },
         'Migrations completed successfully'
       );
@@ -109,10 +106,10 @@ export class MigrationRunner {
     } catch (error) {
       const duration = Date.now() - startTime;
       logger.error(
-        { 
-          error, 
-          adapterType: adapter.type, 
-          duration 
+        {
+          error,
+          adapterType: adapter.type,
+          duration,
         },
         'Migration failed'
       );
@@ -131,8 +128,11 @@ export class MigrationRunner {
    * Get the appropriate migrations directory for an adapter type
    */
   private getMigrationsDir(adapterType: string): string {
-    const customDir = this.config.adapterMigrationDirs?.[adapterType as keyof typeof this.config.adapterMigrationDirs];
-    
+    const customDir =
+      this.config.adapterMigrationDirs?.[
+        adapterType as keyof typeof this.config.adapterMigrationDirs
+      ];
+
     if (customDir) {
       return customDir;
     }
@@ -152,11 +152,14 @@ export class MigrationRunner {
   /**
    * Execute migrations using the adapter's migration method
    */
-  private async executeMigrations(adapter: IDatabaseAdapter, migrationsDir: string): Promise<number> {
+  private async executeMigrations(
+    adapter: IDatabaseAdapter,
+    migrationsDir: string
+  ): Promise<number> {
     // For now, delegate to the adapter's migrate method
     // In the future, we could add more sophisticated tracking here
     await adapter.migrate(migrationsDir);
-    
+
     // TODO: Return actual count of migrations applied
     // This would require adapter-specific logic to track migration state
     return 0; // Placeholder - adapters don't currently return migration count
@@ -178,21 +181,24 @@ export async function runMigrations(
 /**
  * Create a migration runner with default configuration
  */
-export function createMigrationRunner(migrationsDir: string, options?: {
-  useLocking?: boolean;
-  adapterMigrationDirs?: MigrationConfig['adapterMigrationDirs'];
-}): MigrationRunner {
+export function createMigrationRunner(
+  migrationsDir: string,
+  options?: {
+    useLocking?: boolean;
+    adapterMigrationDirs?: MigrationConfig['adapterMigrationDirs'];
+  }
+): MigrationRunner {
   const config: MigrationConfig = {
     migrationsDir,
   };
-  
+
   if (options?.useLocking !== undefined) {
     config.useLocking = options.useLocking;
   }
-  
+
   if (options?.adapterMigrationDirs !== undefined) {
     config.adapterMigrationDirs = options.adapterMigrationDirs;
   }
-  
+
   return new MigrationRunner(config);
-} 
+}

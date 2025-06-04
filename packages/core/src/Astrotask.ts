@@ -1,23 +1,29 @@
 /**
  * Astrotask Core SDK - Main entry point class
- * 
+ *
  * Provides a unified interface for Astrotask functionality with automatic
  * database setup, service composition, and lifecycle management.
  */
 
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createModuleLogger } from './utils/logger.js';
 import type { IDatabaseAdapter } from './database/adapters/index.js';
 import { createAdapter } from './database/adapters/index.js';
-import { createMigrationRunner, type MigrationResult } from './database/migrate.js';
 import { initializeDatabase } from './database/initialization.js';
-import { parseDbUrl } from './database/url-parser.js';
+import { type MigrationResult, createMigrationRunner } from './database/migrate.js';
 import { DatabaseStore, type Store } from './database/store.js';
-import { TaskService } from './services/TaskService.js';
+import { parseDbUrl } from './database/url-parser.js';
+import {
+  type ComplexityAnalyzer,
+  createComplexityAnalyzer,
+} from './services/ComplexityAnalyzer.js';
 import { DependencyService } from './services/DependencyService.js';
-import { createComplexityAnalyzer, type ComplexityAnalyzer } from './services/ComplexityAnalyzer.js';
-import { createTaskExpansionService, type TaskExpansionService } from './services/TaskExpansionService.js';
+import {
+  type TaskExpansionService,
+  createTaskExpansionService,
+} from './services/TaskExpansionService.js';
+import { TaskService } from './services/TaskService.js';
+import { createModuleLogger } from './utils/logger.js';
 
 const logger = createModuleLogger('Astrotask');
 
@@ -55,10 +61,10 @@ export interface InitializationResult {
 
 /**
  * Main Astrotask SDK class
- * 
+ *
  * Provides a unified interface for all Astrotask functionality including:
  * - Database management with automatic adapter selection
- * - Service composition and lifecycle management  
+ * - Service composition and lifecycle management
  * - Task and dependency operations
  * - Complexity analysis and task expansion
  */
@@ -76,7 +82,7 @@ export class Astrotask {
 
   /**
    * Initialize the Astrotask SDK
-   * 
+   *
    * Sets up database connection, runs migrations, and initializes services
    */
   async init(): Promise<InitializationResult> {
@@ -103,7 +109,10 @@ export class Astrotask {
       }
 
       // Step 3: Initialize database business logic
-      await initializeDatabase(this._adapter!);
+      if (!this._adapter) {
+        throw new Error('Adapter not set up properly');
+      }
+      await initializeDatabase(this._adapter);
 
       // Step 4: Create store and services
       this._setupServices();
@@ -112,17 +121,17 @@ export class Astrotask {
       const duration = Date.now() - startTime;
 
       logger.info(
-        { 
-          adapterType: this._adapter!.type, 
+        {
+          adapterType: this._adapter.type,
           duration,
-          migrationsSkipped: this.config.skipMigrations 
+          migrationsSkipped: this.config.skipMigrations,
         },
         'Astrotask SDK initialized successfully'
       );
 
       return {
         success: true,
-        adapterType: this._adapter!.type,
+        adapterType: this._adapter.type,
         ...(migrationResult ? { migrationResult } : {}),
       };
     } catch (error) {
@@ -161,7 +170,10 @@ export class Astrotask {
    */
   get adapter(): IDatabaseAdapter {
     this._ensureInitialized();
-    return this._adapter!;
+    if (!this._adapter) {
+      throw new Error('Adapter not initialized');
+    }
+    return this._adapter;
   }
 
   /**
@@ -169,7 +181,10 @@ export class Astrotask {
    */
   get store(): Store {
     this._ensureInitialized();
-    return this._store!;
+    if (!this._store) {
+      throw new Error('Store not initialized');
+    }
+    return this._store;
   }
 
   /**
@@ -177,7 +192,10 @@ export class Astrotask {
    */
   get tasks(): TaskService {
     this._ensureInitialized();
-    return this._taskService!;
+    if (!this._taskService) {
+      throw new Error('Task service not initialized');
+    }
+    return this._taskService;
   }
 
   /**
@@ -185,7 +203,10 @@ export class Astrotask {
    */
   get dependencies(): DependencyService {
     this._ensureInitialized();
-    return this._dependencyService!;
+    if (!this._dependencyService) {
+      throw new Error('Dependency service not initialized');
+    }
+    return this._dependencyService;
   }
 
   /**
@@ -193,7 +214,10 @@ export class Astrotask {
    */
   get complexity(): ComplexityAnalyzer {
     this._ensureInitialized();
-    return this._complexityAnalyzer!;
+    if (!this._complexityAnalyzer) {
+      throw new Error('Complexity analyzer not initialized');
+    }
+    return this._complexityAnalyzer;
   }
 
   /**
@@ -201,7 +225,10 @@ export class Astrotask {
    */
   get expansion(): TaskExpansionService {
     this._ensureInitialized();
-    return this._taskExpansionService!;
+    if (!this._taskExpansionService) {
+      throw new Error('Task expansion service not initialized');
+    }
+    return this._taskExpansionService;
   }
 
   /**
@@ -236,11 +263,11 @@ export class Astrotask {
       // Create adapter from URL
       const databaseUrl = this.config.databaseUrl ?? 'memory://default';
       const parsed = parseDbUrl(databaseUrl);
-      
+
       this._adapter = createAdapter(parsed, {
         debug: this.config.debug ?? false,
       });
-      
+
       await this._adapter.init();
     }
   }
@@ -248,20 +275,27 @@ export class Astrotask {
   private async _runMigrations(): Promise<MigrationResult> {
     const migrationsDir = this.config.migrationsDir ?? DEFAULT_MIGRATIONS_DIR;
     const runner = createMigrationRunner(migrationsDir);
-    
+
     // Parse URL for locking if needed
     const parsed = this.config.databaseUrl ? parseDbUrl(this.config.databaseUrl) : undefined;
-    
-    return runner.runMigrations(this._adapter!, parsed);
+
+    if (!this._adapter) {
+      throw new Error('Adapter not set up for migrations');
+    }
+    return runner.runMigrations(this._adapter, parsed);
   }
 
   private _setupServices(): void {
+    if (!this._adapter) {
+      throw new Error('Adapter not available for service setup');
+    }
+
     // Create store
     this._store = new DatabaseStore(
-      this._adapter!.client,
-      this._adapter!.drizzle,
+      this._adapter.client,
+      this._adapter.drizzle,
       false, // isSyncing - deprecated
-      false  // isEncrypted - not implemented yet
+      false // isEncrypted - not implemented yet
     );
 
     // Create services
@@ -321,30 +355,35 @@ export class Astrotask {
 
 /**
  * Create and initialize an Astrotask SDK instance
- * 
+ *
  * Convenience function for one-step initialization
  */
 export async function createAstrotask(config: AstrotaskConfig = {}): Promise<Astrotask> {
   const astrotask = new Astrotask(config);
   const result = await astrotask.init();
-  
+
   if (!result.success) {
     throw result.error ?? new Error('Failed to initialize Astrotask SDK');
   }
-  
+
   return astrotask;
 }
 
 /**
  * Create an Astrotask SDK instance with a specific database URL
  */
-export async function createAstrotaskWithDatabase(databaseUrl: string, config: Omit<AstrotaskConfig, 'databaseUrl'> = {}): Promise<Astrotask> {
+export async function createAstrotaskWithDatabase(
+  databaseUrl: string,
+  config: Omit<AstrotaskConfig, 'databaseUrl'> = {}
+): Promise<Astrotask> {
   return createAstrotask({ ...config, databaseUrl });
 }
 
 /**
  * Create an in-memory Astrotask SDK instance (useful for testing)
  */
-export async function createInMemoryAstrotask(config: Omit<AstrotaskConfig, 'databaseUrl'> = {}): Promise<Astrotask> {
+export async function createInMemoryAstrotask(
+  config: Omit<AstrotaskConfig, 'databaseUrl'> = {}
+): Promise<Astrotask> {
   return createAstrotask({ ...config, databaseUrl: 'memory://test' });
-} 
+}

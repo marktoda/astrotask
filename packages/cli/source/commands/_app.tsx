@@ -1,4 +1,4 @@
-import { createAstrotask, cfg, type Astrotask } from "@astrotask/core";
+import { type Astrotask, cfg, createAstrotask } from "@astrotask/core";
 import { Text } from "ink";
 import type { AppProps } from "pastel";
 import React from "react";
@@ -22,7 +22,10 @@ export default function App({ Component, commandProps }: AppProps) {
 				try {
 					await astrotask.dispose();
 				} catch (err) {
-					console.error("Failed to dispose Astrotask SDK:", err instanceof Error ? err.message : String(err));
+					console.error(
+						"Failed to dispose Astrotask SDK:",
+						err instanceof Error ? err.message : String(err),
+					);
 				}
 			}
 		};
@@ -44,13 +47,12 @@ export default function App({ Component, commandProps }: AppProps) {
 				astrotask = createdAstrotask;
 
 				// Display appropriate connection info based on database type
-				const connectionInfo = astrotask.databaseType === 'sqlite' 
-					? `SQLite database at ${cfg.DATABASE_URI}`
-					: `${astrotask.databaseType} database`;
+				const connectionInfo =
+					astrotask.databaseType === "sqlite"
+						? `SQLite database at ${cfg.DATABASE_URI}`
+						: `${astrotask.databaseType} database`;
 
-				console.log(
-					`Initialized Astrotask SDK with ${connectionInfo}`,
-				);
+				console.log(`Initialized Astrotask SDK with ${connectionInfo}`);
 				setContext({ astrotask });
 			})
 			.catch((err) => {

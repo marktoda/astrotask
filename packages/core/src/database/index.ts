@@ -186,12 +186,12 @@ export { parseDbUrl, type DbUrl } from './url-parser.js';
 export { openDatabase } from './factory.js';
 
 // Migration runner exports
-export { 
-  MigrationRunner, 
-  runMigrations, 
+export {
+  MigrationRunner,
+  runMigrations,
   createMigrationRunner,
   type MigrationConfig,
-  type MigrationResult 
+  type MigrationResult,
 } from './migrate.js';
 
 export * from './schema.js';
