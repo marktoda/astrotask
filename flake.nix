@@ -35,8 +35,7 @@
           export PATH="$NPM_CONFIG_PREFIX/bin:$PATH"
           mkdir -p "$NPM_CONFIG_PREFIX"
 
-          # Install Task Master CLI globally in project
-          npm install -g task-master-ai
+          npm install -g @astrotask/cli
 
           # Set Biome binary path for consistency
           export BIOME_BINARY="${pkgs.biome}/bin/biome"
