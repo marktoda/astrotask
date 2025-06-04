@@ -7,16 +7,15 @@ RUN npm install -g pnpm@latest
 # Set working directory
 WORKDIR /app
 
-# Copy package configuration files
+# Copy workspace configuration files
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-COPY packages/*/package.json ./packages/*/
-
-# Install dependencies
-RUN pnpm install --frozen-lockfile
-
-# Copy source code
-COPY packages/ ./packages/
 COPY tsconfig.json biome.json ./
+
+# Copy all packages (needed for workspace dependency resolution)
+COPY packages/ ./packages/
+
+# Install dependencies (workspace dependencies need source to be present)
+RUN pnpm install --no-frozen-lockfile
 
 # Build the workspace
 RUN pnpm build

@@ -1,7 +1,7 @@
 runtime: "container"
 
 startCommand:
-  type: "http"
+  type: "stdio"
   configSchema:
     type: "object"
     properties:
@@ -37,4 +37,4 @@ build:
   dockerBuildPath: "../.."
 
 env:
-  NODE_ENV: "production" 
+  NODE_ENV: "production"
