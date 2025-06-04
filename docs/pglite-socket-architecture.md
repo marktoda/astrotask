@@ -254,7 +254,7 @@ export async function createDatabaseConnection(options: ConnectionOptions) {
 
 1. **Quick CLI Usage** (MCP not running):
    ```bash
-   $ astrotask list
+   $ astro list
    ⚠️  MCP server not detected, using direct database access
       Note: Only one process can access the database at a time
    
@@ -265,7 +265,7 @@ export async function createDatabaseConnection(options: ConnectionOptions) {
 
 2. **Concurrent Usage** (MCP running):
    ```bash
-   $ astrotask list
+   $ astro list
    ✓ Connected to MCP server (socket mode)
    
    Tasks:
@@ -275,14 +275,14 @@ export async function createDatabaseConnection(options: ConnectionOptions) {
 
 3. **Conflict Detection**:
    ```bash
-   $ astrotask list
+   $ astro list
    ⚠️  MCP server not detected, using direct database access
    ❌ Database is locked by another process
    
    Options:
    1. Stop the other process using the database
    2. Start the MCP server: npx astrotask-mcp-server
-   3. Force direct access (risky): astrotask list --force
+   3. Force direct access (risky): astro list --force
    ```
 
 ### Benefits of Hybrid Approach
@@ -317,3 +317,20 @@ If issues arise:
 - [PGLite Documentation](https://pglite.dev/)
 - [@electric-sql/pglite-socket](https://www.npmjs.com/package/@electric-sql/pglite-socket)
 - [PostgreSQL Wire Protocol](https://www.postgresql.org/docs/current/protocol.html) 
+
+# Example client commands
+$ astro list
+
+Example 2: Two readers, one writer
+```bash
+$ astro list
+$ pglite-web-client show TASK-1
+$ astro add-task "New feature"  # Writer operation
+```
+
+Example 3: CLI-only mode
+```bash
+$ astro list
+```
+
+3. Force direct access (risky): astro list --force 

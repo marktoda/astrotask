@@ -24,10 +24,10 @@ The `@astrotask/cli` package provides a beautiful, interactive command-line inte
 npm install -g @astrotask/cli
 ```
 
-After installation, you can use the `astrotask` command globally:
+After installation, you can use the `astro` command globally:
 
 ```bash
-astrotask --help
+astro --help
 ```
 
 ### Using npx
@@ -45,14 +45,14 @@ npx @astrotask/cli --help
 mkdir my-project && cd my-project
 
 # 2. Initialize Astrotask (creates ./data/astrotask.db)
-astrotask init
+astro init
 
 # 3. Add a task and view it
-astrotask task add "Ship public launch"
-astrotask task list
+astro task add "Ship public launch"
+astro task list
 
 # 4. Open the live dashboard
-astrotask dashboard
+astro dashboard
 ```
 
 ## Commands
@@ -61,33 +61,33 @@ astrotask dashboard
 
 ```bash
 # Add tasks
-astrotask task add "Write documentation"
-astrotask task add "Design hero section" --parent 123e456 --priority high
+astro task add "Write documentation"
+astro task add "Design hero section" --parent 123e456 --priority high
 
 # List and view tasks
-astrotask task list
-astrotask task next
-astrotask task tree
+astro task list
+astro task next
+astro task tree
 
 # Update tasks
-astrotask task done <id>
-astrotask task update <id> --status done
+astro task done <id>
+astro task update <id> --status done
 ```
 
 ### Dashboard
 
 ```bash
 # Open interactive dashboard
-astrotask dashboard
+astro dashboard
 ```
 
 ### Dependencies
 
 ```bash
 # Manage task dependencies
-astrotask dependency add <dependent-id> <dependency-id>
-astrotask dependency list
-astrotask dependency tree
+astro dependency add <dependent-id> <dependency-id>
+astro dependency list
+astro dependency tree
 ```
 
 ## Configuration

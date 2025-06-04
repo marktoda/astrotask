@@ -1,14 +1,13 @@
 {
-    "mcpServers": {
-        "astrotask": {
-            "command": "node",
-            "args": [
-                "/home/toda/dev/astrotask/packages/mcp/dist/packages/mcp/src/index.js"
-            ],
-            "env": {
-                "OPENAI_API_KEY": "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",
-                "DATABASE_URI": "postgres://postgres:password@127.0.0.1:5432/astrolabe"
-            }
-        }
+  "mcpServers": {
+    "astrotask-task": {
+      "command": "node",
+      "args": [
+        "/home/toda/dev/astrotask/.npm-global/lib/node_modules/packages/mcp/dist/packages/mcp/src/index.js"
+      ],
+      "env": {
+        "DATABASE_PATH": "/home/toda/dev/astrotask/data/astrotask.db"
+      }
     }
+  }
 }

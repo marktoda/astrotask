@@ -378,43 +378,35 @@ export const dependencyValidationRules = {
 ### 9.1 CLI Commands
 
 ```bash
-# Add dependencies
-astrotask task add-dependency <dependent-task> <dependency-task>
-astrotask task remove-dependency <dependent-task> <dependency-task>
+# Add dependency relationship
+astro task add-dependency <dependent-task> <dependency-task>
+astro task remove-dependency <dependent-task> <dependency-task>
 
-# View dependencies
-astrotask task dependencies <task-id>
-astrotask task dependents <task-id>  
+# Query dependencies
+astro task dependencies <task-id>
+astro task dependents <task-id>
 
 # Find available work
-astrotask task available --priority high
+astro task available --priority high
 
-# Visualize dependency graph
-astrotask graph dependencies --root <task-id> --format mermaid
+# Visualize dependencies
+astro graph dependencies --root <task-id> --format mermaid
 
-# Validate dependencies
-astrotask task validate-dependencies --fix-cycles
+# Validate dependency graph
+astro task validate-dependencies --fix-cycles
 ```
 
 ### 9.2 Status Feedback
 
 ```bash
-$ astrotask task update ABCD --status in-progress
-Error: Task ABCD is blocked by incomplete dependencies: XYZW, EFGH
+$ astro task update ABCD --status in-progress
+# Warning: This will block task EFGH which depends on ABCD
 
-$ astrotask task available
-Available tasks (can start now):
-  XYZW - Setup authentication system (high priority)
-  IJKL - Write documentation (medium priority)
+$ astro task available
+# Shows only tasks with no unmet dependencies
 
-$ astrotask task dependencies ABCD
-Task ABCD depends on:
-  ✗ XYZW - Setup authentication system (in-progress)
-  ✗ EFGH - Database schema migration (pending)
-  
-Blocking:
-  MNOP - Frontend integration tests
-  QRST - Deploy to staging
+$ astro task dependencies ABCD
+# Shows: Task ABCD depends on: [XYZ-123, ABC-456] (2 incomplete)
 ```
 
 ---

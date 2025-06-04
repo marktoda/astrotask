@@ -64,9 +64,9 @@ DATABASE_URI="memory://test"                   // PGLite (memory)
 **Example:**
 ```bash
 # With SQLite WAL mode, these all work concurrently:
-$ astrotask list          # Reader 1
-$ astrotask show TASK-1   # Reader 2
-$ astrotask add-task ...  # Writer (blocks other writers only)
+$ astro list          # Reader 1
+$ astro show TASK-1   # Reader 2
+$ astro add-task ...  # Writer (blocks other writers only)
 ```
 
 ### 2. Migration Complexity

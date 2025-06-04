@@ -344,7 +344,7 @@ await updateStatus({ taskId: newTask.id, status: "done" });
 - Use task hierarchy to mirror project structure
 
 ### With Development Tools
-- Use astrotask with CLI: `astrotask task list`, `astrotask task next`
+- Use astro with CLI: `astro task list`, `astro task next`
 - Integrate with Cursor IDE via MCP configuration
 - Leverage ElectricSQL for offline-first development
 

@@ -108,7 +108,7 @@ Astrolabe is built with offline-first principles and MCP compatibility:
 ```mermaid
 graph TD
   subgraph Local
-    CLI["CLI Interface<br>(astrotask)"]
+    CLI["CLI Interface<br>(astro)"]
     MCP[[MCP Server]]
     SQLite[(SQLite Database<br>ElectricSQL)]
     Resolver[Context Resolver]
@@ -262,28 +262,28 @@ See the [dev_workflow.mdc](.cursor/rules/dev_workflow.mdc) rule for complete gui
 Future CLI layout based on design:
 
 ```
-astrotask ─┬ task     list|add|update|rm|done
-           ├ context  show <taskId>
-           ├ prd      import <file> | export <epicIds>
-           ├ graph    render [--format mermaid]
-           ├ sync     linear push|pull [--label linear]
-           └ db       migrate|status
+astro ─┬ task     list|add|update|rm|done
+       ├ context  show <taskId>
+       ├ prd      import <file> | export <epicIds>
+       ├ graph    render [--format mermaid]
+       ├ sync     linear push|pull [--label linear]
+       └ db       migrate|status
 ```
 
 ### Command Examples
 
 ```bash
 # list open tasks
-astrotask task list --status todo
+astro task list --status todo
 
 # quick capture
-astrotask task add "Add OAuth flow" --parent epic:auth
+astro task add "Add OAuth flow" --parent epic:auth
 
 # one-shot context bundle for an agent
-astrotask context show 123e456-…
+astro context show 123e456-…
 
 # push tasks tagged #linear
-astrotask sync linear push
+astro sync linear push
 ```
 
 ---

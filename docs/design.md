@@ -1,9 +1,9 @@
 **Astrolabe – Design Document (v 0.1)**
 *A local-first, MCP-compatible task-navigation platform for humans + AI agents*
 
-> **Why “Astrolabe”?**
+> **Why "Astrolabe"?**
 > An astrotask let medieval sailors locate themselves from the stars.
-> Likewise, this tool helps developers & agents “plot their position” in a project—offline, precisely, and with just one reading.
+> Likewise, this tool helps developers & agents "plot their position" in a project—offline, precisely, and with just one reading.
 
 ---
 
@@ -38,7 +38,7 @@ It must work for solo devs at 30 000 ft with no Wi-Fi and for small teams that s
 ```mermaid
 graph TD
   subgraph Local
-    CLI["CLI / VS Code<br>(astrotask …)"]
+    CLI["CLI / VS Code<br>(astro …)"]
     MCP[[MCP Server]]
     Resolver[Context Resolver]
     SQLite[(SQLite • ElectricSQL)]
@@ -110,28 +110,28 @@ The MCP manifest advertises these so agents can discover them.
 ## 7 Idiomatic CLI Layout
 
 ```
-astrotask ─┬ task     list|add|update|rm|done
-           ├ context  show <taskId>
-           ├ prd      import <file> | export <epicIds>
-           ├ graph    render [--format mermaid]
-           ├ sync     linear push|pull [--label linear]
-           └ db       migrate|status
+astro ─┬ task     list|add|update|rm|done
+       ├ context  show <taskId>
+       ├ prd      import <file> | export <epicIds>
+       ├ graph    render [--format mermaid]
+       ├ sync     linear push|pull [--label linear]
+       └ db       migrate|status
 ```
 
 ### Command Examples
 
 ```bash
 # list open tasks
-astrotask task list --status todo
+astro task list --status todo
 
 # quick capture
-astrotask task add "Add OAuth flow" --parent epic:auth
+astro task add "Add OAuth flow" --parent epic:auth
 
 # one-shot context bundle for an agent
-astrotask context show 123e456-…
+astro context show 123e456-…
 
 # push tasks tagged #linear
-astrotask sync linear push
+astro sync linear push
 ```
 
 ---
@@ -166,10 +166,10 @@ astrotask sync linear push
 
 ## 11 Developer Experience
 
-* `npx astrotask init` → DB + MCP scaffold.
+* `npx astro init` → DB + MCP scaffold.
 * Hot-reload MCP when Zod schemas change.
-* `astrotask graph render` → Mermaid for README/PR.
-* `astrotask prd import docs/login.md` → autogenerate epics + tasks.
+* `astro graph render` → Mermaid for README/PR.
+* `astro prd import docs/login.md` → autogenerate epics + tasks.
 
 ---
 
