@@ -211,7 +211,7 @@ flowchart TD
   MCP --SDK--> Core
   Core[("@astrotask/core\nService layer & Zod types")]
   Core --SQL--> DB[(SQLite / PGLite)]
-  DB ==optional sync== Cloud[(ElectricSQL)]
+  DB -.optional sync.-> Cloud[("ElectricSQL")]
 ```
 
 1. **@astrotask/core** provides a type-safe service layer over the local database.
