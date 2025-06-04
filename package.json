@@ -17,9 +17,9 @@
     "dashboard": "cd packages/cli && npm run dashboard",
     "publish:dry": "pnpm -r publish --dry-run",
     "publish:all": "pnpm -r publish",
-    "version:patch": "pnpm -r version patch",
-    "version:minor": "pnpm -r version minor",
-    "version:major": "pnpm -r version major"
+    "version:patch": "pnpm -r exec pnpm version patch",
+    "version:minor": "pnpm -r exec pnpm version minor",
+    "version:major": "pnpm -r exec pnpm version major"
   },
   "engines": {
     "node": ">=16",
