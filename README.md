@@ -1,238 +1,240 @@
 # Astrotask
 
-> **Coordinate work with your AI agents – no more "sorry, I can't help with this codebase!"**
+**task manager built for humans _and_ AI agents**
+Offline‑ready · MCP‑compatible · Fully‑type‑safe · Extensible
 
-[![Discord](https://img.shields.io/discord/YOUR_DISCORD_ID?label=Discord&logo=discord&logoColor=white)](https://discord.gg/YOUR_INVITE)
-![npm (scoped)](https://img.shields.io/npm/v/@astrotask/core?label=%40astrotask%2Fcore)
-[![codecov](https://codecov.io/gh/marktoda/astrotask/branch/main/graph/badge.svg)](https://codecov.io/gh/marktoda/astrotask)
-![CI](https://github.com/marktoda/astrotask/actions/workflows/ci.yml/badge.svg)
+[![npm (scoped)](https://img.shields.io/npm/v/@astrotask/cli?label=npm%20%40astrotask%2Fcli)](https://www.npmjs.com/package/@astrotask/cli)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![CI](https://github.com/astrotask/astrotask/actions/workflows/ci.yml/badge.svg)](https://github.com/astrotask/astrotask/actions)
 
-## Overview
+---
 
-Astrotask is a modern, local-first task platform that lets you and your favourite AI assistant share the **same single-player database**. It combines an ergonomic CLI, a rich TUI dashboard, a **Model Context Protocol (MCP) server**, and a full TypeScript SDK.
+## Why Astrotask?
 
-**Why does this matter?**
-- ✅ Your AI can see exactly what you're working on, plan next steps, and update task status
-- ✅ No cloud lock-in – everything lives in your local SQLite database
-- ✅ Git-friendly – commit your task database alongside your code
-- ✅ Works offline first, with optional team synchronization later
+Astrotask is more than a to‑do list—it's a **shared brain** where developers and AI agents collaborate in real time.
 
-**What's included:**
-- Task management with hierarchies, dependencies, and rich context
-- Complexity analysis and automatic task breakdown
-- Interactive terminal dashboard
-- MCP server for Claude Desktop, Cursor, and other MCP clients
-- Full TypeScript SDK for custom integrations
+- **One database file, limitless context** – Every surface (CLI, TUI, SDK, MCP) reads & writes the _same_ local database, so long‑running agents never lose the bigger picture.
+- **Capture anywhere, even offline** – Jot ideas down on a plane; the file lives on your disk and syncs later
+- **Automatic project decomposition** – Built‑in generators break PRDs into nested tasks your agent can tackle autonomously.
+- **First‑class dependency graph** – Visualise blockers and let agents sequence their own work without stepping on each other.
+- **Multi‑agent friendly** – Run several specialised agents (or agent + developer) against the same store; SQLite WAL keeps writes safe.
+- **Human‑optimised CLI & dashboard** – Developers can triage, reprioritise, or inject tasks while agents churn through the backlog.
+
+---
+
+## Table of Contents
+
+- [Features](#features)
+- [Installation](#installation)
+- [Quick Start](#quick-start)
+
+  - [CLI](#cli)
+  - [Programmatic](#programmatic)
+  - [AI / MCP](#ai--mcp)
+
+- [Adding Tasks](#adding-tasks)
+- [Operating & Running Tasks](#operating--running-tasks)
+- [Screenshots](#screenshots)
+- [How It Works](#how-it-works)
+- [Contributing](#contributing)
+- [Roadmap](#roadmap)
+- [License](#license)
 
 ---
 
 ## Features
 
-**Core Task Management:**
-- ✅ **Hierarchical tasks** – organize work into parent/child relationships
-- ✅ **Task dependencies** – model blocked/blocking relationships  
-- ✅ **Rich context** – attach notes, links, and implementation details
-- ✅ **Status tracking** – pending, in-progress, done, cancelled, archived
-- ✅ **Priority levels** – high/medium/low with intelligent filtering
-
-**AI Integration:**
-- ✅ **MCP server** – works with Claude Desktop, Cursor, and other MCP clients
-- ✅ **Complexity analysis** – automatically identify tasks that need breakdown
-- ✅ **Task generation** – convert specs/PRDs into structured work
-- ✅ **Context sharing** – AI sees your full task context and history
-
-**Developer Experience:**
-- ✅ **Local-first** – all data stored in local SQLite database
-- ✅ **Git-friendly** – commit your task database with your code
-- ✅ **TypeScript SDK** – build custom integrations and workflows
-- ✅ **Terminal UI** – beautiful, interactive dashboard in your terminal
-- ✅ **Performance** – optimized for thousands of tasks with sub-100ms queries
-
-**Enterprise Ready:**
-- ✅ Fully-typed TypeScript SDK (`@astrotask/core`)
-- ✅ Zero-config CLI / TUI built with React-Ink (`astro`)
-- ✅ Comprehensive test coverage and error handling
-- ✅ Local-first with optional team sync (coming soon)
+|     | Feature                               | Details                                                                                                                                                            |
+| --: | :------------------------------------ | :----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+|  🏠 | **Local‑first**                       | Works 100 % offline on SQLite (or WASM‑powered _PGLite_ in the browser). ElectricSQL replication coming soon.                                                      |
+|  🤖 | **AI‑native**                         | Ships with an MCP server so LLM agents can `listTasks`, `addTasks`, `updateStatus`, … Context bundling ensures agents only receive the relevant slice of the tree. |
+|  🌲 | **Hierarchical tasks & dependencies** | Unlimited depth, rich metadata, first‑class dependency graph & smart filters.                                                                                      |
+|  🚀 | **DX that just works**                | Fully‑typed TypeScript SDK (`@astrotask/core`), zero‑config CLI/TUI **`astro`** built with React‑Ink, batteries‑included templates & tests.                        |
 
 ---
 
 ## Installation
 
-Astrotask is distributed as a collection of packages. For most users the CLI is the entry-point:
-
 ```bash
-# Install the CLI globally
-npm install -g @astrotask/cli@next            # or pnpm / yarn
+# Until v1.0 install the latest pre‑release tag
+npm install -g @astrotask/cli@next      # or: pnpm / yarn
 ```
 
-To update to the latest version:
+Upgrading is just as easy:
 
 ```bash
-# Update to latest
 npm update -g @astrotask/cli
 ```
 
+> **Prerequisites**  Node 18+, SQLite 3.40+, and `pnpm` if you plan to work on the monorepo.
+
+After installation you'll have the `astro` command in your PATH.
+
 ---
 
-## Quick Start
+## Quick Start
 
-Let's get you up and running in under 2 minutes:
+### CLI
 
 ```bash
-# 1. Install globally
-npm install -g @astrotask/cli
+# 1. Create a workspace
+mkdir my-project && cd $_
 
 # 2. Initialise Astrotask (creates ./data/astrotask.db and starter rules)
 astro init
 
-# 3. Add your first task
+# 3. Add a task and view it
 astro task add "Ship public launch"
-astro task list
+astro task tree
 
-# 4. Launch the interactive dashboard
+# 4. Open the live dashboard (press <c> to toggle completed tasks)
 astro dashboard
 ```
 
-**SDK Usage:**
+### Programmatic
 
-```typescript
+```ts
 import { createDatabase } from "@astrotask/core";
 
-const db = await createDatabase({
-  dataDir: "./data/astrotask.db",
-});
+const db = await createDatabase({ dataDir: "./data/astrotask.db" });
 
-// Add tasks, manage dependencies, analyse complexity
-const task = await db.tasks.add({ title: "Build authentication" });
+await db.addTask({
+  title: "Implement OAuth",
+  description: "Add Google login",
+});
 ```
 
-**MCP Server (for AI assistants):**
+### AI / MCP
+
+```json
+{
+  "mcpServers": {
+    "astrotask-task": {
+      "command": "npx",
+      "args": ["@astrotask/mcp"],
+      "env": {
+        "DATABASE_PATH": "/home/toda/dev/astrotask/data/astrotask.db"
+      }
+    }
+  }
+}
+```
+
+OR
 
 ```bash
-# Run MCP server on port 4242 (for Claude Desktop integration)
-DATABASE_URI=sqlite://./data/astrotask.db \
-node $(npm root -g)/@astrotask/mcp/dist/index.js --port 4242
+astro init
+```
+
+Configure your agent (Cursor, ChatGPT plug‑in, …) with the endpoint and start calling tools such as:
+
+```json
+{
+  "name": "getNextTask",
+  "arguments": { "priority": "high" }
+}
 ```
 
 ---
 
-## Usage Examples
+## Adding Tasks
 
-**Basic Task Management:**
+### Manual (CLI)
 
 ```bash
-# Add tasks with hierarchy and metadata
+# Simple capture
 astro task add "Write onboarding docs"
 
-# Create child tasks with priorities  
-astro task add "Design hero section" --parent 123e456… --priority high
+# Add under a parent and set priority
+astro task add "Design hero section" --parent <parentId> --priority high
 ```
 
-**AI-Powered Task Generation:**
+### Generate from a PRD
 
-Astrotask ships with an AI generator that can break a spec into structured work:
+Break a spec into structured work:
 
 ```bash
-astro task generate --file ./specs/authentication.prd.md --parent epic:auth
+astro task generate --file ./specs/authentication.prd.md
+# Use --dry to preview without touching your DB
 ```
 
-This will:
-1. Analyze the spec for complexity and dependencies
-2. Break it down into manageable tasks
-3. Set up parent/child relationships automatically
-4. Add contextual notes and acceptance criteria
+### Ask an Agent (MCP)
 
-**Common Workflows:**
+```json
+{
+  "name": "addTasks",
+  "arguments": {
+    "tasks": [
+      {
+        "title": "Refactor caching layer",
+        "description": "Move from LRU to ARC",
+        "priority": "medium"
+      }
+    ]
+  }
+}
+```
 
-| Action                            | Command                                   |
-|-----------------------------------|-------------------------------------------|
+---
+
+## Operating & Running Tasks
+
+| Action                            | Command                                |
+| --------------------------------- | -------------------------------------- |
 | See what to do next               | `astro task next`                      |
-| Full list (pending & in-progress) | `astro task list`                      |
+| Full list (pending & in‑progress) | `astro task list`                      |
 | Mark done                         | `astro task done <id>`                 |
 | Update fields                     | `astro task update <id> --status done` |
 | Visualise tree                    | `astro task tree [--root <id>]`        |
 | Validate dependencies             | `astro dependency validate`            |
 | Interactive dashboard             | `astro dashboard`                      |
 
----
-
-## Dashboard
-
-The built-in terminal dashboard gives you a real-time view of all your work:
-
-![Astrotask Dashboard](./assets/dashboard.png)
-
-**Features:**
-- 📊 **Real-time task overview** – see pending, in-progress, and completed work
-- 🔍 **Advanced filtering** – by status, priority, parent task, or search term
-- ⌨️ **Keyboard shortcuts** – navigate and update tasks without leaving the terminal
-- 📈 **Progress tracking** – visual progress bars and completion percentages
-- 🔗 **Dependency visualization** – see what's blocked and what's ready to work on
+All commands accept `--help`.
 
 ---
 
-## Architecture
+## Screenshots
 
-```mermaid
-graph TB
-    CLI[CLI / Dashboard<br>(@astrotask/cli)]
-    MCP[MCP Server<br>(@astrotask/mcp)]
-    Core[("@astrotask/core\nService layer & Zod types")]
-    DB[(Local SQLite<br>./data/astrotask.db)]
-    
-    CLI --> Core
-    MCP --> Core
-    Core --> DB
-```
-
-1. **@astrotask/core** provides a type-safe service layer over the local database.
-2. **@astrotask/cli** offers task management, a dashboard, and maintenance commands.
-3. **@astrotask/mcp** exposes an MCP server so AI assistants can read/write tasks.
-
-All components share the same local SQLite database – no network calls, no vendor lock-in.
+![Astrotask Dashboard screenshot](./docs/assets/dashboard.png)
 
 ---
 
-## MCP Integration
+## How It Works
 
-The MCP server enables AI assistants to:
-- View your current tasks and context
-- Add new tasks and break down complex work
-- Update task status as work progresses
-- Understand project structure and dependencies
+1. `@astrotask/core` provides a type‑safe service layer over the local database.
+2. The CLI/TUI (`astro`) talks to the SDK directly.
+3. The MCP server exposes the same operations to AI tools via JSON‑RPC.
+4. SQLite WAL mode gives safe concurrent access (dashboard + agent + script).
 
-**Available MCP Functions:**
-- `getNextTask()` – Get the most important task to work on
-- `addTasks()` – Create tasks with hierarchy and dependencies  
-- `listTasks()` – Filter and search existing tasks
-- `updateStatus()` – Mark tasks as in-progress, done, etc.
-- `addTaskContext()` – Attach notes and implementation details
-- `addDependency()` – Model task relationships
+**Design principles**
 
-**Setup with Claude Desktop:**
-Add this to your Claude Desktop MCP configuration to get started.
+- **Local‑first** – Data should be useful without a network.
+- **Single source of truth** – CLI, SDK & MCP all share the same database file.
+- **Explicit context** – Agents receive structured bundles, never raw SQL.
+- **Type‑safe all the way** – Zod runtime validation mirrors TypeScript types.
 
 ---
 
-## Development
+## Contributing
 
-```bash
-# Clone and install
-git clone https://github.com/your-org/astrotask
-cd astrotask && pnpm install
+We ♥ new contributors! See [CONTRIBUTING.md](CONTRIBUTING.md) and [AGENTS.md](AGENTS.md) for philosophy & guidelines.
 
-# Build all packages
-pnpm build
+- Code must pass `pnpm verify` (`build ➜ type-check ➜ lint ➜ test`).
+- Keep rules/docs in sync with code changes.
+- Small PRs > big bang.
 
-# Run tests
-pnpm test
+---
 
-# Start development
-pnpm dev
-```
+## Roadmap
+
+| Milestone | Focus                                       |
+| --------- | ------------------------------------------- |
+| **v0.2**  | Polished CLI & MCP, dependency UX           |
+| **v0.3**  | ElectricSQL synchronization + web dashboard |
+| **v1.0**  | Mobile apps, plug‑in ecosystem              |
 
 ---
 
 ## License
 
-Astrotask is released under the **MIT License**.
+Astrotask is released under the [MIT License](LICENSE).

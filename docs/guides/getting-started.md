@@ -231,8 +231,8 @@ Create `.cursor/mcp.json` in your project:
 {
   "mcpServers": {
     "astrotask": {
-      "command": "node",
-      "args": ["path/to/astrotask/packages/mcp/dist/index.js"],
+      "command": "npx",
+      "args": ["@astrotask/mcp"],
       "env": {
         "DATABASE_URI": "sqlite://./data/astrotask.db",
         "DB_VERBOSE": "false",

@@ -52,9 +52,8 @@ interface PromptState {
 
 // Get absolute path to the MCP server
 function getMcpServerPath(): string {
-	const currentFile = fileURLToPath(import.meta.url);
-	const projectRoot = resolve(dirname(currentFile), "../../../..");
-	return join(projectRoot, "packages/mcp/dist/packages/mcp/src/index.js");
+	// Use npx to run the published @astrotask/mcp package
+	return "@astrotask/mcp";
 }
 
 // Generate MCP configuration for different editors
@@ -70,7 +69,7 @@ function generateMcpConfig(
 			return {
 				mcpServers: {
 					"astrotask-task": {
-						command: "node",
+						command: "npx",
 						args: [mcpServerPath],
 						env: {
 							DATABASE_PATH: absoluteDbPath,
@@ -83,7 +82,7 @@ function generateMcpConfig(
 			return {
 				mcpServers: {
 					"astrotask-task": {
-						command: "node",
+						command: "npx",
 						args: [mcpServerPath],
 						env: {
 							DATABASE_PATH: absoluteDbPath,
@@ -97,7 +96,7 @@ function generateMcpConfig(
 			return {
 				mcpServers: {
 					"astrotask-task": {
-						command: "node",
+						command: "npx",
 						args: [mcpServerPath],
 						env: {
 							DATABASE_PATH: absoluteDbPath,
@@ -111,7 +110,7 @@ function generateMcpConfig(
 			return {
 				mcpServers: {
 					"astrotask-task": {
-						command: "node",
+						command: "npx",
 						args: [mcpServerPath],
 						env: {
 							DATABASE_PATH: absoluteDbPath,

@@ -1,9 +1,9 @@
 {
   "mcpServers": {
     "astrotask-task": {
-      "command": "node",
+      "command": "npx",
       "args": [
-        "/home/toda/dev/astrotask/.npm-global/lib/node_modules/packages/mcp/dist/packages/mcp/src/index.js"
+        "@astrotask/mcp"
       ],
       "env": {
         "DATABASE_PATH": "/home/toda/dev/astrotask/data/astrotask.db"
