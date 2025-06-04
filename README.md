@@ -93,11 +93,13 @@ astro dashboard
 ### Programmatic
 
 ```ts
-import { createDatabase } from "@astrotask/core";
+import { createAstrotask } from "@astrotask/core";
 
-const db = await createDatabase({ dataDir: "./data/astrotask.db" });
+const astrotask = await createAstrotask({ 
+  databaseUrl: "./data/astrotask.db" 
+});
 
-await db.addTask({
+await astrotask.tasks.addTask({
   title: "Implement OAuth",
   description: "Add Google login",
 });
