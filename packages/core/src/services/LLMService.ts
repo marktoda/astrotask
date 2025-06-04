@@ -14,17 +14,21 @@ export interface ILLMService {
 }
 
 /**
- * Default implementation that simply wraps the existing `createLLM` helper.
- * It preserves all current behaviour (env-var checks, model selection, etc.).
+ * Default implementation that lazily creates the LLM model when first accessed.
+ * This allows overrides to be applied before the model is instantiated.
  */
 export class DefaultLLMService implements ILLMService {
-  private readonly model: ChatOpenAI;
+  private model?: ChatOpenAI;
+  private readonly overrides: Parameters<typeof createLLM>[0];
 
   constructor(overrides: Parameters<typeof createLLM>[0] = {}) {
-    this.model = createLLM(overrides);
+    this.overrides = overrides;
   }
 
   getChatModel(): ChatOpenAI {
+    if (!this.model) {
+      this.model = createLLM(this.overrides);
+    }
     return this.model;
   }
 }

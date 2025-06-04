@@ -410,13 +410,16 @@ export async function createInMemoryAstrotask(
  * This avoids requiring OpenAI API keys in test environments
  */
 export async function createTestAstrotask(
-  config: Omit<AstrotaskConfig, 'databaseUrl' | 'overrides'> = {}
+  config: Omit<AstrotaskConfig, 'databaseUrl'> = {}
 ): Promise<Astrotask> {
   return createAstrotask({
     ...config,
     databaseUrl: TEST_CONFIG.DATABASE_URL,
     overrides(reg) {
-      // Override LLM service with a mock that doesn't require OpenAI API key
+      // Apply user-provided overrides first
+      config.overrides?.(reg);
+      
+      // Then apply our test-specific overrides (these will not replace user overrides due to registry behavior)
       reg.register(DependencyType.LLM_SERVICE, {
         getChatModel: () => {
           // Create a mock that extends a minimal base class
