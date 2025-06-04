@@ -19,6 +19,9 @@ export const configSchema = z.object({
   // Log verbosity
   LOG_LEVEL: z.enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal']).default('info'),
 
+  // CLI mode - when true, reduces logging verbosity for better user experience
+  CLI_MODE: z.coerce.boolean().default(false),
+
   // Database configuration
   // Can be either a file path for PGlite (e.g., './data/astrotask.db')
   // or a PostgreSQL connection string (e.g., 'postgresql://user:pass@host:port/db')

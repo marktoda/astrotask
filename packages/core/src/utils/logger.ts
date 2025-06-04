@@ -10,6 +10,7 @@ import { cfg } from '../utils/config.js';
  * - Structured logging with consistent formatting
  * - Pretty-printed output in development
  * - JSON output in production
+ * - CLI mode support for reduced verbosity
  */
 
 /**
@@ -18,9 +19,21 @@ import { cfg } from '../utils/config.js';
 function createLoggerOptions(): LoggerOptions {
   const isDevelopment = cfg.NODE_ENV === 'development';
   const isTest = cfg.NODE_ENV === 'test';
+  const isCLIMode = cfg.CLI_MODE;
+
+  // Determine log level based on context
+  let logLevel: string;
+  if (isTest) {
+    logLevel = 'warn';
+  } else if (isCLIMode) {
+    // In CLI mode, only show important messages (warn/error)
+    logLevel = 'warn';
+  } else {
+    logLevel = cfg.LOG_LEVEL;
+  }
 
   const baseOptions: LoggerOptions = {
-    level: isTest ? 'warn' : cfg.LOG_LEVEL,
+    level: logLevel,
     base: {
       pid: process.pid,
       hostname: process.env.HOSTNAME || 'unknown',

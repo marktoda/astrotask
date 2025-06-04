@@ -10,9 +10,7 @@
 
 ---
 
-Astrotask is a modern, local-first task platform that lets you and your favourite AI assistant share the **same single-player database**.  It combines an ergonomic CLI, a rich TUI dashboard, a **Model Context Protocol (MCP)** server, and a type-safe JavaScript/TypeScript SDK—all backed by SQLite.
-
-*Keep everything on-device, work completely offline, and sync only when you want.*
+Astrotask is a modern, local-first task platform that lets you and your favourite AI assistant share the **same single-player database**. It combines an ergonomic CLI, a rich TUI dashboard, a **Model Context Protocol (MCP)** server, and a type-safe JavaScript/TypeScript SDK—all backed by SQLite.
 
 ---
 
@@ -40,27 +38,31 @@ Astrotask is a modern, local-first task platform that lets you and your favourit
 ## Features
 
 ### 🏠 Local-first
-* Works 100 % offline using SQLite (or PGLite/WASM in the browser)
-* Optional ElectricSQL replication coming soon
+
+- Works 100 % offline using SQLite (or PGLite/WASM in the browser)
+- Optional ElectricSQL replication coming soon
 
 ### 🤖 AI-native
-* Ships with a **MCP** server so LLM agents can call `listTasks`, `addTasks`, `updateStatus`, etc.
-* Built-in context bundling → agents always receive the right slice of the tree
+
+- Ships with a **MCP** server so LLM agents can call `listTasks`, `addTasks`, `updateStatus`, etc.
+- Built-in context bundling → agents always receive the right slice of the tree
 
 ### 🌲 Hierarchical tasks & dependencies
-* Unlimited depth, rich metadata, first-class dependency graph
-* Smart filters hide closed work by default
+
+- Unlimited depth, rich metadata, first-class dependency graph
+- Smart filters hide closed work by default
 
 ### 🚀 Developer experience
-* Fully-typed TypeScript SDK (`@astrotask/core`)
-* Zero-config CLI / TUI built with React-Ink (`astrotask`)
-* Batteries-included templates & tests
+
+- Fully-typed TypeScript SDK (`@astrotask/core`)
+- Zero-config CLI / TUI built with React-Ink (`astrotask`)
+- Batteries-included templates & tests
 
 ---
 
 ## Installation
 
-Astrotask is distributed as a collection of packages.  For most users the CLI is the entry-point:
+Astrotask is distributed as a collection of packages. For most users the CLI is the entry-point:
 
 ```bash
 # …until we hit v1.0 we recommend installing the latest pre-release
@@ -106,7 +108,7 @@ const db = await createDatabase({
 });
 
 await db.addTask({
-  title: "Implement OAuth", 
+  title: "Implement OAuth",
   description: "Add Google login",
 });
 ```
@@ -191,10 +193,7 @@ The CLI is built with Ink—you always get **live** updates and colours. All com
 
 ## Screenshots
 
-<p align="center">
-  <!-- Replace with real images before launch -->
-  <em>Screenshots coming soon – TUI dashboard & AI context bundle 👀</em>
-</p>
+![Astrotask Dashboard](./assets/dashboard.png)
 
 ---
 
@@ -221,16 +220,16 @@ flowchart TD
 
 Design principles:
 
-* *Local-first* – Data should be useful without a network.
-* *One source of truth* – CLI, SDK, and MCP all share the same database file.
-* *Explicit context* – Agents receive structured bundles, never raw SQL.
-* *Type-safe all the way* – Zod runtime validation mirrors the TypeScript types.
+- _Local-first_ – Data should be useful without a network.
+- _One source of truth_ – CLI, SDK, and MCP all share the same database file.
+- _Explicit context_ – Agents receive structured bundles, never raw SQL.
+- _Type-safe all the way_ – Zod runtime validation mirrors the TypeScript types.
 
 ---
 
 ## Contributing
 
-We ♥ new contributors!  Please read [AGENTS.md](AGENTS.md) for the philosophy and the [contributing guide](docs/guides/contributing.md) for coding standards.
+We ♥ new contributors! Please read [AGENTS.md](AGENTS.md) for the philosophy and the [contributing guide](docs/guides/contributing.md) for coding standards.
 
 - Code must pass `pnpm verify` (build ➜ type-check ➜ lint ➜ test).
 - Keep rules / docs in sync with code changes.
@@ -240,15 +239,14 @@ We ♥ new contributors!  Please read [AGENTS.md](AGENTS.md) for the philosophy 
 
 ## Roadmap
 
-| Milestone | Focus                               |
-| --------- | ----------------------------------- |
-| v0.2      | Polished CLI & MCP, dependency UX   |
-| v0.3      | ElectricSQL sync + web dashboard    |
-| v1.0      | Mobile apps, plug-in ecosystem      |
+| Milestone | Focus                             |
+| --------- | --------------------------------- |
+| v0.2      | Polished CLI & MCP, dependency UX |
+| v0.3      | ElectricSQL sync + web dashboard  |
+| v1.0      | Mobile apps, plug-in ecosystem    |
 
 ---
 
 ## License
 
 Astrotask is released under the **MIT License**.
-

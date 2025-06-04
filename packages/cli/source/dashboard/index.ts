@@ -9,6 +9,8 @@ import { DashboardLayout } from "./ui/components/layout.js";
 
 // Suppress terminfo warnings
 process.env["NODE_NO_WARNINGS"] = "1";
+// Set CLI mode for reduced logging verbosity
+process.env["CLI_MODE"] = "true";
 
 // Exit the Ink context first
 if (process.stdout.isTTY) {

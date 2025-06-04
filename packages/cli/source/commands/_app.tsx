@@ -16,6 +16,9 @@ export default function App({ Component, commandProps }: AppProps) {
 	React.useEffect(() => {
 		let astrotask: Astrotask | null = null;
 
+		// Set CLI mode for reduced logging verbosity
+		process.env["CLI_MODE"] = "true";
+
 		// Cleanup function for graceful shutdown
 		const cleanup = async () => {
 			if (astrotask) {
