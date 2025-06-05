@@ -1,5 +1,7 @@
 # Astrotask
 
+![Astrotask Logo](./assets/logo.png)
+
 **Task manager built for humans _and_ AI agents**
 
 Offline‑ready · MCP‑compatible · Fully‑type‑safe · Extensible
