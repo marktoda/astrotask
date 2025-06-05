@@ -18,6 +18,7 @@ COPY packages/ ./packages/
 RUN pnpm install --no-frozen-lockfile
 
 # Build only the required packages (core and mcp)
+RUN pnpm --filter @astrotask/core build
 RUN pnpm --filter @astrotask/mcp build
 
 # Create data directory for SQLite database

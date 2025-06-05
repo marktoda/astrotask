@@ -1,40 +1,6 @@
-runtime: "container"
-
-startCommand:
-  type: "http"
-  configSchema:
-    type: "object"
-    properties:
-      databaseUrl:
-        type: "string"
-        title: "Database URL"
-        description: "SQLite database path or connection URL for Astrotask"
-        default: "./data/astrotask.db"
-      debug:
-        type: "boolean"
-        title: "Debug Mode"
-        description: "Enable verbose database logging"
-        default: false
-      logLevel:
-        type: "string"
-        title: "Log Level"
-        description: "Logging level for the MCP server"
-        enum: ["debug", "info", "warn", "error"]
-        default: "info"
-      openaiApiKey:
-        type: "string"
-        title: "OpenAI API Key"
-        description: "Optional OpenAI API key for enhanced functionality"
-    required: ["databaseUrl"]
-  exampleConfig:
-    databaseUrl: "./data/astrotask.db"
-    debug: false
-    logLevel: "info"
-    openaiApiKey: "sk-example123"
-
-build:
-  dockerfile: "Dockerfile"
-  dockerBuildPath: "../.."
-
-env:
-  NODE_ENV: "production"
+name: "@astrotask/mcp"
+description: "Your MCP description here"
+connections:
+  - type: stdio
+    command: npx
+    args: ["@astrotask/mcp"]
