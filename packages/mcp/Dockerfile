@@ -24,7 +24,7 @@ RUN pnpm --filter @astrotask/mcp build
 # Create data directory for SQLite database
 RUN mkdir -p /app/data
 
-# Expose port for HTTP MCP server
+# Expose port for MCP server
 EXPOSE 3000
 
 # Set environment variables

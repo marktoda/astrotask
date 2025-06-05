@@ -29,7 +29,7 @@
   "author": "Astrolabe Team",
   "license": "MIT",
   "dependencies": {
-    "@astrotask/core": "^0.1.2",
+    "@astrotask/core": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.0.4",
     "zod": "^3.24.1"
   },
