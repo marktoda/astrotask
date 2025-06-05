@@ -22,24 +22,51 @@ const logger = createModuleLogger('mcp-server-http');
 // Map to store transports by session ID
 const transports: { [sessionId: string]: StreamableHTTPServerTransport } = {};
 
+// Lazy-loaded Astrotask instance
+let astrotaskInstance: Awaited<ReturnType<typeof createAstrotask>> | null = null;
+
+/**
+ * Lazy-load the Astrotask SDK instance
+ * This ensures configuration errors don't prevent the server from starting
+ */
+async function getAstrotaskInstance() {
+  if (!astrotaskInstance) {
+    try {
+      // Use Smithery configuration if available, fall back to defaults
+      const databaseUrl = process.env.databaseUrl || cfg.DATABASE_URI;
+      const debug = process.env.debug === 'true' || cfg.DB_VERBOSE;
+      
+      astrotaskInstance = await createAstrotask({
+        databaseUrl,
+        debug,
+      });
+      
+      logger.info('Astrotask SDK initialized successfully', { databaseUrl, debug });
+    } catch (error) {
+      logger.error('Failed to initialize Astrotask SDK', { 
+        error: error instanceof Error ? error.message : String(error) 
+      });
+      throw error;
+    }
+  }
+  return astrotaskInstance;
+}
+
 /**
  * Astrotask MCP Server with Streamable HTTP Transport
  * Provides 6 essential tools for AI agent task management via HTTP
  * Designed for hosted deployment and web-based clients
  */
 async function createMCPServer(): Promise<McpServer> {
-  // Create Astrotask SDK instance with configuration
-  const astrotask = await createAstrotask({
-    databaseUrl: cfg.DATABASE_URI,
-    debug: cfg.DB_VERBOSE,
-  });
-
-  // Create handler context factory
-  const createHandlerContext = () => ({
-    astrotask,
-    requestId: randomUUID(),
-    timestamp: new Date().toISOString(),
-  });
+  // Create handler context factory with lazy loading
+  const createHandlerContext = async () => {
+    const astrotask = await getAstrotaskInstance();
+    return {
+      astrotask,
+      requestId: randomUUID(),
+      timestamp: new Date().toISOString(),
+    };
+  };
 
   // Create the high-level MCP server instance
   const server = new McpServer({
@@ -51,7 +78,7 @@ async function createMCPServer(): Promise<McpServer> {
   server.tool('getNextTask',
     getNextTaskSchema.shape,
     wrapMCPHandler(async (args) => {
-      const context = createHandlerContext();
+      const context = await createHandlerContext();
       const handlers = new MinimalHandlers(context);
       return handlers.getNextTask(args);
     })
@@ -60,7 +87,7 @@ async function createMCPServer(): Promise<McpServer> {
   server.tool('addTasks',
     addTasksSchema.shape,
     wrapMCPHandler(async (args) => {
-      const context = createHandlerContext();
+      const context = await createHandlerContext();
       const handlers = new MinimalHandlers(context);
       return handlers.addTasks(args);
     })
@@ -69,7 +96,7 @@ async function createMCPServer(): Promise<McpServer> {
   server.tool('listTasks',
     listTasksSchema.shape,
     wrapMCPHandler(async (args) => {
-      const context = createHandlerContext();
+      const context = await createHandlerContext();
       const handlers = new MinimalHandlers(context);
       return handlers.listTasks(args);
     })
@@ -78,7 +105,7 @@ async function createMCPServer(): Promise<McpServer> {
   server.tool('addTaskContext',
     addTaskContextSchema.shape,
     wrapMCPHandler(async (args) => {
-      const context = createHandlerContext();
+      const context = await createHandlerContext();
       const handlers = new MinimalHandlers(context);
       return handlers.addTaskContext(args);
     })
@@ -87,7 +114,7 @@ async function createMCPServer(): Promise<McpServer> {
   server.tool('addDependency',
     addDependencySchema.shape,
     wrapMCPHandler(async (args) => {
-      const context = createHandlerContext();
+      const context = await createHandlerContext();
       const handlers = new MinimalHandlers(context);
       return handlers.addDependency(args);
     })
@@ -96,42 +123,12 @@ async function createMCPServer(): Promise<McpServer> {
   server.tool('updateStatus',
     updateStatusSchema.shape,
     wrapMCPHandler(async (args) => {
-      const context = createHandlerContext();
+      const context = await createHandlerContext();
       const handlers = new MinimalHandlers(context);
       return handlers.updateStatus(args);
     })
   );
 
-  // Set up graceful shutdown with Astrotask SDK cleanup
-  const setupShutdownHandlers = () => {
-    const handleShutdown = async (signal: string) => {
-      await logShutdown(logger, signal, async () => {
-        logger.info('Disposing Astrotask SDK...');
-        try {
-          await astrotask.dispose();
-          logger.info('Astrotask SDK disposed successfully');
-        } catch (error) {
-          logger.error('Failed to dispose Astrotask SDK', { 
-            error: error instanceof Error ? error.message : String(error) 
-          });
-        }
-      });
-      process.exit(0);
-    };
-
-    process.on('SIGINT', () => handleShutdown('SIGINT'));
-    process.on('SIGTERM', () => handleShutdown('SIGTERM'));
-    process.on('uncaughtException', (error) => {
-      logger.fatal({ error: error.message, stack: error.stack }, 'Uncaught exception, shutting down');
-      handleShutdown('uncaughtException');
-    });
-    process.on('unhandledRejection', (reason) => {
-      logger.fatal({ reason }, 'Unhandled rejection, shutting down');
-      handleShutdown('unhandledRejection');
-    });
-  };
-
-  setupShutdownHandlers();
   return server;
 }
 
@@ -168,7 +165,7 @@ async function main() {
           }
         };
 
-        // Create and connect MCP server
+        // Create and connect MCP server (lazy loading happens inside handlers)
         const server = await createMCPServer();
         await server.connect(transport);
       } else {
@@ -187,7 +184,10 @@ async function main() {
       // Handle the request
       await transport.handleRequest(req, res, req.body);
     } catch (error) {
-      logger.error('Error handling MCP request', { error: error instanceof Error ? error.message : String(error) });
+      logger.error('Error handling MCP request', { 
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined 
+      });
       res.status(500).json({
         jsonrpc: '2.0',
         error: {
@@ -231,6 +231,39 @@ async function main() {
   app.listen(port, () => {
     logger.info(`Astrotask MCP Server (http) started on port ${port} with 6 enhanced tools: getNextTask, addTasks, listTasks, addTaskContext, addDependency, updateStatus`);
   });
+
+  // Set up graceful shutdown with Astrotask SDK cleanup
+  const setupShutdownHandlers = () => {
+    const handleShutdown = async (signal: string) => {
+      await logShutdown(logger, signal, async () => {
+        if (astrotaskInstance) {
+          logger.info('Disposing Astrotask SDK...');
+          try {
+            await astrotaskInstance.dispose();
+            logger.info('Astrotask SDK disposed successfully');
+          } catch (error) {
+            logger.error('Failed to dispose Astrotask SDK', { 
+              error: error instanceof Error ? error.message : String(error) 
+            });
+          }
+        }
+      });
+      process.exit(0);
+    };
+
+    process.on('SIGINT', () => handleShutdown('SIGINT'));
+    process.on('SIGTERM', () => handleShutdown('SIGTERM'));
+    process.on('uncaughtException', (error) => {
+      logger.fatal({ error: error.message, stack: error.stack }, 'Uncaught exception, shutting down');
+      handleShutdown('uncaughtException');
+    });
+    process.on('unhandledRejection', (reason) => {
+      logger.fatal({ reason }, 'Unhandled rejection, shutting down');
+      handleShutdown('unhandledRejection');
+    });
+  };
+
+  setupShutdownHandlers();
 }
 
 // Start the server

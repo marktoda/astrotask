@@ -28,7 +28,7 @@ RUN mkdir -p /app/data
 EXPOSE 3000
 
 # Set environment variables
-ENV DATABASE_PATH=/app/data/astrotask.db
+ENV DATABASE_URI=/app/data/astrotask.db
 ENV NODE_ENV=production
 
 # Start the MCP server with HTTP transport (for hosted deployment)
