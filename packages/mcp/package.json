@@ -6,11 +6,15 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
-    "astrotask-mcp": "dist/index.js"
+    "astrotask-mcp": "dist/index.js",
+    "astrotask-mcp-stdio": "dist/stdio.js",
+    "astrotask-mcp-http": "dist/http.js"
   },
   "scripts": {
     "build": "rimraf dist && tsc",
     "start": "node dist/index.js",
+    "start:stdio": "node dist/stdio.js",
+    "start:http": "node dist/http.js",
     "type-check": "tsc --noEmit",
     "lint": "biome lint src/",
     "lint:fix": "biome lint --write src/",
@@ -31,9 +35,11 @@
   "dependencies": {
     "@astrotask/core": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.0.4",
+    "express": "^4.19.2",
     "zod": "^3.24.1"
   },
   "devDependencies": {
+    "@types/express": "^4.17.21",
     "@types/node": "^22.10.2",
     "tsup": "^8.3.5",
     "typescript": "^5.7.2",
