@@ -1,6 +1,1 @@
-name: "@astrotask/mcp"
-description: "Your MCP description here"
-connections:
-  - type: stdio
-    command: npx
-    args: ["@astrotask/mcp"]
+runtime: typescript
