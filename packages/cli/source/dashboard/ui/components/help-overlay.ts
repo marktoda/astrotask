@@ -5,17 +5,21 @@ import type { DashboardStore } from "../../store/index.js";
 interface KeyBinding {
 	keys: string[];
 	description: string;
+	priority?: "essential" | "common" | "advanced"; // Priority level for the binding
 }
 
 interface Section {
 	title: string;
 	bindings: KeyBinding[];
+	description?: string; // Optional section description
+	category: "essential" | "navigation" | "operations" | "advanced"; // Section category
 }
 
 export class HelpOverlay {
 	private box: blessed.Widgets.BoxElement;
 	private content: blessed.Widgets.TextElement;
 	private unsubscribe: () => void;
+	private allSections: Section[] = [];
 
 	constructor(
 		private parent: blessed.Widgets.Node,
@@ -41,7 +45,7 @@ export class HelpOverlay {
 			hidden: true,
 		});
 
-		// Create scrollable content
+		// Create scrollable content (simplified - no search for now)
 		this.content = blessed.text({
 			parent: this.box,
 			top: 0,
@@ -60,10 +64,11 @@ export class HelpOverlay {
 			},
 		});
 
-		// Set up content
+		// Initialize sections data
+		this.initializeSections();
 		this.setContent();
 
-		// Handle escape key
+		// Simple key handlers - just escape to close
 		this.box.key(["escape", "q", "?"], () => {
 			this.store.getState().toggleHelpOverlay();
 		});
@@ -78,128 +83,239 @@ export class HelpOverlay {
 		});
 	}
 
-	private setContent() {
-		const sections: Section[] = [
+	private initializeSections() {
+		this.allSections = [
 			{
-				title: "Global",
+				title: "🚀 Essential Commands",
+				description: "Must-know shortcuts for daily use",
+				category: "essential" as const,
 				bindings: [
+					{
+						keys: ["?"],
+						description: "Show/hide this help",
+						priority: "essential" as const,
+					},
 					{
 						keys: ["q", "Ctrl+c"],
 						description: "Quit application (double tap)",
+						priority: "essential" as const,
 					},
-					{ keys: ["?"], description: "Show/hide this help" },
-					{ keys: [":"], description: "Open command palette" },
-					{ keys: ["c"], description: "Toggle completed tasks visibility" },
-					{ keys: ["Tab"], description: "Focus next panel" },
-					{ keys: ["Shift+Tab"], description: "Focus previous panel" },
+					{
+						keys: [":"],
+						description: "Open command palette",
+						priority: "essential" as const,
+					},
+					{
+						keys: ["Tab"],
+						description: "Focus next panel",
+						priority: "essential" as const,
+					},
+					{
+						keys: ["Shift+Tab"],
+						description: "Focus previous panel",
+						priority: "essential" as const,
+					},
 				],
 			},
 			{
-				title: "Task Tree Navigation",
-				bindings: [
-					{ keys: ["↑", "k"], description: "Move cursor up" },
-					{ keys: ["↓", "j"], description: "Move cursor down" },
-					{ keys: ["←", "h"], description: "Collapse node" },
-					{ keys: ["→", "l"], description: "Expand node" },
-					{ keys: ["g"], description: "Go to top" },
-					{ keys: ["G"], description: "Go to bottom" },
-					{ keys: ["f"], description: "Focus on task (set as tree root)" },
-					{ keys: ["Esc", "u"], description: "Reset to show all projects" },
-				],
-			},
-			{
-				title: "Task Operations",
-				bindings: [
-					{ keys: ["Enter", "Space"], description: "Toggle task completion" },
-					{ keys: ["a"], description: "Add sibling task with editor" },
-					{ keys: ["A"], description: "Add child task with editor" },
-					{ keys: ["r"], description: "Rename task" },
-					{ keys: ["e"], description: "Edit task with editor" },
-					{ keys: ["D"], description: "Delete task (with confirmation)" },
-					{ keys: ["d"], description: "Toggle dependency tree view" },
-					{ keys: ["b"], description: "Add dependency" },
-					{ keys: ["B"], description: "Remove dependency" },
-					{ keys: ["*"], description: "Expand all nodes" },
-					{ keys: ["_"], description: "Collapse all nodes" },
-				],
-			},
-			{
-				title: "Project Sidebar",
+				title: "🧭 Navigation & Movement",
+				description: "Move around the interface efficiently",
+				category: "navigation" as const,
 				bindings: [
 					{
-						keys: ["Enter", "Click"],
-						description: "Select project and switch to tree",
+						keys: ["↑", "k"],
+						description: "Move cursor up",
+						priority: "essential" as const,
 					},
-					{ keys: ["↑", "k"], description: "Move up" },
-					{ keys: ["↓", "j"], description: "Move down" },
-					{ keys: ["PgUp"], description: "Page up" },
-					{ keys: ["PgDn"], description: "Page down" },
+					{
+						keys: ["↓", "j"],
+						description: "Move cursor down",
+						priority: "essential" as const,
+					},
+					{
+						keys: ["←", "h"],
+						description: "Collapse node / Move left",
+						priority: "common" as const,
+					},
+					{
+						keys: ["→", "l"],
+						description: "Expand node / Move right",
+						priority: "common" as const,
+					},
+					{
+						keys: ["g"],
+						description: "Go to top",
+						priority: "common" as const,
+					},
+					{
+						keys: ["G"],
+						description: "Go to bottom",
+						priority: "common" as const,
+					},
 				],
 			},
 			{
-				title: "Task Details",
+				title: "📝 Task Operations",
+				description: "Create, edit, and manage tasks",
+				category: "operations" as const,
 				bindings: [
-					{ keys: ["g"], description: "Toggle dependency graph view" },
-					{ keys: ["↑", "k"], description: "Scroll up" },
-					{ keys: ["↓", "j"], description: "Scroll down" },
-				],
-			},
-			{
-				title: "Command Palette",
-				bindings: [
-					{ keys: ['add "title"'], description: "Add new task" },
 					{
-						keys: ['add "title" under ID'],
-						description: "Add task under parent",
+						keys: ["Enter", "Space"],
+						description: "Toggle task completion",
+						priority: "essential" as const,
 					},
-					{ keys: ["add editor"], description: "Add new task with editor" },
 					{
-						keys: ["add editor under ID"],
-						description: "Add task with editor under parent",
+						keys: ["a"],
+						description: "Add sibling task with editor",
+						priority: "essential" as const,
 					},
-					{ keys: ['rename ID "new title"'], description: "Rename task by ID" },
-					{ keys: ["edit ID"], description: "Edit task with editor by ID" },
-					{ keys: ["delete ID"], description: "Delete task by ID" },
-					{ keys: ["dep ID -> ID"], description: "Add dependency" },
-					{ keys: ["undep ID -> ID"], description: "Remove dependency" },
-					{ keys: ["expand all"], description: "Expand all tasks" },
-					{ keys: ["collapse all"], description: "Collapse all tasks" },
+					{
+						keys: ["A"],
+						description: "Add child task with editor",
+						priority: "essential" as const,
+					},
+					{
+						keys: ["r"],
+						description: "Rename task",
+						priority: "common" as const,
+					},
+					{
+						keys: ["e"],
+						description: "Edit task with editor",
+						priority: "common" as const,
+					},
+					{
+						keys: ["D"],
+						description: "Delete task (with confirmation)",
+						priority: "common" as const,
+					},
+					{
+						keys: ["c"],
+						description: "Toggle completed tasks visibility",
+						priority: "common" as const,
+					},
 				],
 			},
 		];
+	}
 
+	private setContent() {
 		const lines: string[] = [];
 
-		// Header - use blessed tags for styling
+		// Header
 		lines.push("{bold}{cyan-fg}Astrolabe Terminal UI - Keyboard Shortcuts{/}");
 		lines.push("");
-		lines.push("{gray-fg}Press ? or q to close this help{/}");
+		lines.push("{gray-fg}Press ? or q to close • Enhanced version coming soon{/}");
+		lines.push("{dim}{gray-fg}💡 Priority: {green-fg}⭐ Essential{/gray-fg} • {blue-fg}📌 Common{/gray-fg} • {magenta-fg}🔧 Advanced{/gray-fg}{/}");
 		lines.push("");
 
-		// Sections
-		sections.forEach((section) => {
-			lines.push(`{bold}{yellow-fg}${section.title}{/}`);
-			lines.push("{gray-fg}" + "─".repeat(40) + "{/}");
+		// Group sections by category for better organization
+		const categorizedSections = this.groupSectionsByCategory();
+		
+		for (const [category, sections] of categorizedSections) {
+			if (sections.length > 0) {
+				// Category header
+				const categoryTitle = this.getCategoryTitle(category);
+				lines.push(`{bold}{white-fg}${categoryTitle}{/}`);
+				lines.push("{gray-fg}" + "═".repeat(50) + "{/}");
+				lines.push("");
 
-			section.bindings.forEach((binding) => {
-				const keys = binding.keys.join(", ");
-				const padding = 25 - keys.length;
-				lines.push(
-					`  {cyan-fg}${keys}{/}${" ".repeat(Math.max(0, padding))}${binding.description}`,
-				);
-			});
+				sections.forEach((section) => {
+					lines.push(`{bold}{yellow-fg}${section.title}{/}`);
+					
+					// Add section description if available
+					if (section.description) {
+						lines.push(`{dim}{gray-fg}${section.description}{/}`);
+					}
+					lines.push("{gray-fg}" + "─".repeat(40) + "{/}");
 
-			lines.push("");
-		});
+					// Sort bindings by priority
+					const sortedBindings = this.sortBindingsByPriority(section.bindings);
+
+					sortedBindings.forEach((binding) => {
+						const keys = binding.keys.join(", ");
+						const description = binding.description;
+						const priorityIcon = this.getPriorityIcon(binding.priority);
+						const padding = 22 - keys.length;
+						
+						lines.push(
+							`  ${priorityIcon} {cyan-fg}${keys}{/}${" ".repeat(Math.max(0, padding))}${description}`,
+						);
+					});
+
+					lines.push("");
+				});
+			}
+		}
 
 		// Footer
 		lines.push("");
-		lines.push("{gray-fg}" + "─".repeat(40) + "{/}");
-		lines.push(
-			"{gray-fg}Tip: Use vim-style navigation (hjkl) throughout the interface{/}",
-		);
+		lines.push("{gray-fg}" + "═".repeat(50) + "{/}");
+		lines.push("{gray-fg}Tip: Use vim-style navigation (hjkl) throughout the interface{/}");
 
 		this.content.setContent(lines.join("\n"));
+	}
+
+	private groupSectionsByCategory(): Map<string, Section[]> {
+		const grouped = new Map<string, Section[]>();
+		
+		// Define category order for consistent display
+		const categoryOrder = ["essential", "navigation", "operations", "advanced"];
+		
+		// Initialize all categories
+		categoryOrder.forEach(category => {
+			grouped.set(category, []);
+		});
+		
+		// Group sections by category
+		this.allSections.forEach(section => {
+			const category = section.category;
+			if (!grouped.has(category)) {
+				grouped.set(category, []);
+			}
+			grouped.get(category)!.push(section);
+		});
+		
+		// Return only categories that have sections
+		const result = new Map<string, Section[]>();
+		for (const [category, sections] of grouped) {
+			if (sections.length > 0) {
+				result.set(category, sections);
+			}
+		}
+		
+		return result;
+	}
+
+	private getCategoryTitle(category: string): string {
+		const categoryTitles: Record<string, string> = {
+			essential: "⭐ ESSENTIAL - Start Here",
+			navigation: "🧭 NAVIGATION - Moving Around", 
+			operations: "⚡ OPERATIONS - Getting Things Done",
+			advanced: "🔧 ADVANCED - Power User Features"
+		};
+		
+		return categoryTitles[category] || category.toUpperCase();
+	}
+
+	private sortBindingsByPriority(bindings: KeyBinding[]): KeyBinding[] {
+		const priorityOrder = { essential: 0, common: 1, advanced: 2 };
+		
+		return [...bindings].sort((a, b) => {
+			const aPriority = priorityOrder[a.priority || "common"];
+			const bPriority = priorityOrder[b.priority || "common"];
+			return aPriority - bPriority;
+		});
+	}
+
+	private getPriorityIcon(priority?: "essential" | "common" | "advanced"): string {
+		const icons = {
+			essential: "{green-fg}⭐{/}",
+			common: "{blue-fg}📌{/}",
+			advanced: "{magenta-fg}🔧{/}"
+		};
+		
+		return icons[priority || "common"];
 	}
 
 	show() {
