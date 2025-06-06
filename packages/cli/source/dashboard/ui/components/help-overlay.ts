@@ -25,13 +25,13 @@ export class HelpOverlay {
 		private parent: blessed.Widgets.Node,
 		private store: StoreApi<DashboardStore>,
 	) {
-		// Create the overlay box
+		// Create the overlay box with full coverage
 		this.box = blessed.box({
 			parent: this.parent,
-			top: "center",
-			left: "center",
-			width: "70%",
-			height: "80%",
+			top: 2,
+			left: 2,
+			right: 2,
+			bottom: 2,
 			border: {
 				type: "line",
 			},
@@ -40,27 +40,26 @@ export class HelpOverlay {
 					fg: "cyan",
 				},
 				bg: "black",
+				fg: "white",
 			},
 			label: " Help - Key Bindings ",
 			hidden: true,
 		});
 
-		// Create scrollable content (simplified - no search for now)
+		// Create scrollable content with better padding
 		this.content = blessed.text({
 			parent: this.box,
 			top: 0,
-			left: 0,
-			right: 0,
+			left: 1,
+			right: 1,
 			bottom: 0,
 			scrollable: true,
 			keys: true,
 			mouse: true,
-			padding: 1,
-			tags: true, // Enable blessed tag parsing
+			content: "",
 			style: {
-				scrollbar: {
-					bg: "gray",
-				},
+				bg: "black",
+				fg: "white",
 			},
 		});
 
@@ -86,7 +85,7 @@ export class HelpOverlay {
 	private initializeSections() {
 		this.allSections = [
 			{
-				title: "🚀 Essential Commands",
+				title: "Essential Commands",
 				description: "Must-know shortcuts for daily use",
 				category: "essential" as const,
 				bindings: [
@@ -118,7 +117,7 @@ export class HelpOverlay {
 				],
 			},
 			{
-				title: "🧭 Navigation & Movement",
+				title: "Navigation & Movement",
 				description: "Move around the interface efficiently",
 				category: "navigation" as const,
 				bindings: [
@@ -155,7 +154,7 @@ export class HelpOverlay {
 				],
 			},
 			{
-				title: "📝 Task Operations",
+				title: "Task Operations",
 				description: "Create, edit, and manage tasks",
 				category: "operations" as const,
 				bindings: [
@@ -202,11 +201,11 @@ export class HelpOverlay {
 	private setContent() {
 		const lines: string[] = [];
 
-		// Header
-		lines.push("{bold}{cyan-fg}Astrolabe Terminal UI - Keyboard Shortcuts{/}");
+		// Header with simpler formatting
+		lines.push("Astrolabe Terminal UI - Keyboard Shortcuts");
 		lines.push("");
-		lines.push("{gray-fg}Press ? or q to close • Enhanced version coming soon{/}");
-		lines.push("{dim}{gray-fg}💡 Priority: {green-fg}⭐ Essential{/gray-fg} • {blue-fg}📌 Common{/gray-fg} • {magenta-fg}🔧 Advanced{/gray-fg}{/}");
+		lines.push("Press ? or q to close");
+		lines.push("Priority: * Essential • + Common • > Advanced");
 		lines.push("");
 
 		// Group sections by category for better organization
@@ -214,20 +213,20 @@ export class HelpOverlay {
 		
 		for (const [category, sections] of categorizedSections) {
 			if (sections.length > 0) {
-				// Category header
+				// Category header - simplified
 				const categoryTitle = this.getCategoryTitle(category);
-				lines.push(`{bold}{white-fg}${categoryTitle}{/}`);
-				lines.push("{gray-fg}" + "═".repeat(50) + "{/}");
+				lines.push(categoryTitle);
+				lines.push("═".repeat(60));
 				lines.push("");
 
 				sections.forEach((section) => {
-					lines.push(`{bold}{yellow-fg}${section.title}{/}`);
+					lines.push(section.title);
 					
 					// Add section description if available
 					if (section.description) {
-						lines.push(`{dim}{gray-fg}${section.description}{/}`);
+						lines.push(`  ${section.description}`);
 					}
-					lines.push("{gray-fg}" + "─".repeat(40) + "{/}");
+					lines.push("─".repeat(50));
 
 					// Sort bindings by priority
 					const sortedBindings = this.sortBindingsByPriority(section.bindings);
@@ -236,10 +235,11 @@ export class HelpOverlay {
 						const keys = binding.keys.join(", ");
 						const description = binding.description;
 						const priorityIcon = this.getPriorityIcon(binding.priority);
-						const padding = 22 - keys.length;
+						const padding = 25 - keys.length;
 						
+						// Simplified formatting without blessed tags
 						lines.push(
-							`  ${priorityIcon} {cyan-fg}${keys}{/}${" ".repeat(Math.max(0, padding))}${description}`,
+							`  ${priorityIcon} ${keys}${" ".repeat(Math.max(0, padding))}${description}`,
 						);
 					});
 
@@ -250,8 +250,8 @@ export class HelpOverlay {
 
 		// Footer
 		lines.push("");
-		lines.push("{gray-fg}" + "═".repeat(50) + "{/}");
-		lines.push("{gray-fg}Tip: Use vim-style navigation (hjkl) throughout the interface{/}");
+		lines.push("═".repeat(60));
+		lines.push("Tip: Use vim-style navigation (hjkl) throughout the interface");
 
 		this.content.setContent(lines.join("\n"));
 	}
@@ -289,10 +289,10 @@ export class HelpOverlay {
 
 	private getCategoryTitle(category: string): string {
 		const categoryTitles: Record<string, string> = {
-			essential: "⭐ ESSENTIAL - Start Here",
-			navigation: "🧭 NAVIGATION - Moving Around", 
-			operations: "⚡ OPERATIONS - Getting Things Done",
-			advanced: "🔧 ADVANCED - Power User Features"
+			essential: "* ESSENTIAL - Start Here",
+			navigation: "* NAVIGATION - Moving Around", 
+			operations: "* OPERATIONS - Getting Things Done",
+			advanced: "* ADVANCED - Power User Features"
 		};
 		
 		return categoryTitles[category] || category.toUpperCase();
@@ -310,9 +310,9 @@ export class HelpOverlay {
 
 	private getPriorityIcon(priority?: "essential" | "common" | "advanced"): string {
 		const icons = {
-			essential: "{green-fg}⭐{/}",
-			common: "{blue-fg}📌{/}",
-			advanced: "{magenta-fg}🔧{/}"
+			essential: "*",
+			common: "+",
+			advanced: ">"
 		};
 		
 		return icons[priority || "common"];
@@ -326,6 +326,10 @@ export class HelpOverlay {
 
 	hide() {
 		this.box.hide();
+		// Return focus to the main dashboard
+		if (this.parent && 'focus' in this.parent) {
+			(this.parent as any).focus();
+		}
 		this.box.screen.render();
 	}
 
