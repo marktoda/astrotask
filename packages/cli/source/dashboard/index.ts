@@ -2,7 +2,7 @@
 import { cfg, createDatabase } from "@astrotask/core";
 import blessed from "blessed";
 import { EditorService } from "./services/editor.js";
-import { KeymapService } from "./services/keymap.js";
+import { EnhancedKeymapService } from "./services/enhanced-keymap.js";
 import { SyncService } from "./services/sync.js";
 import { createDashboardStore } from "./store/index.js";
 import { DashboardLayout } from "./ui/components/layout.js";
@@ -96,7 +96,7 @@ async function main() {
 			}
 
 			// Initialize services
-			const keymapService = new KeymapService();
+			const keymapService = new EnhancedKeymapService();
 			const syncService = new SyncService(useStore);
 
 			// Create main layout

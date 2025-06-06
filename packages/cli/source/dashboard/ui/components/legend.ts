@@ -1,22 +1,28 @@
 import blessed from "blessed";
 import type { StoreApi } from "zustand";
 import type { DashboardStore } from "../../store/index.js";
+import type { FooterHintRenderer } from "./footer-hint-renderer.js";
 
 export class Legend {
 	private box: blessed.Widgets.BoxElement;
 	private unsubscribe: () => void;
+	private footerHintRenderer?: FooterHintRenderer;
 
 	constructor(
 		private parent: blessed.Widgets.Node,
 		private store: StoreApi<DashboardStore>,
+		footerHintRenderer?: FooterHintRenderer,
 	) {
+		this.footerHintRenderer = footerHintRenderer;
+
 		// Create the legend box
 		this.box = blessed.box({
 			parent: this.parent,
 			bottom: 1,
 			left: 0,
 			right: 0,
-			height: 3,
+			height: 4,
+			tags: true,
 			style: {
 				bg: "black",
 				fg: "white",
@@ -39,18 +45,17 @@ export class Legend {
 		this.render(this.store.getState());
 	}
 
-	private render(state: DashboardStore) {
+	public render(state: DashboardStore) {
 		const { activePanel, treeViewMode } = state;
 
 		let content = "";
 
-		// Icon legend - always show
+		// Icon legend - keep only the most essential ones
 		const iconLegend = [
 			"○ Pending",
-			"◉ In Progress",
+			"◉ In Progress", 
 			"✓ Done",
 			"! High Priority",
-			"Red Text = Blocked",
 		];
 
 		// Common bindings
@@ -81,23 +86,29 @@ export class Legend {
 		// Build content
 		const activePanelBindings = panelBindings[activePanel] || [];
 
-		// First row: icon legend
-		const row1 = `Icons: ${iconLegend.join(" │ ")}`;
-
-		// Second row: key bindings
-		const keyBindings = [...activePanelBindings, ...commonBindings];
-		const row2 = keyBindings.join(" │ ");
-
-		// Add view mode indicator for tree panel
-		let viewModeIndicator = "";
+		// First row: icon legend with view mode indicator
+		let row1 = `Icons: ${iconLegend.join(" │ ")}`;
 		if (activePanel === "tree") {
-			viewModeIndicator =
-				treeViewMode === "dependencies"
-					? " {yellow-fg}[Dependency View]{/}"
-					: " {green-fg}[Hierarchy View]{/}";
+			const viewMode = treeViewMode === "dependencies" ? "Deps" : "Tree";
+			row1 += ` │ View: ${viewMode}`;
 		}
 
-		content = `${row1}${viewModeIndicator}\n${row2}`;
+		// Second row: key bindings (or footer hints if available)
+		let row2 = "";
+		
+		// Check for footer hints first
+		const footerHints = this.footerHintRenderer?.getHintContent();
+		
+		if (footerHints && footerHints.length > 0) {
+			// Show dynamic footer hints
+			row2 = footerHints;
+		} else {
+			// Fallback to static keybindings
+			const keyBindings = [...activePanelBindings, ...commonBindings];
+			row2 = keyBindings.join(" │ ");
+		}
+
+		content = `${row1}\n${row2}`;
 
 		this.box.setContent(content);
 		this.box.screen.render();
