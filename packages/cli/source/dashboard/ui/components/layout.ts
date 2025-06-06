@@ -13,6 +13,8 @@ import { TaskTreeComponent } from "./task-tree.js";
 import { FooterHintRenderer } from "./footer-hint-renderer.js";
 import { ContextTracker } from "../../services/context-tracker.js";
 import { HintScorer } from "../../services/hint-scorer.js";
+import { HoldDetectorService } from "../../services/hold-detector.js";
+import { KeyRingOverlay } from "./key-ring-overlay.js";
 
 export class DashboardLayout {
 	private projectSidebar: ProjectSidebar;
@@ -25,6 +27,8 @@ export class DashboardLayout {
 	private footerHintRenderer: FooterHintRenderer;
 	private contextTracker: ContextTracker;
 	private hintScorer: HintScorer;
+	private holdDetector: HoldDetectorService;
+	private keyRingOverlay: KeyRingOverlay;
 	private unsubscribe: () => void;
 
 	constructor(
@@ -49,6 +53,31 @@ export class DashboardLayout {
 			this.hintScorer,
 			this.contextTracker,
 			store
+		);
+
+		// Initialize hold detector for Ctrl-K overlay trigger
+		this.holdDetector = new HoldDetectorService({
+			holdDuration: 250, // 250ms as specified in the task
+			triggerKeys: ["c-k"], // Ctrl-K
+			onHoldDetected: () => {
+				this.showKeyRingOverlay();
+			},
+			onHoldCanceled: () => {
+				// Optional: could show brief feedback that hold was canceled
+				// For now, do nothing to avoid clutter
+			},
+		});
+
+		// Initialize key ring overlay
+		this.keyRingOverlay = new KeyRingOverlay(
+			screen,
+			store,
+			keymapService as EnhancedKeymapService,
+			{
+				displayDuration: 5000, // 5 seconds
+				autoHideOnKeyPress: true,
+				backgroundOpacity: 20,
+			}
 		);
 
 		// Create layout containers
@@ -226,6 +255,9 @@ export class DashboardLayout {
 	async initialize() {
 		const state = this.store.getState();
 
+		// Attach hold detector to screen for Ctrl-K hold detection
+		this.holdDetector.attach(this.screen);
+
 		// Load initial data
 		await state.loadTasks();
 
@@ -239,6 +271,16 @@ export class DashboardLayout {
 
 		// Render initial state
 		this.screen.render();
+	}
+
+	private showKeyRingOverlay() {
+		// Show the key ring overlay for the current context
+		this.keyRingOverlay.show();
+		
+		// Optional: Add debug logging if enabled
+		if (process.env["DEBUG_KEYS"]) {
+			console.error("DEBUG: Ctrl-K hold detected - showing key ring overlay");
+		}
 	}
 
 	handleResize() {
@@ -257,5 +299,9 @@ export class DashboardLayout {
 		this.unsubscribe();
 		this.footerHintRenderer.destroy();
 		this.contextTracker.destroy();
+		// Detach hold detector to clean up event listeners
+		this.holdDetector.detach();
+		// Clean up key ring overlay
+		this.keyRingOverlay.destroy();
 	}
 }
