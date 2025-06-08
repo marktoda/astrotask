@@ -60,7 +60,7 @@ export const taskTreeSchema: z.ZodType<TaskTreeData> = z.lazy(() =>
       parentId: z.string().nullable(),
       title: z.string(),
       description: z.string().nullable(),
-      status: z.enum(['pending', 'in-progress', 'done', 'cancelled', 'archived']),
+      status: z.enum(['pending', 'in-progress', 'blocked', 'done', 'cancelled', 'archived']),
       priority: z.enum(['low', 'medium', 'high']),
       prd: z.string().nullable(),
       contextDigest: z.string().nullable(),

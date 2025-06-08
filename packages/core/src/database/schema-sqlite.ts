@@ -9,6 +9,8 @@ import { check, foreignKey, integer, sqliteTable, text, unique } from 'drizzle-o
   TEXT primary keys (UUIDs stored as TEXT). Timestamps use INTEGER
   to store Unix timestamps for SQLite compatibility.
   
+  Updated for Astrolabe TUI redesign with enhanced status support including 'blocked'.
+  
   NOTE: Types are defined in src/schemas/* to avoid duplication. This file only
   defines the database table structure with proper enum constraints for SQLite.
 */
@@ -23,7 +25,7 @@ export const tasks = sqliteTable(
     parentId: text('parent_id'),
     title: text('title').notNull(),
     description: text('description'),
-    status: text('status', { enum: ['pending', 'in-progress', 'done', 'cancelled', 'archived'] })
+    status: text('status', { enum: ['pending', 'in-progress', 'blocked', 'done', 'cancelled', 'archived'] })
       .notNull()
       .default('pending'),
     priority: text('priority', { enum: ['low', 'medium', 'high'] })
@@ -48,7 +50,7 @@ export const tasks = sqliteTable(
     }),
     check(
       'status_check',
-      sql`${table.status} IN ('pending', 'in-progress', 'done', 'cancelled', 'archived')`
+      sql`${table.status} IN ('pending', 'in-progress', 'blocked', 'done', 'cancelled', 'archived')`
     ),
     check('priority_check', sql`${table.priority} IN ('low', 'medium', 'high')`),
   ]

@@ -3,6 +3,7 @@
  *
  * This module provides validation for task status transitions, ensuring that
  * tasks cannot be started if they are blocked by incomplete dependencies.
+ * Updated for Astrolabe TUI redesign with enhanced 'blocked' status support.
  *
  * @module utils/statusTransitions
  * @since 1.0.0
@@ -13,13 +14,15 @@ import type { TaskStatus } from '../schemas/task.js';
 /**
  * Valid status transitions for tasks.
  * Defines which status changes are allowed from each current status.
+ * Updated for Astrolabe TUI redesign with blocked status support.
  */
 export const taskStatusTransitions: Record<TaskStatus, TaskStatus[]> = {
-  pending: ['in-progress', 'cancelled'], // Can only start if not blocked
-  'in-progress': ['done', 'pending', 'cancelled'],
+  pending: ['in-progress', 'blocked', 'cancelled'], // Can start or be blocked
+  'in-progress': ['done', 'pending', 'blocked', 'cancelled'], // Can complete, pause, or be blocked
+  blocked: ['pending', 'in-progress'], // Can be unblocked to previous state
   done: ['in-progress'], // Can reopen, which may block dependents
-  cancelled: ['pending'],
-  archived: [], // Terminal state
+  cancelled: ['pending', 'blocked'], // Can be reopened
+  archived: [], // Terminal state - no transitions allowed
 } as const;
 
 /**

@@ -2,6 +2,9 @@ import type { Task, TaskTree, TrackingTaskTree } from "@astrotask/core";
 import blessed from "blessed";
 import type { StoreApi } from "zustand";
 import type { DashboardStore } from "../../store/index.js";
+import { StatusRenderer } from "../../utils/status-renderer.js";
+import { TaskLineFormatter, type TaskLineInfo } from "../../utils/task-line-formatter.js";
+import { ColorIntegrationSystem, type DependencyRelationship } from "../../utils/color-integration.js";
 
 interface TaskTreeItem {
 	taskId: string;
@@ -10,6 +13,7 @@ interface TaskTreeItem {
 	isExpanded: boolean;
 	hasChildren: boolean;
 	task: Task;
+	index: number; // Add index for line numbering
 }
 
 export class TaskTreeComponent {
@@ -19,11 +23,25 @@ export class TaskTreeComponent {
 	private keyDebounceMs: number = 150;
 	private isRendering: boolean = false;
 	private currentItems: TaskTreeItem[] = [];
+	private statusRenderer: StatusRenderer;
+	private taskLineFormatter: TaskLineFormatter;
+	private colorIntegration: ColorIntegrationSystem;
 
 	constructor(
 		private parent: blessed.Widgets.Node,
 		private store: StoreApi<DashboardStore>,
 	) {
+		// Initialize the enhanced status renderer
+		this.statusRenderer = StatusRenderer.create();
+		
+		// Initialize the task line formatter
+		this.taskLineFormatter = TaskLineFormatter.create({
+			statusRenderer: this.statusRenderer
+		});
+
+		// Initialize the color integration system
+		this.colorIntegration = ColorIntegrationSystem.createBackgroundOnly();
+
 		// Create the list widget with proper blessed configuration
 		this.list = blessed.list({
 			parent: this.parent,
@@ -126,32 +144,42 @@ export class TaskTreeComponent {
 			}
 		});
 
-		// Enter to expand/collapse or select
+		// Enter to expand/collapse or toggle status  
 		this.list.key(["enter"], () => {
 			const selectedIndex = (this.list as any).selected;
 			const item = this.currentItems[selectedIndex];
 			if (item) {
-				if (item.hasChildren) {
-					state().toggleTaskExpanded(item.taskId);
-				}
-				state().selectTask(item.taskId);
-
-				// Show helpful message about dependency highlighting
-				const currentState = state();
-				const dependencies = currentState.getTaskDependencies(item.taskId);
-				const dependents = currentState.getTaskDependents(item.taskId);
-
-				if (dependencies.length > 0 || dependents.length > 0) {
-					state().setStatusMessage(
-						`Selected: ${item.task.title} | Dependency highlighting active - ⚠ blocking pending, ✓ blocking done, ← dependent, ~ related`,
-					);
+				// New behavior: Toggle between pending and in-progress
+				if (item.task.status === "pending") {
+					state().updateTaskStatus(item.taskId, "in-progress");
+					state().setStatusMessage(`Started: ${item.task.title}`);
+				} else if (item.task.status === "in-progress") {
+					state().updateTaskStatus(item.taskId, "pending");
+					state().setStatusMessage(`Paused: ${item.task.title}`);
 				} else {
-					state().setStatusMessage(`Selected: ${item.task.title}`);
+					// For other statuses, expand/collapse if has children
+					if (item.hasChildren) {
+						state().toggleTaskExpanded(item.taskId);
+					}
+					state().selectTask(item.taskId);
+
+					// Show helpful message about dependency highlighting
+					const currentState = state();
+					const dependencies = currentState.getTaskDependencies(item.taskId);
+					const dependents = currentState.getTaskDependents(item.taskId);
+
+					if (dependencies.length > 0 || dependents.length > 0) {
+						state().setStatusMessage(
+							`Selected: ${item.task.title} | Dependency highlighting active - ⚠ blocking pending, ✓ blocking done, ← dependent, ~ related`,
+						);
+					} else {
+						state().setStatusMessage(`Selected: ${item.task.title}`);
+					}
 				}
 			}
 		});
 
-		// Space to toggle completion status
+		// Space to also toggle pending⇄in-progress (same as Enter for consistency)
 		this.list.key(["space"], async () => {
 			const now = Date.now();
 			if (now - this.lastKeyPress < this.keyDebounceMs) return;
@@ -160,33 +188,55 @@ export class TaskTreeComponent {
 			const selectedIndex = (this.list as any).selected;
 			const item = this.currentItems[selectedIndex];
 			if (item) {
-				// Cycle through states: pending -> in-progress -> done -> pending
-				let newStatus: Task["status"];
-				switch (item.task.status) {
-					case "pending":
-						newStatus = "in-progress";
-						break;
-					case "in-progress":
-						newStatus = "done";
-						break;
-					case "done":
-						newStatus = "pending";
-						break;
-					case "cancelled":
-					case "archived":
-						// For cancelled/archived tasks, reset to pending
-						newStatus = "pending";
-						break;
-					default:
-						// Fallback for any unexpected status
-						newStatus = "pending";
-						break;
+				// New behavior: Toggle between pending and in-progress only
+				if (item.task.status === "pending") {
+					state().updateTaskStatus(item.taskId, "in-progress");
+					state().setStatusMessage(`Started: ${item.task.title}`);
+				} else if (item.task.status === "in-progress") {
+					state().updateTaskStatus(item.taskId, "pending");
+					state().setStatusMessage(`Paused: ${item.task.title}`);
+				} else {
+					// For other statuses, show a message
+					state().setStatusMessage(`Cannot toggle - task is ${item.task.status}. Use Shift+D to mark done, or b to block/unblock.`);
 				}
+			}
+		});
 
-				// Update the status - this is now a synchronous operation with optimistic updates
-				state().updateTaskStatus(item.taskId, newStatus);
+		// Shift+D to mark done
+		this.list.key(["S-d"], async () => {
+			const selectedIndex = (this.list as any).selected;
+			const item = this.currentItems[selectedIndex];
+			if (item) {
+				// Only allow marking done from pending or in-progress
+				if (item.task.status === "pending" || item.task.status === "in-progress" || item.task.status === "blocked") {
+					state().updateTaskStatus(item.taskId, "done");
+					state().setStatusMessage(`Completed: ${item.task.title} ✓`);
+				} else if (item.task.status === "done") {
+					// Allow reopening completed tasks
+					state().updateTaskStatus(item.taskId, "in-progress");
+					state().setStatusMessage(`Reopened: ${item.task.title}`);
+				} else {
+					state().setStatusMessage(`Cannot mark done - task is ${item.task.status}`);
+				}
+			}
+		});
 
-				// The store will handle UI updates via subscriptions, no need to force render
+		// b/B to block/unblock tasks
+		this.list.key(["b", "S-b"], async () => {
+			const selectedIndex = (this.list as any).selected;
+			const item = this.currentItems[selectedIndex];
+			if (item) {
+				if (item.task.status === "blocked") {
+					// Unblock: restore to in-progress (could be enhanced later to remember previous state)
+					state().updateTaskStatus(item.taskId, "in-progress");
+					state().setStatusMessage(`Unblocked: ${item.task.title} - resumed as in-progress`);
+				} else if (item.task.status === "pending" || item.task.status === "in-progress") {
+					// Block the task
+					state().updateTaskStatus(item.taskId, "blocked");
+					state().setStatusMessage(`Blocked: ${item.task.title} ⛔`);
+				} else {
+					state().setStatusMessage(`Cannot block/unblock - task is ${item.task.status}`);
+				}
 			}
 		});
 
@@ -210,8 +260,8 @@ export class TaskTreeComponent {
 			}
 		});
 
-		// Delete task - use correct Blessed uppercase key format
-		this.list.key(["S-d"], () => {
+		// Delete task - changed from Shift+D to Delete to avoid conflict with mark done
+		this.list.key(["delete", "C-d"], () => {
 			const selectedIndex = (this.list as any).selected;
 			const item = this.currentItems[selectedIndex];
 
@@ -451,30 +501,18 @@ export class TaskTreeComponent {
 				(this.list as any)._clines = [];
 			}
 
-			// Set items with blessed color tags based on dependency relationships
+			// Set items with enhanced color integration that preserves status glyph colors
 			const formattedItems = items.map((item) => {
-				const plainLabel = this.stripAnsi(item.label);
-				const relationship = state.getTaskRelationshipToSelected(item.taskId);
+				const relationship = state.getTaskRelationshipToSelected(item.taskId) as DependencyRelationship;
+				
+				// Use the color integration system to apply dependency highlighting
+				// while preserving the status glyph colors from TaskLineFormatter
+				const styledResult = this.colorIntegration.styleTaskLine(
+					item.label,
+					relationship
+				);
 
-				// Apply colors based on relationship to selected task
-				switch (relationship) {
-					case "blocking-pending":
-						// Task is blocking the selected task and is still pending (red/orange)
-						return `{red-fg}${plainLabel}{/red-fg}`;
-					case "blocking-completed":
-						// Task is blocking the selected task but is done (green)
-						return `{green-fg}${plainLabel}{/green-fg}`;
-					case "dependent":
-						// Task depends on the selected task (blue)
-						return `{blue-fg}${plainLabel}{/blue-fg}`;
-					case "related":
-						// Task shares dependencies with the selected task (yellow)
-						return `{yellow-fg}${plainLabel}{/yellow-fg}`;
-					case "none":
-					default:
-						// No special relationship or no task selected
-						return plainLabel;
-				}
+				return styledResult.styledLine;
 			});
 
 			this.list.setItems(formattedItems);
@@ -562,11 +600,13 @@ export class TaskTreeComponent {
 						depth,
 						hasChildren,
 						isExpanded,
+						items.length, // Use current array length as index
 					),
 					depth,
 					isExpanded,
 					hasChildren,
 					task: node.task,
+					index: items.length, // Store the index for reference
 				});
 
 				// Add children if expanded
@@ -648,11 +688,13 @@ export class TaskTreeComponent {
 						depth,
 						hasChildren,
 						isExpanded,
+						items.length,
 					),
 					depth: depth,
 					isExpanded: isExpanded,
 					hasChildren: hasChildren,
 					task: taskNode.task,
+					index: items.length,
 				});
 
 				// Add dependents if expanded
@@ -695,51 +737,31 @@ export class TaskTreeComponent {
 		depth: number,
 		hasChildren: boolean,
 		isExpanded: boolean,
+		index: number,
 	): string {
-		const indent = "  ".repeat(depth);
-		const expandIcon = hasChildren ? (isExpanded ? "▼" : "▶") : " ";
-		const statusIcon = this.getStatusIcon(task.status);
-		const priorityIcon = this.getPriorityIcon(task.priority);
-		const dependencyIcon = this.getDependencyIndicator(task.id);
+		// Prepare task line info for the formatter
+		const taskLineInfo: TaskLineInfo = {
+			task,
+			index: index + 1, // Convert to 1-based indexing for display
+			depth,
+			hasChildren,
+			isExpanded,
+			priorityIndicator: this.getPriorityIcon(task.priority),
+			dependencyIndicator: this.getDependencyIndicator(task.id),
+		};
 
-		// Build the base label
-		let label = `${indent}${expandIcon} ${statusIcon} ${task.title}`;
-
-		// Add priority indicator if not medium
-		if (task.priority !== "medium") {
-			label += priorityIcon;
-		}
-
-		// Add dependency indicator
-		if (dependencyIcon) {
-			label += dependencyIcon;
-		}
-
+		// Use the task line formatter to create the properly formatted line
+		const formattedLine = this.taskLineFormatter.formatTaskLine(taskLineInfo);
+		
 		// Pad the label to ensure it fills the entire line width
 		// This helps overwrite any residual text when collapsing
 		const maxWidth = (this.list.width as number) - 4; // Account for borders and padding
+		let label = formattedLine.fullLine;
 		if (label.length < maxWidth) {
 			label = label.padEnd(maxWidth, " ");
 		}
 
 		return label;
-	}
-
-	private getStatusIcon(status: Task["status"]): string {
-		switch (status) {
-			case "done":
-				return "✓";
-			case "in-progress":
-				return "◉"; // Changed to filled circle for better visibility
-			case "pending":
-				return "○";
-			case "cancelled":
-				return "✗";
-			case "archived":
-				return "⧈"; // Changed to a better archive icon
-			default:
-				return "?";
-		}
 	}
 
 	private getPriorityIcon(priority: Task["priority"]): string {
@@ -776,10 +798,5 @@ export class TaskTreeComponent {
 			default:
 				return "";
 		}
-	}
-
-	private stripAnsi(str: string): string {
-		// Simple ANSI code removal - blessed doesn't need complex parsing
-		return str.replace(/\x1b\[[0-9;]*m/g, "");
 	}
 }

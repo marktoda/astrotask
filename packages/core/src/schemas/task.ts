@@ -1,9 +1,15 @@
 import { z } from 'zod';
 import { description, optionalTaskId, taskId, title } from './base.js';
 
-// Simple task status enum - adding 'archived' to replace project status
+// Enhanced task status enum for Astrolabe TUI redesign
+// Supports both legacy statuses and new simplified taxonomy:
+// - pending (PEN): Created, waiting to be started
+// - in-progress (ACT): Actively worked on  
+// - blocked (BLK): Waiting on prerequisite - NEW STATUS
+// - done (DONE): Work finished
+// - cancelled, archived: Legacy statuses maintained for compatibility
 export const taskStatus = z
-  .enum(['pending', 'in-progress', 'done', 'cancelled', 'archived'])
+  .enum(['pending', 'in-progress', 'blocked', 'done', 'cancelled', 'archived'])
   .default('pending');
 
 // Task priority enum (moved from project schema)

@@ -3,6 +3,7 @@ import { Box, Text } from "ink";
 import { useEffect, useState } from "react";
 import zod from "zod";
 import { useDatabase } from "../../context/DatabaseContext.js";
+import { StatusRenderer } from "../../dashboard/utils/status-renderer.js";
 
 export const description =
 	"Visualize task hierarchy as an interactive tree. By default, shows only pending and in-progress tasks. Use --show-all to include completed and archived tasks.";
@@ -32,6 +33,7 @@ export default function Tree({ options }: Props) {
 	const [tree, setTree] = useState<TaskTree[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
+	const [statusRenderer] = useState(() => StatusRenderer.createAscii()); // Use ASCII for ink output
 
 	const showStatus = !options.hideStatus;
 	const maxDepth = options.depth;
@@ -188,6 +190,7 @@ export default function Tree({ options }: Props) {
 					depth={0}
 					maxDepth={maxDepth}
 					showStatus={showStatus}
+					statusRenderer={statusRenderer}
 					prefix=""
 				/>
 			))}
@@ -201,7 +204,7 @@ export default function Tree({ options }: Props) {
 							Legend:
 						</Text>
 						<Text color="gray">
-							⏳ Pending 🔄 In Progress ✅ Done ❌ Cancelled
+							{statusRenderer.getLegendText()}
 						</Text>
 						<Text color="gray">
 							Status may be inherited from parent tasks (effective status)
@@ -219,6 +222,7 @@ interface TreeNodeComponentProps {
 	depth: number;
 	maxDepth?: number;
 	showStatus: boolean;
+	statusRenderer: StatusRenderer;
 	prefix: string;
 }
 
@@ -228,6 +232,7 @@ function TreeNodeComponent({
 	depth,
 	maxDepth,
 	showStatus,
+	statusRenderer,
 	prefix,
 }: TreeNodeComponentProps) {
 	const shouldShowChildren = maxDepth === undefined || depth < maxDepth;
@@ -255,9 +260,9 @@ function TreeNodeComponent({
 					{prefix}
 					{connector}
 				</Text>
-				{showStatus && getStatusIcon(effectiveStatus)}
+				{showStatus && statusRenderer.getGlyph(effectiveStatus)}
 				{showStatus && " "}
-				<Text bold color={getStatusColor(effectiveStatus)}>
+				<Text bold color={statusRenderer.getColor(effectiveStatus)}>
 					{task.title}
 				</Text>
 				<Text color="gray"> ({task.id})</Text>
@@ -300,6 +305,7 @@ function TreeNodeComponent({
 							depth={depth + 1}
 							maxDepth={maxDepth}
 							showStatus={showStatus}
+							statusRenderer={statusRenderer}
 							prefix={childPrefix}
 						/>
 					))}
@@ -314,34 +320,4 @@ function TreeNodeComponent({
 			)}
 		</Box>
 	);
-}
-
-function getStatusIcon(status: string): string {
-	switch (status) {
-		case "pending":
-			return "⏳";
-		case "in-progress":
-			return "🔄";
-		case "done":
-			return "✅";
-		case "cancelled":
-			return "❌";
-		default:
-			return "📝";
-	}
-}
-
-function getStatusColor(status: string): string {
-	switch (status) {
-		case "pending":
-			return "yellow";
-		case "in-progress":
-			return "blue";
-		case "done":
-			return "green";
-		case "cancelled":
-			return "red";
-		default:
-			return "white";
-	}
 }

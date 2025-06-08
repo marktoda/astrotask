@@ -2,6 +2,7 @@ import type { Task } from "@astrotask/core";
 import blessed from "blessed";
 import type { StoreApi } from "zustand";
 import type { DashboardStore } from "../../store/index.js";
+import { StatusRenderer } from "../../utils/status-renderer.js";
 
 export class DetailPane {
 	private box: blessed.Widgets.BoxElement;
@@ -10,6 +11,7 @@ export class DetailPane {
 	private lastRenderedTaskId: string | null = null;
 	private lastRenderedViewMode: string | null = null;
 	private lastContextSliceCount: number = 0;
+	private statusRenderer: StatusRenderer;
 
 	constructor(
 		private parent: blessed.Widgets.Node,
@@ -62,6 +64,9 @@ export class DetailPane {
 		this.unsubscribe = this.store.subscribe((state) => {
 			this.render(state);
 		});
+
+		// Initialize the enhanced status renderer
+		this.statusRenderer = StatusRenderer.create();
 
 		// Initial render
 		this.render(this.store.getState());
@@ -264,7 +269,7 @@ export class DetailPane {
 		const isBlocked = state.isTaskBlocked(task.id);
 		if (isBlocked) {
 			const blockingTasks = state.getBlockingTasks(task.id);
-			lines.push("{bold}{red-fg}⏸ Task is Blocked{/red-fg}{/bold}");
+			lines.push("{bold}{red-fg}Task is Blocked{/red-fg}{/bold}");
 			lines.push("{yellow-fg}Complete these tasks first:{/yellow-fg}");
 			blockingTasks.forEach((blockingId: string) => {
 				const blockingTaskNode = trackingTree?.find(
@@ -296,7 +301,7 @@ export class DetailPane {
 		const lines: string[] = [];
 
 		// Header
-		lines.push("{bold}{cyan-fg}🕸️  Dependency Graph View{/bold}{/cyan-fg}");
+		lines.push("{bold}{cyan-fg}Dependency Graph View{/bold}{/cyan-fg}");
 		lines.push(`{bold}Task: ${task.title}{/bold} (${task.id})`);
 		lines.push("");
 		lines.push("{gray-fg}Press 'd' for normal detail view{/gray-fg}");
@@ -310,7 +315,7 @@ export class DetailPane {
 		// Show upstream dependencies (what this task needs)
 		if (deps.length > 0) {
 			lines.push(
-				"{cyan-fg}⬆️  UPSTREAM (Dependencies required before this task):{/cyan-fg}",
+				"{cyan-fg}UPSTREAM (Dependencies required before this task):{/cyan-fg}",
 			);
 			this.renderDependencyTree(lines, deps, trackingTree, "  ", true);
 			lines.push("");
@@ -321,8 +326,8 @@ export class DetailPane {
 		const statusColor = this.getDependencyStatusColor(task.status);
 		const priorityIcon = this.getPriorityIcon(task.priority);
 		const priorityDisplay = priorityIcon ? ` ${priorityIcon}` : "";
-		const blockIcon = isBlocked ? " 🚫" : "";
-		lines.push(`{bold}📍 CURRENT TASK:{/bold}`);
+		const blockIcon = isBlocked ? " [BLOCKED]" : "";
+		lines.push(`{bold}CURRENT TASK:{/bold}`);
 		lines.push(
 			`   ${statusIcon} {${statusColor}-fg}${task.title}{/${statusColor}-fg}${priorityDisplay}${blockIcon}`,
 		);
@@ -331,38 +336,38 @@ export class DetailPane {
 		// Show downstream dependents (what this task blocks)
 		if (dependents.length > 0) {
 			lines.push(
-				"{magenta-fg}⬇️  DOWNSTREAM (Tasks blocked by this task):{/magenta-fg}",
+				"{magenta-fg}DOWNSTREAM (Tasks blocked by this task):{/magenta-fg}",
 			);
 			this.renderDependencyTree(lines, dependents, trackingTree, "  ", false);
 			lines.push("");
 		}
 
 		// Show flow summary
-		lines.push("{yellow-fg}📊 Flow Summary:{/yellow-fg}");
+		lines.push("{yellow-fg}Flow Summary:{/yellow-fg}");
 		if (deps.length === 0) {
-			lines.push("  🏁 No dependencies - can start immediately");
+			lines.push("  » No dependencies - can start immediately");
 		} else {
 			const completedDeps = deps.filter((depId) => {
 				const depNode = trackingTree.find((t: Task) => t.id === depId);
 				return depNode?.task.status === "done";
 			});
 			lines.push(
-				`  📥 Dependencies: ${completedDeps.length}/${deps.length} completed`,
+				`  » Dependencies: ${completedDeps.length}/${deps.length} completed`,
 			);
 		}
 
 		if (dependents.length === 0) {
-			lines.push("  🎯 No dependents - leaf task");
+			lines.push("  » No dependents - leaf task");
 		} else {
 			lines.push(
-				`  📤 Blocks: ${dependents.length} downstream task${dependents.length > 1 ? "s" : ""}`,
+				`  » Blocks: ${dependents.length} downstream task${dependents.length > 1 ? "s" : ""}`,
 			);
 		}
 
 		if (isBlocked) {
-			lines.push("  ⚠️  Currently blocked - complete dependencies first");
+			lines.push("  » Currently blocked - complete dependencies first");
 		} else {
-			lines.push("  ✅ Ready to work on (no blocking dependencies)");
+			lines.push("  » Ready to work on (no blocking dependencies)");
 		}
 
 		this.content.setContent(lines.join("\n"));
@@ -430,54 +435,15 @@ export class DetailPane {
 	}
 
 	private getStatusIcon(status: Task["status"]): string {
-		switch (status) {
-			case "done":
-				return "✓";
-			case "in-progress":
-				return "◉";
-			case "pending":
-				return "○";
-			case "cancelled":
-				return "✗";
-			case "archived":
-				return "⧈";
-			default:
-				return "○";
-		}
+		return this.statusRenderer.renderStatus(status);
 	}
 
 	private getDependencyStatusIcon(status: Task["status"]): string {
-		switch (status) {
-			case "done":
-				return "✓";
-			case "in-progress":
-				return "◉";
-			case "pending":
-				return "○";
-			case "cancelled":
-				return "✗";
-			case "archived":
-				return "⧈";
-			default:
-				return "○";
-		}
+		return this.statusRenderer.renderStatus(status);
 	}
 
 	private getDependencyStatusColor(status: Task["status"]): string {
-		switch (status) {
-			case "done":
-				return "green";
-			case "in-progress":
-				return "yellow";
-			case "pending":
-				return "cyan";
-			case "cancelled":
-				return "red";
-			case "archived":
-				return "gray";
-			default:
-				return "white";
-		}
+		return this.statusRenderer.getColor(status);
 	}
 
 	private getPriorityIcon(priority: Task["priority"]): string {
@@ -494,33 +460,33 @@ export class DetailPane {
 	}
 
 	private getComplexityIcon(complexity: number): string {
-		if (complexity >= 8) return "🔥"; // High complexity
-		if (complexity >= 6) return "⚠️"; // Medium-high complexity
-		if (complexity >= 4) return "📊"; // Medium complexity
-		return "✅"; // Low complexity
+		if (complexity >= 8) return "!!!"; // High complexity - simplified
+		if (complexity >= 6) return "!!"; // Medium-high complexity - simplified
+		if (complexity >= 4) return "!"; // Medium complexity - simplified
+		return ""; // Low complexity - no icon needed
 	}
 
 	private getContextSliceType(title: string): { icon: string; color: string } {
 		const titleLower = title.toLowerCase();
 
 		if (titleLower.includes("complexity")) {
-			return { icon: "📊", color: "cyan" };
+			return { icon: "»", color: "cyan" };
 		}
 		if (titleLower.includes("analysis")) {
-			return { icon: "🔍", color: "blue" };
+			return { icon: "»", color: "blue" };
 		}
 		if (titleLower.includes("research")) {
-			return { icon: "📚", color: "magenta" };
+			return { icon: "»", color: "magenta" };
 		}
 		if (titleLower.includes("notes") || titleLower.includes("note")) {
-			return { icon: "📝", color: "yellow" };
+			return { icon: "»", color: "yellow" };
 		}
 		if (titleLower.includes("implementation")) {
-			return { icon: "⚙️", color: "green" };
+			return { icon: "»", color: "green" };
 		}
 
 		// Default
-		return { icon: "💡", color: "white" };
+		return { icon: "»", color: "white" };
 	}
 
 	// Helper method to escape content that might interfere with blessed tags

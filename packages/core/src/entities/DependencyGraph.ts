@@ -70,7 +70,7 @@ export const dependencyGraphDataSchema = z.object({
     .array(
       z.object({
         id: z.string(),
-        status: z.enum(['pending', 'in-progress', 'done', 'cancelled', 'archived']),
+        status: z.enum(['pending', 'in-progress', 'blocked', 'done', 'cancelled', 'archived']),
       })
     )
     .optional(),
@@ -83,7 +83,7 @@ export type DependencyGraphData = z.infer<typeof dependencyGraphDataSchema>;
  */
 export const taskDataSchema = z.object({
   id: z.string(),
-  status: z.enum(['pending', 'in-progress', 'done', 'cancelled', 'archived']),
+  status: z.enum(['pending', 'in-progress', 'blocked', 'done', 'cancelled', 'archived']),
 });
 
 export type TaskData = z.infer<typeof taskDataSchema>;

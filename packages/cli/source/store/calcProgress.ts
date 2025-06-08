@@ -1,4 +1,5 @@
 import type { Task } from "@astrotask/core";
+import { StatusRenderer } from "../dashboard/utils/status-renderer.js";
 
 export interface ProgressCalculationResult {
 	taskId: string;
@@ -10,6 +11,9 @@ export interface ProgressCalculationResult {
 export interface ProgressCalculationOptions {
 	useEffectiveStatus?: boolean;
 }
+
+// Create a default status renderer for progress calculations
+const progressStatusRenderer = StatusRenderer.createAscii();
 
 /**
  * Get the status to use for calculations (actual or effective)
@@ -179,23 +183,15 @@ export function getTaskStatusIcon(
 ): string {
 	const status = getStatusForCalculation(task, useEffectiveStatus);
 
-	switch (status) {
-		case "done":
-			return "✅";
-		case "in-progress":
-			return "🔄";
-		case "cancelled":
-			return "❌";
-		case "archived":
-			return "📦";
-		case "pending":
-		default:
-			// For pending tasks with children, show progress-based icon
-			if (progress !== undefined && progress > 0) {
-				return progress >= 100 ? "✅" : progress >= 50 ? "🔄" : "⏳";
-			}
-			return "⏳";
+	// For pending tasks with children, show progress-based icon if available
+	if (status === "pending" && progress !== undefined && progress > 0) {
+		return progress >= 100 ? progressStatusRenderer.getGlyph("done") : 
+			   progress >= 50 ? progressStatusRenderer.getGlyph("in-progress") : 
+			   progressStatusRenderer.getGlyph("pending");
 	}
+
+	// Use the status renderer for all other cases
+	return progressStatusRenderer.getGlyph(status);
 }
 
 /**
