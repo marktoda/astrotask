@@ -25,7 +25,9 @@ export const tasks = pgTable(
     parentId: text('parent_id'),
     title: text('title').notNull(),
     description: text('description'),
-    status: text('status', { enum: ['pending', 'in-progress', 'blocked', 'done', 'cancelled', 'archived'] })
+    status: text('status', {
+      enum: ['pending', 'in-progress', 'blocked', 'done', 'cancelled', 'archived'],
+    })
       .notNull()
       .default('pending'),
     priority: text('priority', { enum: ['low', 'medium', 'high'] })

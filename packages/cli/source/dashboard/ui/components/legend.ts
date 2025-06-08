@@ -1,8 +1,8 @@
 import blessed from "blessed";
 import type { StoreApi } from "zustand";
 import type { DashboardStore } from "../../store/index.js";
-import type { FooterHintRenderer } from "./footer-hint-renderer.js";
 import { StatusRenderer } from "../../utils/status-renderer.js";
+import type { FooterHintRenderer } from "./footer-hint-renderer.js";
 
 export class Legend {
 	private box: blessed.Widgets.BoxElement;
@@ -19,7 +19,7 @@ export class Legend {
 		footerHintRenderer?: FooterHintRenderer,
 	) {
 		this.footerHintRenderer = footerHintRenderer;
-		
+
 		// Initialize enhanced rendering systems
 		this.statusRenderer = StatusRenderer.create();
 
@@ -69,16 +69,19 @@ export class Legend {
 
 		// Enhanced status legend using StatusRenderer
 		const statusLegend = this.buildStatusLegend();
-		
+
 		// Dependency relationship legend (when a task is selected)
 		const dependencyLegend = selectedTaskId ? this.buildDependencyLegend() : "";
 
 		// Updated keybindings reflecting new shortcuts
-		const updatedPanelBindings: Record<DashboardStore["activePanel"], string[]> = {
+		const updatedPanelBindings: Record<
+			DashboardStore["activePanel"],
+			string[]
+		> = {
 			sidebar: ["↑/k: Up", "↓/j: Down", "Enter: Select"],
 			tree: [
 				"↑/k: Up",
-				"↓/j: Down", 
+				"↓/j: Down",
 				"←/h: Collapse",
 				"→/l: Expand",
 				"Enter/Space: Toggle Pending⇄Active",
@@ -112,13 +115,13 @@ export class Legend {
 
 		// Second row: Dependency legend (if applicable) or footer hints
 		let row2 = "";
-		
+
 		if (dependencyLegend) {
 			row2 = `Dependencies: ${dependencyLegend}`;
 		} else {
 			// Check for footer hints
 			const footerHints = this.footerHintRenderer?.getHintContent();
-			
+
 			if (footerHints && footerHints.length > 0) {
 				// Show dynamic footer hints
 				row2 = footerHints;
@@ -148,7 +151,7 @@ export class Legend {
 		if (this.autoHideTimer) {
 			clearTimeout(this.autoHideTimer);
 		}
-		
+
 		this.unsubscribe();
 		this.box.destroy();
 	}
@@ -156,10 +159,10 @@ export class Legend {
 	private setupAutoHide() {
 		// Monitor screen events for activity
 		if (this.box.screen) {
-			this.box.screen.on('keypress', () => this.onActivity());
-			this.box.screen.on('mouse', () => this.onActivity());
+			this.box.screen.on("keypress", () => this.onActivity());
+			this.box.screen.on("mouse", () => this.onActivity());
 		}
-		
+
 		// Start the initial timer
 		this.resetAutoHideTimer();
 	}
@@ -169,7 +172,7 @@ export class Legend {
 		if (this.isHidden) {
 			this.show();
 		}
-		
+
 		// Reset the auto-hide timer
 		this.resetAutoHideTimer();
 	}
@@ -181,7 +184,7 @@ export class Legend {
 		if (this.autoHideTimer) {
 			clearTimeout(this.autoHideTimer);
 		}
-		
+
 		this.autoHideTimer = setTimeout(() => {
 			this.hide();
 		}, this.AUTO_HIDE_DELAY);
@@ -213,14 +216,15 @@ export class Legend {
 	 * Build enhanced status legend using StatusRenderer
 	 */
 	private buildStatusLegend(): string {
-		const statuses = ['pending', 'in-progress', 'blocked', 'done'] as const;
-		const items = statuses.map(status => {
+		const statuses = ["pending", "in-progress", "blocked", "done"] as const;
+		const items = statuses.map((status) => {
 			const glyph = this.statusRenderer.renderStatus(status);
-			const description = status.charAt(0).toUpperCase() + status.slice(1).replace('-', ' ');
+			const description =
+				status.charAt(0).toUpperCase() + status.slice(1).replace("-", " ");
 			return `${glyph} ${description}`;
 		});
 
-		return items.join(' │ ');
+		return items.join(" │ ");
 	}
 
 	/**
@@ -228,17 +232,17 @@ export class Legend {
 	 */
 	private buildDependencyLegend(): string {
 		const relationships = [
-			{ type: '⚠ Blocking (pending)', bg: 'red' },
-			{ type: '✓ Blocking (done)', bg: 'green' },
-			{ type: '← Dependent', bg: 'blue' },
-			{ type: '~ Related', bg: 'yellow' }
+			{ type: "⚠ Blocking (pending)", bg: "red" },
+			{ type: "✓ Blocking (done)", bg: "green" },
+			{ type: "← Dependent", bg: "blue" },
+			{ type: "~ Related", bg: "yellow" },
 		];
 
-		const items = relationships.map(rel => {
+		const items = relationships.map((rel) => {
 			// Use background color styling for the sample
 			return `{${rel.bg}-bg} ${rel.type} {/${rel.bg}-bg}`;
 		});
 
-		return items.join(' │ ');
+		return items.join(" │ ");
 	}
 }

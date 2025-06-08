@@ -210,7 +210,7 @@ export class HelpOverlay {
 
 		// Group sections by category for better organization
 		const categorizedSections = this.groupSectionsByCategory();
-		
+
 		for (const [category, sections] of categorizedSections) {
 			if (sections.length > 0) {
 				// Category header - simplified
@@ -221,7 +221,7 @@ export class HelpOverlay {
 
 				sections.forEach((section) => {
 					lines.push(section.title);
-					
+
 					// Add section description if available
 					if (section.description) {
 						lines.push(`  ${section.description}`);
@@ -236,7 +236,7 @@ export class HelpOverlay {
 						const description = binding.description;
 						const priorityIcon = this.getPriorityIcon(binding.priority);
 						const padding = 25 - keys.length;
-						
+
 						// Simplified formatting without blessed tags
 						lines.push(
 							`  ${priorityIcon} ${keys}${" ".repeat(Math.max(0, padding))}${description}`,
@@ -258,24 +258,24 @@ export class HelpOverlay {
 
 	private groupSectionsByCategory(): Map<string, Section[]> {
 		const grouped = new Map<string, Section[]>();
-		
+
 		// Define category order for consistent display
 		const categoryOrder = ["essential", "navigation", "operations", "advanced"];
-		
+
 		// Initialize all categories
-		categoryOrder.forEach(category => {
+		categoryOrder.forEach((category) => {
 			grouped.set(category, []);
 		});
-		
+
 		// Group sections by category
-		this.allSections.forEach(section => {
+		this.allSections.forEach((section) => {
 			const category = section.category;
 			if (!grouped.has(category)) {
 				grouped.set(category, []);
 			}
 			grouped.get(category)!.push(section);
 		});
-		
+
 		// Return only categories that have sections
 		const result = new Map<string, Section[]>();
 		for (const [category, sections] of grouped) {
@@ -283,24 +283,24 @@ export class HelpOverlay {
 				result.set(category, sections);
 			}
 		}
-		
+
 		return result;
 	}
 
 	private getCategoryTitle(category: string): string {
 		const categoryTitles: Record<string, string> = {
 			essential: "* ESSENTIAL - Start Here",
-			navigation: "* NAVIGATION - Moving Around", 
+			navigation: "* NAVIGATION - Moving Around",
 			operations: "* OPERATIONS - Getting Things Done",
-			advanced: "* ADVANCED - Power User Features"
+			advanced: "* ADVANCED - Power User Features",
 		};
-		
+
 		return categoryTitles[category] || category.toUpperCase();
 	}
 
 	private sortBindingsByPriority(bindings: KeyBinding[]): KeyBinding[] {
 		const priorityOrder = { essential: 0, common: 1, advanced: 2 };
-		
+
 		return [...bindings].sort((a, b) => {
 			const aPriority = priorityOrder[a.priority || "common"];
 			const bPriority = priorityOrder[b.priority || "common"];
@@ -308,13 +308,15 @@ export class HelpOverlay {
 		});
 	}
 
-	private getPriorityIcon(priority?: "essential" | "common" | "advanced"): string {
+	private getPriorityIcon(
+		priority?: "essential" | "common" | "advanced",
+	): string {
 		const icons = {
 			essential: "*",
 			common: "+",
-			advanced: ">"
+			advanced: ">",
 		};
-		
+
 		return icons[priority || "common"];
 	}
 
@@ -327,7 +329,7 @@ export class HelpOverlay {
 	hide() {
 		this.box.hide();
 		// Return focus to the main dashboard
-		if (this.parent && 'focus' in this.parent) {
+		if (this.parent && "focus" in this.parent) {
 			(this.parent as any).focus();
 		}
 		this.box.screen.render();

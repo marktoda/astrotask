@@ -18,10 +18,11 @@ import type { TaskStatus } from '../src/schemas/task.js';
 describe('Status Transitions', () => {
   describe('taskStatusTransitions', () => {
     it('should define valid transitions for each status', () => {
-      expect(taskStatusTransitions.pending).toEqual(['in-progress', 'cancelled']);
-      expect(taskStatusTransitions['in-progress']).toEqual(['done', 'pending', 'cancelled']);
+      expect(taskStatusTransitions.pending).toEqual(['in-progress', 'blocked', 'cancelled']);
+      expect(taskStatusTransitions['in-progress']).toEqual(['done', 'pending', 'blocked', 'cancelled']);
+      expect(taskStatusTransitions.blocked).toEqual(['pending', 'in-progress']);
       expect(taskStatusTransitions.done).toEqual(['in-progress']);
-      expect(taskStatusTransitions.cancelled).toEqual(['pending']);
+      expect(taskStatusTransitions.cancelled).toEqual(['pending', 'blocked']);
       expect(taskStatusTransitions.archived).toEqual([]);
     });
   });
@@ -72,7 +73,7 @@ describe('Status Transitions', () => {
     it('should return reason for invalid status transitions', () => {
       const reason = getTransitionRejectionReason('pending', 'done', false);
       expect(reason).toContain("Cannot transition from 'pending' to 'done'");
-      expect(reason).toContain('Allowed transitions: in-progress, cancelled');
+      expect(reason).toContain('Allowed transitions: in-progress, blocked, cancelled');
     });
 
     it('should return reason for blocked tasks', () => {

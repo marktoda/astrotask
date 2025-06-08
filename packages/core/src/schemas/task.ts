@@ -4,7 +4,7 @@ import { description, optionalTaskId, taskId, title } from './base.js';
 // Enhanced task status enum for Astrolabe TUI redesign
 // Supports both legacy statuses and new simplified taxonomy:
 // - pending (PEN): Created, waiting to be started
-// - in-progress (ACT): Actively worked on  
+// - in-progress (ACT): Actively worked on
 // - blocked (BLK): Waiting on prerequisite - NEW STATUS
 // - done (DONE): Work finished
 // - cancelled, archived: Legacy statuses maintained for compatibility

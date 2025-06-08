@@ -185,9 +185,11 @@ export function getTaskStatusIcon(
 
 	// For pending tasks with children, show progress-based icon if available
 	if (status === "pending" && progress !== undefined && progress > 0) {
-		return progress >= 100 ? progressStatusRenderer.getGlyph("done") : 
-			   progress >= 50 ? progressStatusRenderer.getGlyph("in-progress") : 
-			   progressStatusRenderer.getGlyph("pending");
+		return progress >= 100
+			? progressStatusRenderer.getGlyph("done")
+			: progress >= 50
+				? progressStatusRenderer.getGlyph("in-progress")
+				: progressStatusRenderer.getGlyph("pending");
 	}
 
 	// Use the status renderer for all other cases

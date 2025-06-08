@@ -203,9 +203,7 @@ export default function Tree({ options }: Props) {
 						<Text color="gray" bold>
 							Legend:
 						</Text>
-						<Text color="gray">
-							{statusRenderer.getLegendText()}
-						</Text>
+						<Text color="gray">{statusRenderer.getLegendText()}</Text>
 						<Text color="gray">
 							Status may be inherited from parent tasks (effective status)
 						</Text>

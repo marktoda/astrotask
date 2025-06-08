@@ -2,9 +2,15 @@ import type { Task, TaskTree, TrackingTaskTree } from "@astrotask/core";
 import blessed from "blessed";
 import type { StoreApi } from "zustand";
 import type { DashboardStore } from "../../store/index.js";
+import {
+	ColorIntegrationSystem,
+	type DependencyRelationship,
+} from "../../utils/color-integration.js";
 import { StatusRenderer } from "../../utils/status-renderer.js";
-import { TaskLineFormatter, type TaskLineInfo } from "../../utils/task-line-formatter.js";
-import { ColorIntegrationSystem, type DependencyRelationship } from "../../utils/color-integration.js";
+import {
+	TaskLineFormatter,
+	type TaskLineInfo,
+} from "../../utils/task-line-formatter.js";
 
 interface TaskTreeItem {
 	taskId: string;
@@ -33,10 +39,10 @@ export class TaskTreeComponent {
 	) {
 		// Initialize the enhanced status renderer
 		this.statusRenderer = StatusRenderer.create();
-		
+
 		// Initialize the task line formatter
 		this.taskLineFormatter = TaskLineFormatter.create({
-			statusRenderer: this.statusRenderer
+			statusRenderer: this.statusRenderer,
 		});
 
 		// Initialize the color integration system
@@ -144,7 +150,7 @@ export class TaskTreeComponent {
 			}
 		});
 
-		// Enter to expand/collapse or toggle status  
+		// Enter to expand/collapse or toggle status
 		this.list.key(["enter"], () => {
 			const selectedIndex = (this.list as any).selected;
 			const item = this.currentItems[selectedIndex];
@@ -197,7 +203,9 @@ export class TaskTreeComponent {
 					state().setStatusMessage(`Paused: ${item.task.title}`);
 				} else {
 					// For other statuses, show a message
-					state().setStatusMessage(`Cannot toggle - task is ${item.task.status}. Use Shift+D to mark done, or b to block/unblock.`);
+					state().setStatusMessage(
+						`Cannot toggle - task is ${item.task.status}. Use Shift+D to mark done, or b to block/unblock.`,
+					);
 				}
 			}
 		});
@@ -208,7 +216,11 @@ export class TaskTreeComponent {
 			const item = this.currentItems[selectedIndex];
 			if (item) {
 				// Only allow marking done from pending or in-progress
-				if (item.task.status === "pending" || item.task.status === "in-progress" || item.task.status === "blocked") {
+				if (
+					item.task.status === "pending" ||
+					item.task.status === "in-progress" ||
+					item.task.status === "blocked"
+				) {
 					state().updateTaskStatus(item.taskId, "done");
 					state().setStatusMessage(`Completed: ${item.task.title} ✓`);
 				} else if (item.task.status === "done") {
@@ -216,7 +228,9 @@ export class TaskTreeComponent {
 					state().updateTaskStatus(item.taskId, "in-progress");
 					state().setStatusMessage(`Reopened: ${item.task.title}`);
 				} else {
-					state().setStatusMessage(`Cannot mark done - task is ${item.task.status}`);
+					state().setStatusMessage(
+						`Cannot mark done - task is ${item.task.status}`,
+					);
 				}
 			}
 		});
@@ -229,13 +243,20 @@ export class TaskTreeComponent {
 				if (item.task.status === "blocked") {
 					// Unblock: restore to in-progress (could be enhanced later to remember previous state)
 					state().updateTaskStatus(item.taskId, "in-progress");
-					state().setStatusMessage(`Unblocked: ${item.task.title} - resumed as in-progress`);
-				} else if (item.task.status === "pending" || item.task.status === "in-progress") {
+					state().setStatusMessage(
+						`Unblocked: ${item.task.title} - resumed as in-progress`,
+					);
+				} else if (
+					item.task.status === "pending" ||
+					item.task.status === "in-progress"
+				) {
 					// Block the task
 					state().updateTaskStatus(item.taskId, "blocked");
 					state().setStatusMessage(`Blocked: ${item.task.title} ⛔`);
 				} else {
-					state().setStatusMessage(`Cannot block/unblock - task is ${item.task.status}`);
+					state().setStatusMessage(
+						`Cannot block/unblock - task is ${item.task.status}`,
+					);
 				}
 			}
 		});
@@ -503,13 +524,15 @@ export class TaskTreeComponent {
 
 			// Set items with enhanced color integration that preserves status glyph colors
 			const formattedItems = items.map((item) => {
-				const relationship = state.getTaskRelationshipToSelected(item.taskId) as DependencyRelationship;
-				
+				const relationship = state.getTaskRelationshipToSelected(
+					item.taskId,
+				) as DependencyRelationship;
+
 				// Use the color integration system to apply dependency highlighting
 				// while preserving the status glyph colors from TaskLineFormatter
 				const styledResult = this.colorIntegration.styleTaskLine(
 					item.label,
-					relationship
+					relationship,
 				);
 
 				return styledResult.styledLine;
@@ -752,7 +775,7 @@ export class TaskTreeComponent {
 
 		// Use the task line formatter to create the properly formatted line
 		const formattedLine = this.taskLineFormatter.formatTaskLine(taskLineInfo);
-		
+
 		// Pad the label to ensure it fills the entire line width
 		// This helps overwrite any residual text when collapsing
 		const maxWidth = (this.list.width as number) - 4; // Account for borders and padding

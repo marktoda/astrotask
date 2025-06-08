@@ -1,18 +1,18 @@
 import blessed from "blessed";
 import type { StoreApi } from "zustand";
-import type { KeymapService } from "../../services/keymap.js";
+import { ContextTracker } from "../../services/context-tracker.js";
 import type { EnhancedKeymapService } from "../../services/enhanced-keymap.js";
+import { HintScorer } from "../../services/hint-scorer.js";
+import type { KeymapService } from "../../services/keymap.js";
 import type { DashboardStore } from "../../store/index.js";
 import { CommandPalette } from "./command-palette.js";
 import { DetailPane } from "./detail-pane.js";
+import { FooterHintRenderer } from "./footer-hint-renderer.js";
 import { HelpOverlay } from "./help-overlay.js";
 import { Legend } from "./legend.js";
 import { ProjectSidebar } from "./project-sidebar.js";
 import { StatusBar } from "./status-bar.js";
 import { TaskTreeComponent } from "./task-tree.js";
-import { FooterHintRenderer } from "./footer-hint-renderer.js";
-import { ContextTracker } from "../../services/context-tracker.js";
-import { HintScorer } from "../../services/hint-scorer.js";
 
 export class DashboardLayout {
 	private projectSidebar: ProjectSidebar;
@@ -34,21 +34,23 @@ export class DashboardLayout {
 	) {
 		// Initialize footer hint system
 		this.contextTracker = new ContextTracker(store);
-		
+
 		// Check if we have the enhanced keymap service with registry access
-		if ('getRegistry' in keymapService) {
+		if ("getRegistry" in keymapService) {
 			const registry = (keymapService as EnhancedKeymapService).getRegistry();
 			this.hintScorer = new HintScorer(registry, this.contextTracker);
 		} else {
 			// TODO: Create a basic scorer that works with legacy KeymapService
 			// For now, we'll skip hint scoring if registry is not available
-			throw new Error("Footer hints require EnhancedKeymapService with registry access");
+			throw new Error(
+				"Footer hints require EnhancedKeymapService with registry access",
+			);
 		}
-		
+
 		this.footerHintRenderer = new FooterHintRenderer(
 			this.hintScorer,
 			this.contextTracker,
-			store
+			store,
 		);
 
 		// Create layout containers

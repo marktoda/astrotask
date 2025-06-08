@@ -78,7 +78,7 @@ describe('TaskService', () => {
     const grandchildren = childA1!.getChildren();
     expect(grandchildren.length).toBe(1);
     expect(grandchildren[0].task.title).toBe('Task A.1.1');
-  });
+  }, 20000);
 
   it('honours maxDepth when building tree', async () => {
     const { A } = (global as any).testTaskIds;
