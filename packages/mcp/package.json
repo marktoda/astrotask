@@ -6,6 +6,7 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
+    "@astrotask/mcp": "dist/index.js",
     "astrotask-mcp": "dist/index.js",
     "astrotask-mcp-stdio": "dist/stdio.js",
     "astrotask-mcp-http": "dist/http.js"
