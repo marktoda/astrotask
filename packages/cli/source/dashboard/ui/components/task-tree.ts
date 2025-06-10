@@ -289,9 +289,6 @@ export class TaskTreeComponent {
 			if (item) {
 				// Show immediate status feedback
 				state().setStatusMessage(`Deleting task: ${item.task.title}...`);
-				
-				// Debug logging
-				console.log(`Delete key pressed for task: ${item.task.title}`);
 
 				this.confirmDelete(item.task, (cascade) => {
 					try {
@@ -381,8 +378,6 @@ export class TaskTreeComponent {
 	}
 
 	private confirmDelete(task: Task, callback: (cascade: boolean) => void) {
-		console.log(`confirmDelete called for task: ${task.title}`);
-		
 		// Temporarily disable renders to prevent jittering
 		const originalRender = this.render.bind(this);
 		let renderingDisabled = true;
@@ -398,8 +393,6 @@ export class TaskTreeComponent {
 		const state = this.store.getState();
 		const taskNode = state.trackingTree?.find((t) => t.id === task.id);
 		const childCount = taskNode ? taskNode.getAllDescendants().length : 0;
-		
-		console.log(`Task ${task.title} has ${childCount} children`);
 
 		// Create the dialog text based on whether task has children
 		let promptText: string;
@@ -442,19 +435,15 @@ export class TaskTreeComponent {
 
 		prompt.input(promptText, "", (err, value) => {
 			cleanup();
-			console.log(`Prompt response: ${value}, error: ${err}`);
-			
 			if (err || !value) return;
 
 			const response = value.toLowerCase().trim();
 			
 			if (response === "y" || response === "yes") {
 				// Delete with cascade (if has children) or simple delete (if no children)
-				console.log(`Calling callback with cascade: ${childCount > 0}`);
 				callback(childCount > 0);
 			} else if (response === "t" && childCount > 0) {
 				// Delete task only (no cascade)
-				console.log("Calling callback with cascade: false");
 				callback(false);
 			}
 			// Any other response cancels the operation

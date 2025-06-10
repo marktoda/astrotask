@@ -570,8 +570,6 @@ export function createDashboardStore(
 		},
 
 		deleteTask: (taskId, cascade = false) => {
-			console.log(`deleteTask called with taskId: ${taskId}, cascade: ${cascade}`);
-			
 			const { trackingTree } = get();
 
 			if (!trackingTree) {
@@ -599,12 +597,10 @@ export function createDashboardStore(
 			if (cascade) {
 				// Get all descendants before deletion
 				const descendants = taskNode.getAllDescendants();
-				console.log(`Found ${descendants.length} descendants to delete`);
 				deletedCount += descendants.length;
 
 				// Remove each descendant individually (mutations recorded automatically)
 				for (const descendant of descendants) {
-					console.log(`Deleting descendant: ${descendant.id} (${descendant.title})`);
 					const descendantParent = descendant.getParent();
 					if (descendantParent) {
 						descendantParent.removeChild(descendant.id);
