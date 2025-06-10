@@ -1,14 +1,9 @@
 {
   "mcpServers": {
     "astrotask": {
-      "command": "npx",
-      "args": [
-        "@astrotask/mcp"
-      ],
-      "env": {
-        "DATABASE_URI": "/home/toda/dev/astrotask/data/astrotask.db"
-      }
+      "command": "./.cursor/run-astrotask.sh",
+      "args": [],
+      "env": {}
     }
   }
 }
-

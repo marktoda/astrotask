@@ -33,7 +33,8 @@ export class SqliteAdapter implements DatabaseBackend<BetterSQLite3Database<type
 
   async init(): Promise<void> {
     this.sqlite = new Database(this.config.dataDir, {
-      verbose: this.config.debug ? console.log : undefined,
+      verbose: this.config.debug ? (message?: unknown, ...additionalArgs: unknown[]) => 
+        logger.debug('SQLite SQL:', { message, additionalArgs }) : undefined,
     });
 
     // Enable WAL mode for better concurrency (multiple readers + 1 writer)

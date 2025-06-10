@@ -32,6 +32,7 @@
         shellHook = ''
           # Setup npm global directory in project
           export NPM_CONFIG_PREFIX="$PWD/.npm-global"
+          rm -rf .npm-global
           export PATH="$NPM_CONFIG_PREFIX/bin:$PATH"
           mkdir -p "$NPM_CONFIG_PREFIX"
 

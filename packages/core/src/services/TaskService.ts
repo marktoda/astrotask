@@ -15,6 +15,7 @@ import {
   type StatusTransitionResult,
   validateStatusTransition,
 } from '../utils/statusTransitions.js';
+import { createModuleLogger } from '../utils/logger.js';
 import { DependencyService } from './DependencyService.js';
 
 /**
@@ -52,6 +53,8 @@ export interface TaskListFilters {
   parentId?: string | null;
   includeProjectRoot?: boolean;
 }
+
+const logger = createModuleLogger('TaskService');
 
 export class TaskService implements ITaskReconciliationService {
   private cache: TaskTreeCache;
@@ -461,7 +464,7 @@ export class TaskService implements ITaskReconciliationService {
       return { tree: updatedTree, idMappings };
     } catch (error) {
       // Rollback all changes on failure
-      console.error('Executing rollback due to reconciliation failure', {
+      logger.error('Executing rollback due to reconciliation failure', {
         error: error instanceof Error ? error.message : String(error),
         operationsCount: plan.operations.length,
       });
@@ -470,7 +473,7 @@ export class TaskService implements ITaskReconciliationService {
         try {
           await rollback();
         } catch (rollbackError) {
-          console.error('Rollback operation failed', {
+          logger.error('Rollback operation failed', {
             error: rollbackError instanceof Error ? rollbackError.message : String(rollbackError),
           });
         }
@@ -596,7 +599,7 @@ export class TaskService implements ITaskReconciliationService {
     rollbackActions.push(async () => {
       // Rollback would require recreating the entire subtree
       // This is complex and may not be worth implementing fully
-      console.warn(`Rollback of child_remove for ${operation.childId} not fully implemented`);
+      logger.warn(`Rollback of child_remove for ${operation.childId} not fully implemented`);
     });
   }
 
