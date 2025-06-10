@@ -224,7 +224,7 @@ describe('Cooperative Database Locking', () => {
         title: 'Test Task with Locking',
         description: 'Test task',
         status: 'pending',
-        priority: 'medium'
+        priorityScore: 50
       });
 
       expect(task.title).toBe('Test Task with Locking');
@@ -297,7 +297,7 @@ describe('Cooperative Database Locking', () => {
         title: 'CLI Task',
         description: 'From CLI',
         status: 'pending',
-        priority: 'medium'
+        priorityScore: 50
       });
 
       expect(cliTask.title).toBe('CLI Task');
@@ -316,7 +316,7 @@ describe('Cooperative Database Locking', () => {
         title: 'MCP Task',
         description: 'From MCP Server',
         status: 'pending',
-        priority: 'medium'
+        priorityScore: 50
       });
 
       expect(mcpTask.title).toBe('MCP Task');
@@ -357,7 +357,7 @@ describe('Cooperative Database Locking', () => {
         title: 'Recovery Task',
         description: 'Created after lock recovery',
         status: 'pending',
-        priority: 'medium'
+        priorityScore: 50
       });
 
       expect(task.title).toBe('Recovery Task');
@@ -384,7 +384,7 @@ describe('Cooperative Database Locking', () => {
           title: taskTitle,
           description: `Task from sequential test ${i}`,
           status: 'pending',
-          priority: 'medium'
+          priorityScore: 50
         });
 
         expect(task.title).toBe(taskTitle);

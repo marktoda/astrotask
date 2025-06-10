@@ -3,6 +3,7 @@ import { Box, Text } from "ink";
 import { useEffect, useState } from "react";
 import zod from "zod";
 import { useDatabase, useTaskService } from "../../context/DatabaseContext.js";
+import { formatPriority } from "../../utils/priority.js";
 
 export const description = "View dependencies and dependents for a task";
 
@@ -131,7 +132,10 @@ export default function Dependencies({ options }: Props) {
 								{getStatusIcon(dep.status)} <Text color="cyan">{dep.id}</Text> -{" "}
 								{dep.title}
 								<Text color={getStatusColor(dep.status)}> [{dep.status}]</Text>
-								<Text color="magenta"> [{dep.priority}]</Text>
+								<Text color="magenta">
+									{" "}
+									[{formatPriority(dep.priorityScore)}]
+								</Text>
 							</Text>
 						</Box>
 					))}
@@ -177,7 +181,10 @@ export default function Dependencies({ options }: Props) {
 									{" "}
 									[{dependent.status}]
 								</Text>
-								<Text color="magenta"> [{dependent.priority}]</Text>
+								<Text color="magenta">
+									{" "}
+									[{formatPriority(dependent.priorityScore)}]
+								</Text>
 							</Text>
 						</Box>
 					))}

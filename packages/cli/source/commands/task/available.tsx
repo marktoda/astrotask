@@ -1,16 +1,19 @@
 import type { Task } from "@astrotask/core";
-import { taskPriority, taskStatus } from "@astrotask/core";
+import { priorityScore, taskStatus } from "@astrotask/core";
 import { Box, Text } from "ink";
 import { useEffect, useState } from "react";
 import zod from "zod";
 import { useTaskService } from "../../context/DatabaseContext.js";
 
-export const description =
-	"List tasks that can be started immediately (no incomplete dependencies)";
+export const description = "List all available tasks that can be started";
 
 export const options = zod.object({
 	status: taskStatus.optional().describe("Filter by task status"),
-	priority: taskPriority.optional().describe("Filter by task priority"),
+	priorityScore: priorityScore
+		.optional()
+		.describe(
+			"Filter by minimum priority score (0-100). Tasks with scores >= this value will be included",
+		),
 });
 
 type Props = {
@@ -26,9 +29,9 @@ export default function Available({ options }: Props) {
 	useEffect(() => {
 		async function loadAvailableTasks() {
 			try {
-				const filter: { status?: any; priority?: string } = {};
+				const filter: { status?: any; priorityScore?: number } = {};
 				if (options.status) filter.status = options.status;
-				if (options.priority) filter.priority = options.priority;
+				if (options.priorityScore) filter.priorityScore = options.priorityScore;
 
 				const availableTasks = await taskService.getAvailableTasks(filter);
 				setTasks(availableTasks);
@@ -61,8 +64,8 @@ export default function Available({ options }: Props) {
 
 	if (tasks.length === 0) {
 		const filterText =
-			options.status || options.priority
-				? ` matching your filters (status: ${options.status || "any"}, priority: ${options.priority || "any"})`
+			options.status || options.priorityScore
+				? ` matching your filters (status: ${options.status || "any"}, priorityScore: ${options.priorityScore || "any"})`
 				: "";
 
 		return (
@@ -76,11 +79,45 @@ export default function Available({ options }: Props) {
 		);
 	}
 
-	// Group by priority for better organization
+	// Group by priority level for better organization
 	const tasksByPriority = {
-		high: tasks.filter((t) => t.priority === "high"),
-		medium: tasks.filter((t) => t.priority === "medium"),
-		low: tasks.filter((t) => t.priority === "low"),
+		high: tasks.filter((t) => t.priorityScore > 70),
+		medium: tasks.filter((t) => t.priorityScore >= 20 && t.priorityScore <= 70),
+		low: tasks.filter((t) => t.priorityScore < 20),
+	};
+
+	const renderTaskGroup = (tasks: Task[], level: "high" | "medium" | "low") => {
+		if (tasks.length === 0) return null;
+
+		const colors = {
+			high: "red",
+			medium: "yellow",
+			low: "blue",
+		} as const;
+
+		return (
+			<Box flexDirection="column" marginTop={1}>
+				<Text bold color={colors[level]}>
+					{level.charAt(0).toUpperCase() + level.slice(1)} Priority (
+					{tasks.length})
+				</Text>
+				{tasks.map((task) => (
+					<Box key={task.id} marginLeft={2} marginBottom={1}>
+						<Text>
+							<Text color="cyan">{task.id}</Text> -{" "}
+							<Text bold>{task.title}</Text>
+							<Text color={getStatusColor(task.status)}> [{task.status}]</Text>
+							<Text color="magenta"> [{task.priorityScore}]</Text>
+						</Text>
+						{task.description && (
+							<Box marginLeft={2}>
+								<Text color="gray">{task.description}</Text>
+							</Box>
+						)}
+					</Box>
+				))}
+			</Box>
+		);
 	};
 
 	return (
@@ -90,92 +127,9 @@ export default function Available({ options }: Props) {
 				These tasks can be started immediately - no incomplete dependencies
 			</Text>
 
-			{tasksByPriority.high.length > 0 && (
-				<Box flexDirection="column" marginTop={1}>
-					<Text bold color="red">
-						High Priority ({tasksByPriority.high.length})
-					</Text>
-					{tasksByPriority.high.map((task) => (
-						<Box key={task.id} marginLeft={2} marginBottom={1}>
-							<Text>
-								<Text color="cyan">{task.id}</Text> -{" "}
-								<Text bold>{task.title}</Text>
-								<Text color={getStatusColor(task.status)}>
-									{" "}
-									[{task.status}]
-								</Text>
-								<Text color="magenta">
-									{" "}
-									[{task.priority}{task.priorityScore ? ` (${task.priorityScore})` : ''}]
-								</Text>
-							</Text>
-							{task.description && (
-								<Box marginLeft={2}>
-									<Text color="gray">{task.description}</Text>
-								</Box>
-							)}
-						</Box>
-					))}
-				</Box>
-			)}
-
-			{tasksByPriority.medium.length > 0 && (
-				<Box flexDirection="column" marginTop={1}>
-					<Text bold color="yellow">
-						Medium Priority ({tasksByPriority.medium.length})
-					</Text>
-					{tasksByPriority.medium.map((task) => (
-						<Box key={task.id} marginLeft={2} marginBottom={1}>
-							<Text>
-								<Text color="cyan">{task.id}</Text> -{" "}
-								<Text bold>{task.title}</Text>
-								<Text color={getStatusColor(task.status)}>
-									{" "}
-									[{task.status}]
-								</Text>
-								<Text color="magenta">
-									{" "}
-									[{task.priority}{task.priorityScore ? ` (${task.priorityScore})` : ''}]
-								</Text>
-							</Text>
-							{task.description && (
-								<Box marginLeft={2}>
-									<Text color="gray">{task.description}</Text>
-								</Box>
-							)}
-						</Box>
-					))}
-				</Box>
-			)}
-
-			{tasksByPriority.low.length > 0 && (
-				<Box flexDirection="column" marginTop={1}>
-					<Text bold color="blue">
-						Low Priority ({tasksByPriority.low.length})
-					</Text>
-					{tasksByPriority.low.map((task) => (
-						<Box key={task.id} marginLeft={2} marginBottom={1}>
-							<Text>
-								<Text color="cyan">{task.id}</Text> -{" "}
-								<Text bold>{task.title}</Text>
-								<Text color={getStatusColor(task.status)}>
-									{" "}
-									[{task.status}]
-								</Text>
-								<Text color="magenta">
-									{" "}
-									[{task.priority}{task.priorityScore ? ` (${task.priorityScore})` : ''}]
-								</Text>
-							</Text>
-							{task.description && (
-								<Box marginLeft={2}>
-									<Text color="gray">{task.description}</Text>
-								</Box>
-							)}
-						</Box>
-					))}
-				</Box>
-			)}
+			{renderTaskGroup(tasksByPriority.high, "high")}
+			{renderTaskGroup(tasksByPriority.medium, "medium")}
+			{renderTaskGroup(tasksByPriority.low, "low")}
 
 			<Box marginTop={1}>
 				<Text color="green">

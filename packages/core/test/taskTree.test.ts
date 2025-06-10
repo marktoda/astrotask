@@ -9,7 +9,7 @@ describe('TaskTree', () => {
     title: 'Root Task',
     description: 'Root task description',
     status: 'pending',
-    priority: 'medium',
+    priorityScore: 50,
     prd: null,
     contextDigest: null,
     createdAt: new Date('2024-01-01'),
@@ -22,7 +22,7 @@ describe('TaskTree', () => {
     title: 'Child Task 1',
     description: 'Child task description',
     status: 'pending',
-    priority: 'high',
+    priorityScore: 80,
     prd: null,
     contextDigest: null,
     createdAt: new Date('2024-01-01'),
@@ -35,7 +35,7 @@ describe('TaskTree', () => {
     title: 'Grandchild Task 1',
     description: 'Grandchild task description',
     status: 'done',
-    priority: 'low',
+    priorityScore: 10,
     prd: null,
     contextDigest: null,
     createdAt: new Date('2024-01-01'),
@@ -242,8 +242,8 @@ describe('TaskTree', () => {
       const markdown = tree.toMarkdown();
       
       expect(markdown).toContain('- [ ] Root Task');
-      expect(markdown).toContain('- [ ] Child Task 1 (high)');
-      expect(markdown).toContain('- [x] Grandchild Task 1 (low)');
+      expect(markdown).toContain('- [ ] Child Task 1 (high 80)');
+      expect(markdown).toContain('- [x] Grandchild Task 1 (low 10)');
     });
   });
 

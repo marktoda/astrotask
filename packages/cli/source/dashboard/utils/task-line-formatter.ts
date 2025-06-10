@@ -137,7 +137,7 @@ export class TaskLineFormatter {
 	): string {
 		// Apply indentation based on depth
 		const indent = "  ".repeat(depth);
-		
+
 		// Create the fold indicator with larger, more visible arrows
 		let foldIndicator = " ";
 		if (hasChildren) {

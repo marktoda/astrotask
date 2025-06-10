@@ -491,7 +491,7 @@ export class TaskExpansionService {
     sections.push('');
     sections.push(`**Task Title:** ${task.title}`);
     sections.push(`**Description:** ${task.description || 'No description provided'}`);
-    sections.push(`**Priority:** ${task.priority}`);
+    sections.push(`**Priority Score:** ${task.priorityScore}`);
     sections.push(`**Status:** ${task.status}`);
 
     if (task.prd) {

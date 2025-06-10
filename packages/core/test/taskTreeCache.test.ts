@@ -10,7 +10,7 @@ function createMockTask(id: string, title: string): Task {
     title,
     description: null,
     status: 'pending',
-    priority: 'medium',
+    priorityScore: 50,
     prd: null,
     contextDigest: null,
     createdAt: new Date(),
@@ -196,9 +196,9 @@ describe('TaskTreeCache', () => {
     });
 
     it('generates query keys correctly', () => {
-      const key = TaskTreeCache.generateQueryKey('findTasks', { status: 'done', priority: 'high' });
+      const key = TaskTreeCache.generateQueryKey('findTasks', { status: 'done', priorityScore: 80 });
       expect(key).toMatch(/^query:findTasks:/);
-      expect(key).toContain('priority:"high"');
+      expect(key).toContain('priorityScore:80');
       expect(key).toContain('status:"done"');
     });
 

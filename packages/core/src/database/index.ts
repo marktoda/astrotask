@@ -59,7 +59,13 @@ export async function createDatabase(options: DatabaseOptions = {}): Promise<Sto
     });
 
     // Create the store
-    const baseStore = new DatabaseStore(backend.client, backend.drizzle, backend.type, false, false);
+    const baseStore = new DatabaseStore(
+      backend.client,
+      backend.drizzle,
+      backend.type,
+      false,
+      false
+    );
 
     // Determine if we should use locking
     // Server-based databases should NEVER use file-based locking as they handle concurrency natively

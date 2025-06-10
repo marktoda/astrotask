@@ -11,10 +11,9 @@
 import { z } from 'zod';
 import {
   taskStatus,
-  taskPriority,
   priorityScore,
   type TaskStatus,
-  type TaskPriority,
+  type PriorityScore,
   Astrotask
 } from '@astrotask/core';
 
@@ -51,9 +50,9 @@ export const getNextTaskSchema = z.object({
   status: taskStatus
     .optional()
     .describe("Filter by task status. Options: 'pending' (not started), 'in-progress' (currently active), 'done' (completed), 'cancelled' (abandoned), 'archived' (stored). Most commonly used with 'pending' to find unstarted work."),
-  priority: taskPriority
+  priorityScore: priorityScore
     .optional()
-    .describe("Filter by task priority level. Options: 'low', 'medium', 'high'. Higher priority tasks are automatically preferred when multiple options exist.")
+    .describe("Filter by minimum priority score (0-100). Tasks with scores >= this value will be included. Higher scores indicate higher priority.")
 }).describe("Get the next available task that is ready to work on, automatically excluding tasks with unresolved dependencies");
 
 /**
@@ -75,13 +74,9 @@ export const addTaskSchema = z.object({
     .string()
     .optional()
     .describe("ID of an existing parent task to create this as a subtask. Use this to organize tasks hierarchically under projects or features."),
-  priority: taskPriority
-    .optional()
-    .default('medium')
-    .describe("Task priority level affecting execution order. Options: 'low', 'medium' (default), 'high'. Higher priority tasks are worked on first."),
   priorityScore: priorityScore
     .optional()
-    .describe("Fine-grained priority score (0-100). Higher numbers indicate higher priority. If not provided, defaults to score based on priority field (high=75, medium=50, low=25)."),
+    .describe("Priority score (0-100). Higher numbers indicate higher priority. Defaults to 50 if not provided. Maps to levels: <20=low, 20-70=medium, >70=high."),
   status: taskStatus
     .optional()
     .default('pending')

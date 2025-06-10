@@ -32,21 +32,21 @@ describe('DependencyService', () => {
       title: 'Task 1',
       description: 'First task',
       status: 'pending',
-      priority: 'medium',
+      priorityScore: 50,
     });
 
     task2 = await store.addTask({
       title: 'Task 2', 
       description: 'Second task',
       status: 'pending',
-      priority: 'medium',
+      priorityScore: 50,
     });
 
     task3 = await store.addTask({
       title: 'Task 3',
       description: 'Third task', 
       status: 'done',
-      priority: 'medium',
+      priorityScore: 50,
     });
   });
 

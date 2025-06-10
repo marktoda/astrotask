@@ -1,7 +1,7 @@
+import type { Task } from "@astrotask/core";
 import {
 	DependencyService,
 	type GenerationError,
-	type Task,
 	TaskService,
 	createLLMService,
 	createModuleLogger,
@@ -11,6 +11,7 @@ import { Box, Text } from "ink";
 import { useEffect, useState } from "react";
 import zod from "zod";
 import { useDatabase } from "../../context/DatabaseContext.js";
+import { formatPriority } from "../../utils/priority.js";
 
 export const description = "Generate tasks from PRD content using AI";
 
@@ -376,7 +377,9 @@ export default function Generate({ options }: Props) {
 								<Text color="cyan">{task.id || `[${index + 1}]`}</Text>
 								{" - "}
 								<Text bold>{task.title}</Text>{" "}
-								<Text color="magenta">[{task.priority}]</Text>
+								<Text color="magenta">
+									[{formatPriority(task.priorityScore)}]
+								</Text>
 							</Text>
 							{task.description && (
 								<Text color="gray"> {task.description}</Text>

@@ -33,8 +33,10 @@ export class SqliteAdapter implements DatabaseBackend<BetterSQLite3Database<type
 
   async init(): Promise<void> {
     this.sqlite = new Database(this.config.dataDir, {
-      verbose: this.config.debug ? (message?: unknown, ...additionalArgs: unknown[]) => 
-        logger.debug('SQLite SQL:', { message, additionalArgs }) : undefined,
+      verbose: this.config.debug
+        ? (message?: unknown, ...additionalArgs: unknown[]) =>
+            logger.debug('SQLite SQL:', { message, additionalArgs })
+        : undefined,
     });
 
     // Enable WAL mode for better concurrency (multiple readers + 1 writer)
@@ -123,14 +125,12 @@ export class SqliteAdapter implements DatabaseBackend<BetterSQLite3Database<type
           "title" text NOT NULL,
           "description" text,
           "status" text DEFAULT 'pending' NOT NULL,
-          "priority" text DEFAULT 'medium' NOT NULL,
           "priority_score" real DEFAULT 50.0 NOT NULL,
           "prd" text,
           "context_digest" text,
           "created_at" integer NOT NULL,
           "updated_at" integer NOT NULL,
           CONSTRAINT "status_check" CHECK ("tasks"."status" IN ('pending', 'in-progress', 'blocked', 'done', 'cancelled', 'archived')),
-          CONSTRAINT "priority_check" CHECK ("tasks"."priority" IN ('low', 'medium', 'high')),
           CONSTRAINT "priority_score_check" CHECK ("tasks"."priority_score" >= 0 AND "tasks"."priority_score" <= 100)
         )`,
       },

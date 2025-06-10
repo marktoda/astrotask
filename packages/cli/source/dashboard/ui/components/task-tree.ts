@@ -444,7 +444,7 @@ export class TaskTreeComponent {
 			if (err || !value) return;
 
 			const response = value.toLowerCase().trim();
-			
+
 			if (response === "y" || response === "yes") {
 				// Delete with cascade (if has children) or simple delete (if no children)
 				callback(childCount > 0);
@@ -630,22 +630,26 @@ export class TaskTreeComponent {
 		const items: TaskTreeItem[] = [];
 
 		// Helper function to sort children by status and priority score - done tasks go to bottom, higher priority scores go first within each group
-		const sortChildrenByStatus = (children: readonly (TaskTree | TrackingTaskTree)[]) => {
+		const sortChildrenByStatus = (
+			children: readonly (TaskTree | TrackingTaskTree)[],
+		) => {
 			return [...children].sort((a, b) => {
-				const aIsDone = a.task.status === "done" || a.task.status === "archived";
-				const bIsDone = b.task.status === "done" || b.task.status === "archived";
-				
+				const aIsDone =
+					a.task.status === "done" || a.task.status === "archived";
+				const bIsDone =
+					b.task.status === "done" || b.task.status === "archived";
+
 				// If one is done and the other isn't, put done task last
 				if (aIsDone && !bIsDone) return 1;
 				if (!aIsDone && bIsDone) return -1;
-				
+
 				// If both have same "doneness", sort by priority score (higher scores first)
 				const aScore = a.task.priorityScore ?? 50;
 				const bScore = b.task.priorityScore ?? 50;
 				if (aScore !== bScore) {
 					return bScore - aScore; // Higher scores first
 				}
-				
+
 				// If same priority score, sort by creation date (older tasks first)
 				return a.task.createdAt.getTime() - b.task.createdAt.getTime();
 			});
@@ -735,23 +739,25 @@ export class TaskTreeComponent {
 			return [...dependentIds].sort((aId, bId) => {
 				const aTask = trackingTree.find((task) => task.id === aId);
 				const bTask = trackingTree.find((task) => task.id === bId);
-				
+
 				if (!aTask || !bTask) return 0;
-				
-				const aIsDone = aTask.task.status === "done" || aTask.task.status === "archived";
-				const bIsDone = bTask.task.status === "done" || bTask.task.status === "archived";
-				
+
+				const aIsDone =
+					aTask.task.status === "done" || aTask.task.status === "archived";
+				const bIsDone =
+					bTask.task.status === "done" || bTask.task.status === "archived";
+
 				// If one is done and the other isn't, put done task last
 				if (aIsDone && !bIsDone) return 1;
 				if (!aIsDone && bIsDone) return -1;
-				
+
 				// If both have same "doneness", sort by priority score (higher scores first)
 				const aScore = aTask.task.priorityScore ?? 50;
 				const bScore = bTask.task.priorityScore ?? 50;
 				if (aScore !== bScore) {
 					return bScore - aScore; // Higher scores first
 				}
-				
+
 				// If same priority score, sort by creation date (older tasks first)
 				return aTask.task.createdAt.getTime() - bTask.task.createdAt.getTime();
 			});
@@ -829,23 +835,25 @@ export class TaskTreeComponent {
 		const sortedRootTasks = rootTasks.sort((aId, bId) => {
 			const aTask = trackingTree.find((task) => task.id === aId);
 			const bTask = trackingTree.find((task) => task.id === bId);
-			
+
 			if (!aTask || !bTask) return 0;
-			
-			const aIsDone = aTask.task.status === "done" || aTask.task.status === "archived";
-			const bIsDone = bTask.task.status === "done" || bTask.task.status === "archived";
-			
+
+			const aIsDone =
+				aTask.task.status === "done" || aTask.task.status === "archived";
+			const bIsDone =
+				bTask.task.status === "done" || bTask.task.status === "archived";
+
 			// If one is done and the other isn't, put done task last
 			if (aIsDone && !bIsDone) return 1;
 			if (!aIsDone && bIsDone) return -1;
-			
+
 			// If both have same "doneness", sort by priority score (higher scores first)
 			const aScore = aTask.task.priorityScore ?? 50;
 			const bScore = bTask.task.priorityScore ?? 50;
 			if (aScore !== bScore) {
 				return bScore - aScore; // Higher scores first
 			}
-			
+
 			// If same priority score, sort by creation date (older tasks first)
 			return aTask.task.createdAt.getTime() - bTask.task.createdAt.getTime();
 		});
@@ -871,7 +879,7 @@ export class TaskTreeComponent {
 			depth,
 			hasChildren,
 			isExpanded,
-			priorityIndicator: this.getPriorityIcon(task.priority),
+			priorityIndicator: this.getPriorityIcon(task.priorityScore),
 			dependencyIndicator: this.getDependencyIndicator(task.id),
 		};
 
@@ -889,17 +897,15 @@ export class TaskTreeComponent {
 		return label;
 	}
 
-	private getPriorityIcon(priority: Task["priority"]): string {
+	private getPriorityIcon(priorityScore: number): string {
 		// Priority icons for visual distinction in tree view
 		// Priority scores are displayed elsewhere in the UI
-		switch (priority) {
-			case "high":
-				return " !"; // Keep consistent with detail-pane
-			case "low":
-				return " ~"; // Change to match detail-pane
-			case "medium":
-			default:
-				return "";
+		if (priorityScore > 70) {
+			return " !"; // High priority
+		} else if (priorityScore < 20) {
+			return " ~"; // Low priority
+		} else {
+			return ""; // Medium priority
 		}
 	}
 

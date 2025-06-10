@@ -55,7 +55,7 @@ export class MinimalHandlers implements MCPHandler {
       // Use the Astrotask SDK's task service
       const availableTasks = await this.context.astrotask.tasks.getAvailableTasks({
         status: args.status,
-        priority: args.priority,
+        priorityScore: args.priorityScore,
       });
 
       let filteredTasks = availableTasks;
@@ -252,8 +252,7 @@ export class MinimalHandlers implements MCPHandler {
             title: taskInput.title,
             description: taskInput.description,
             status: taskInput.status || 'pending',
-            priority: taskInput.priority || 'medium',
-            priorityScore: taskInput.priorityScore,
+            priorityScore: taskInput.priorityScore || 50,
             parentId: parentTaskId,
           });
         } else {
@@ -262,8 +261,7 @@ export class MinimalHandlers implements MCPHandler {
             title: taskInput.title,
             description: taskInput.description,
             status: taskInput.status || 'pending',
-            priority: taskInput.priority || 'medium',
-            priorityScore: taskInput.priorityScore,
+            priorityScore: taskInput.priorityScore || 50,
           });
         }
 

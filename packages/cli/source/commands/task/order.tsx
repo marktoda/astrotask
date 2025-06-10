@@ -3,6 +3,7 @@ import { Box, Text } from "ink";
 import { useEffect, useState } from "react";
 import zod from "zod";
 import { useDatabase, useTaskService } from "../../context/DatabaseContext.js";
+import { formatPriority, getPriorityColor } from "../../utils/priority.js";
 
 export const description =
 	"Show the optimal execution order for tasks based on dependencies";
@@ -113,19 +114,6 @@ export default function Order({ options }: Props) {
 		}
 	};
 
-	const getPriorityColor = (priority: string) => {
-		switch (priority) {
-			case "high":
-				return "red";
-			case "medium":
-				return "yellow";
-			case "low":
-				return "blue";
-			default:
-				return "white";
-		}
-	};
-
 	return (
 		<Box flexDirection="column">
 			<Text bold>Optimal Task Execution Order</Text>
@@ -167,9 +155,9 @@ export default function Order({ options }: Props) {
 									{" "}
 									[{task.status}]
 								</Text>
-								<Text color={getPriorityColor(task.priority)}>
+								<Text color={getPriorityColor(task.priorityScore)}>
 									{" "}
-									[{task.priority}]
+									[{formatPriority(task.priorityScore)}]
 								</Text>
 							</Text>
 							{task.description && (

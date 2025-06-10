@@ -51,7 +51,7 @@ describe('Dependency Injection System', () => {
     const task = await astrotask.store.addTask({
       title: 'Test Task',
       status: 'pending',
-      priority: 'medium',
+      priorityScore: 50,
     });
 
     try {
@@ -92,7 +92,7 @@ describe('Dependency Injection System', () => {
     const task = await astrotask.store.addTask({
       title: 'Test Task',
       status: 'pending',
-      priority: 'medium',
+      priorityScore: 50,
     });
 
     expect(task.id).toBeDefined();

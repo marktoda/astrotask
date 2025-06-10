@@ -10,7 +10,7 @@ describe('Hierarchical Status', () => {
     title: `Task ${id}`,
     description: null,
     status,
-    priority: 'medium',
+    priorityScore: 50,
     prd: null,
     contextDigest: null,
     createdAt: new Date(),

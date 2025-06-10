@@ -10,7 +10,7 @@ function createMockTask(id: string, title: string, parentId: string | null = nul
     title,
     description: null,
     status: 'pending',
-    priority: 'medium',
+    priorityScore: 50,
     prd: null,
     contextDigest: null,
     createdAt: new Date(),

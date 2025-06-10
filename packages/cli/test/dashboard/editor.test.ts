@@ -15,7 +15,7 @@ describe("EditorService", () => {
 
 title: Test Task
 description: A test task description
-priority: high
+priorityscore: 80
 status: pending
 tags: test, demo
 `;
@@ -26,7 +26,7 @@ tags: test, demo
 
 			expect(result.title).toBe("Test Task");
 			expect(result.description).toBe("A test task description");
-			expect(result.priority).toBe("high");
+			expect(result.priorityScore).toBe(80);
 			expect(result.status).toBe("pending");
 			expect(result.tags).toEqual(["test", "demo"]);
 			expect(result.details).toBe("");
@@ -43,7 +43,7 @@ details: |
   Implementation details:
   - Step 1
   - Step 2
-priority: medium
+priorityscore: 50
 `;
 
 			const parseMethod = (editorService as any).parseTaskFromTemplate.bind(editorService);
@@ -52,12 +52,12 @@ priority: medium
 			expect(result.title).toBe("Multi-line Task");
 			expect(result.description).toBe("This is a multi-line\ndescription with\nmultiple lines");
 			expect(result.details).toBe("Implementation details:\n- Step 1\n- Step 2");
-			expect(result.priority).toBe("medium");
+			expect(result.priorityScore).toBe(50);
 		});
 
 		it("should throw error if title is missing", () => {
 			const template = `description: No title task
-priority: high
+priorityscore: 80
 `;
 
 			const parseMethod = (editorService as any).parseTaskFromTemplate.bind(editorService);
@@ -92,7 +92,7 @@ title: Task with Comments
 description: Task description
 # More comments
 
-priority: low
+priorityscore: 20
 # Final comment
 `;
 
@@ -101,16 +101,16 @@ priority: low
 
 			expect(result.title).toBe("Task with Comments");
 			expect(result.description).toBe("Task description");
-			expect(result.priority).toBe("low");
+			expect(result.priorityScore).toBe(20);
 		});
 
 		it("should throw error for invalid priority values", () => {
 			const template = `title: Test Task
-priority: urgent
+priorityscore: 150
 `;
 
 			const parseMethod = (editorService as any).parseTaskFromTemplate.bind(editorService);
-			expect(() => parseMethod(template)).toThrow('Invalid priority "urgent". Valid values are: low, medium, high');
+			expect(() => parseMethod(template)).toThrow('Invalid priority score "150". Must be a number between 0 and 100');
 		});
 
 		it("should throw error for invalid status values", () => {
@@ -124,7 +124,7 @@ status: todo
 
 		it("should handle valid priority and status values", () => {
 			const template = `title: Test Task
-priority: high
+priorityscore: 80
 status: in-progress
 `;
 
@@ -132,7 +132,7 @@ status: in-progress
 			const result: TaskTemplate = parseMethod(template);
 
 			expect(result.title).toBe("Test Task");
-			expect(result.priority).toBe("high");
+			expect(result.priorityScore).toBe(80);
 			expect(result.status).toBe("in-progress");
 		});
 	});

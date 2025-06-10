@@ -8,20 +8,18 @@ export {
   createTaskSchema,
   updateTaskSchema,
   taskStatus,
-  taskPriority,
   priorityScore,
   validateTask,
   taskToApi,
-  priorityToScore,
-  scoreToPriority,
+  scoreToPriorityLevel,
+  priorityLevelToScore,
   getEffectivePriorityScore,
-  updatePriorityScore,
   type Task,
   type CreateTask,
   type UpdateTask,
   type TaskStatus,
-  type TaskPriority,
   type PriorityScore,
+  type PriorityLevel,
   type TaskApi,
   type CreateTaskApi,
 } from './task.js';
@@ -63,7 +61,7 @@ export {
   uuidPattern,
 } from './base.js';
 
-export { CONSTRAINTS, type Priority } from './types.js';
+export { CONSTRAINTS } from './types.js';
 
 // ===== VALIDATION UTILITIES =====
 import { z } from 'zod';

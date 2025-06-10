@@ -430,7 +430,63 @@ const defaultValidationOptions: ValidationOptions = {
 
 /**
  * Validation helper for TaskTreeData schema validation
+ * Ensures dates are properly transformed before validation
  */
 export function validateTaskTreeData(data: unknown): data is TaskTreeData {
-  return taskTreeSchema.safeParse(data).success;
+  if (!data || typeof data !== 'object') {
+    return false;
+  }
+
+  // Transform any corrupted dates before validation
+  const transformedData = transformTaskTreeDataDates(data as Record<string, unknown>);
+  return taskTreeSchema.safeParse(transformedData).success;
+}
+
+/**
+ * Transform task tree data to ensure dates are valid Date objects
+ */
+function transformTaskTreeDataDates(data: Record<string, unknown>): Record<string, unknown> {
+  if (!data || typeof data !== 'object') {
+    return data;
+  }
+
+  const ensureDate = (value: unknown): Date => {
+    if (value instanceof Date && !Number.isNaN(value.getTime())) {
+      return value;
+    }
+    // Handle string dates or invalid dates
+    if (typeof value === 'string') {
+      const parsed = new Date(value);
+      if (!Number.isNaN(parsed.getTime())) {
+        return parsed;
+      }
+    }
+    // Handle number timestamps
+    if (typeof value === 'number' && !Number.isNaN(value)) {
+      return new Date(value);
+    }
+    // Fallback to current time for invalid dates
+    return new Date();
+  };
+
+  const transformedData = { ...data };
+
+  // Transform task dates if present
+  if (transformedData.task && typeof transformedData.task === 'object') {
+    const task = transformedData.task as Record<string, unknown>;
+    transformedData.task = {
+      ...task,
+      createdAt: task.createdAt ? ensureDate(task.createdAt) : task.createdAt,
+      updatedAt: task.updatedAt ? ensureDate(task.updatedAt) : task.updatedAt,
+    };
+  }
+
+  // Transform children recursively
+  if (Array.isArray(transformedData.children)) {
+    transformedData.children = transformedData.children.map((child) =>
+      transformTaskTreeDataDates(child as Record<string, unknown>)
+    );
+  }
+
+  return transformedData;
 }

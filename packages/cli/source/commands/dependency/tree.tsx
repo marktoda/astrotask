@@ -3,6 +3,7 @@ import { Box, Text } from "ink";
 import { useEffect, useState } from "react";
 import zod from "zod";
 import { useDatabase, useTaskService } from "../../context/DatabaseContext.js";
+import { formatPriority } from "../../utils/priority.js";
 
 export const description = "Visualize task dependency tree";
 
@@ -177,7 +178,10 @@ export default function DependencyTree({ options }: Props) {
 						[{node.task.status}]
 					</Text>
 				)}
-				<Text color="magenta"> [{node.task.priority}{node.task.priorityScore ? ` (${node.task.priorityScore})` : ''}]</Text>
+				<Text color="magenta">
+					{" "}
+					[{formatPriority(node.task.priorityScore)}]
+				</Text>
 				{options.showBlocked && node.isBlocked && (
 					<Text color="red" bold>
 						{" "}

@@ -32,21 +32,21 @@ describe('TaskService - Dependency Integration', () => {
       title: 'Task 1',
       description: 'First task',
       status: 'pending',
-      priority: 'medium',
+      priorityScore: 50,
     });
 
     task2 = await store.addTask({
       title: 'Task 2', 
       description: 'Second task',
       status: 'pending',
-      priority: 'medium',
+      priorityScore: 50,
     });
 
     task3 = await store.addTask({
       title: 'Task 3',
       description: 'Third task', 
       status: 'done',
-      priority: 'medium',
+      priorityScore: 50,
     });
   });
 
@@ -178,10 +178,10 @@ describe('TaskService - Dependency Integration', () => {
         title: 'High Priority Task',
         description: 'Important task',
         status: 'pending',
-        priority: 'high',
+        priorityScore: 80,
       });
 
-      const availableTasks = await taskService.getAvailableTasks({ priority: 'high' });
+      const availableTasks = await taskService.getAvailableTasks({ priorityScore: 80 });
       
       const availableIds = availableTasks.map(t => t.id);
       expect(availableIds).toContain(highPriorityTask.id);

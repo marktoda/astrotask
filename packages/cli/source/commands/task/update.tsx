@@ -1,4 +1,4 @@
-import { taskPriority, taskStatus, priorityScore } from "@astrotask/core";
+import { priorityScore, taskStatus } from "@astrotask/core";
 import { Text } from "ink";
 import { useEffect, useState } from "react";
 import zod from "zod";
@@ -11,8 +11,11 @@ export const options = zod.object({
 	title: zod.string().optional().describe("New task title"),
 	description: zod.string().optional().describe("New task description"),
 	status: taskStatus.optional().describe("New task status"),
-	priority: taskPriority.optional().describe("New task priority"),
-	priorityScore: priorityScore.optional().describe("New priority score (0-100, higher = more important)"),
+	priorityScore: priorityScore
+		.optional()
+		.describe(
+			"New priority score (0-100, higher = more important). Maps to levels: <20=low, 20-70=medium, >70=high",
+		),
 	parent: zod.string().optional().describe("New parent task ID"),
 });
 
@@ -34,8 +37,8 @@ export default function Update({ options }: Props) {
 				if (options.description !== undefined)
 					updates["description"] = options.description;
 				if (options.status) updates["status"] = options.status;
-				if (options.priority) updates["priority"] = options.priority;
-				if (options.priorityScore !== undefined) updates["priorityScore"] = options.priorityScore;
+				if (options.priorityScore !== undefined)
+					updates["priorityScore"] = options.priorityScore;
 				if (options.parent !== undefined) updates["parentId"] = options.parent;
 
 				const updated = await db.updateTask(options.id, updates);

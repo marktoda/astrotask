@@ -345,7 +345,6 @@ export function createDashboardStore(
 					title,
 					description: null,
 					status: "pending",
-					priority: "medium",
 					priorityScore: 50, // Default priority score
 					prd: null,
 					contextDigest: null,
@@ -618,10 +617,11 @@ export function createDashboardStore(
 			get().triggerTreeUpdate();
 			get().updateUnsavedChangesFlag();
 
-			const message = cascade && deletedCount > 1
-				? `Deleted task and ${deletedCount - 1} children (${deletedCount} total)`
-				: "Task deleted";
-			
+			const message =
+				cascade && deletedCount > 1
+					? `Deleted task and ${deletedCount - 1} children (${deletedCount} total)`
+					: "Task deleted";
+
 			set({ statusMessage: message });
 
 			// Enable auto-flush if not already enabled
@@ -1225,7 +1225,6 @@ export function createDashboardStore(
 					title: taskTemplate.title,
 					description: taskTemplate.description || null,
 					status: taskTemplate.status,
-					priority: taskTemplate.priority,
 					priorityScore: 50, // Default priority score for template-created tasks
 					prd: taskTemplate.details || null, // Store detailed notes in PRD field
 					contextDigest: taskTemplate.notes || null, // Store additional notes in contextDigest
@@ -1330,7 +1329,7 @@ export function createDashboardStore(
 					title: taskTemplate.title,
 					description: taskTemplate.description || null,
 					status: taskTemplate.status,
-					priority: taskTemplate.priority,
+					priorityScore: 50, // Default priority score for template-created tasks
 					prd: taskTemplate.details || null, // Store detailed notes in PRD field
 					contextDigest: taskTemplate.notes || null, // Store additional notes in contextDigest
 					updatedAt: new Date(),

@@ -1,18 +1,22 @@
 import type { CreateTask, Task } from "@astrotask/core";
-import { taskPriority, priorityScore } from "@astrotask/core";
+import { priorityScore } from "@astrotask/core";
 import { Text } from "ink";
 import { useEffect, useState } from "react";
 import zod from "zod";
 import { useDatabase } from "../../context/DatabaseContext.js";
 
-export const description = "Add a new task with the specified title, description, and priority";
+export const description =
+	"Add a new task with the specified title, description, and priority";
 
 export const options = zod.object({
 	title: zod.string().describe("Task title"),
 	description: zod.string().optional().describe("Task description"),
 	parent: zod.string().optional().describe("Parent task ID"),
-	priority: taskPriority.describe("Task priority"),
-	priorityScore: priorityScore.optional().describe("Priority score (0-100, higher = more important)"),
+	priorityScore: priorityScore
+		.optional()
+		.describe(
+			"Priority score (0-100, higher = more important). Maps to levels: <20=low, 20-70=medium, >70=high",
+		),
 });
 
 type Props = {
@@ -34,7 +38,6 @@ export default function Add({ options }: Props) {
 					description: options.description || "",
 					parentId: options.parent,
 					status: "pending",
-					priority: options.priority,
 					priorityScore: options.priorityScore,
 				};
 
@@ -53,11 +56,17 @@ export default function Add({ options }: Props) {
 	if (error) return <Text color="red">Error: {error}</Text>;
 	if (!task) return <Text color="red">No task created</Text>;
 
-	const scoreText = task.priorityScore ? ` (score: ${task.priorityScore})` : '';
+	const priorityLevel =
+		task.priorityScore < 20
+			? "low"
+			: task.priorityScore <= 70
+				? "medium"
+				: "high";
+	const scoreText = ` (${priorityLevel}: ${task.priorityScore})`;
 
 	return (
 		<Text color="green">
-			✅ Created task: <Text bold>{task.id}</Text> - {task.title} [{task.priority}{scoreText}]
+			✅ Created task: <Text bold>{task.id}</Text> - {task.title} {scoreText}
 		</Text>
 	);
 }

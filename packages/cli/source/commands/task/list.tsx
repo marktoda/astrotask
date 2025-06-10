@@ -4,6 +4,7 @@ import { Box, Text } from "ink";
 import { useEffect, useState } from "react";
 import zod from "zod";
 import { useDatabase } from "../../context/DatabaseContext.js";
+import { formatPriority } from "../../utils/priority.js";
 
 export const description =
 	"List tasks with status and priority information. By default, shows only pending and in-progress tasks. Use --show-all to include completed and archived tasks.";
@@ -122,9 +123,10 @@ export default function List({ options }: Props) {
 								<Text color="cyan">{task.id}</Text> -{" "}
 								<Text bold>{task.title}</Text>
 								{task.status && <Text color="yellow"> [{task.status}]</Text>}
-								{task.priority && (
-									<Text color="magenta"> [{task.priority}{task.priorityScore ? ` (${task.priorityScore})` : ''}]</Text>
-								)}
+								<Text color="magenta">
+									{" "}
+									[{formatPriority(task.priorityScore)}]
+								</Text>
 							</Text>
 							{task.description && (
 								<Text color="gray"> {task.description}</Text>
@@ -145,9 +147,10 @@ export default function List({ options }: Props) {
 								<Text color="cyan">{task.id}</Text> -{" "}
 								<Text bold>{task.title}</Text>
 								{task.status && <Text color="yellow"> [{task.status}]</Text>}
-								{task.priority && (
-									<Text color="magenta"> [{task.priority}{task.priorityScore ? ` (${task.priorityScore})` : ''}]</Text>
-								)}
+								<Text color="magenta">
+									{" "}
+									[{formatPriority(task.priorityScore)}]
+								</Text>
 								<Text color="gray"> (parent: {task.parentId})</Text>
 							</Text>
 							{task.description && (

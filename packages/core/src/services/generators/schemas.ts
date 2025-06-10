@@ -21,8 +21,8 @@ export const prdMetadataSchema = z.object({
   complexity: z.enum(['simple', 'moderate', 'complex']).optional(),
   /** Include implementation details */
   includeDetails: z.boolean().optional(),
-  /** Preferred task priority */
-  defaultPriority: z.enum(['low', 'medium', 'high']).optional(),
+  /** Default priority score (0-100) */
+  defaultPriorityScore: z.number().min(0).max(100).optional(),
   /** Source document type */
   sourceType: z.enum(['prd', 'requirements', 'specification']).optional(),
   /** Language of the content */

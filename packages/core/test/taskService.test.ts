@@ -14,10 +14,10 @@ import { TASK_IDENTIFIERS } from '../src/entities/TaskTreeConstants.js';
 function createTask(data: Partial<NewTask> & { title: string }): NewTask {
   return {
     parentId: data.parentId,
-    title: data.title,
+    title: data.title ?? 'Untitled',
     description: data.description ?? undefined,
-    status: data.status ?? 'pending',
-    priority: data.priority ?? 'medium',
+    status: 'pending',
+    priorityScore: data.priorityScore ?? 50,
     prd: undefined,
     contextDigest: undefined,
   };
@@ -200,7 +200,7 @@ describe('TaskService', () => {
         title: 'Task C',
         description: 'Another root task',
         status: 'pending',
-        priority: 'low',
+        priorityScore: 10,
       });
 
       const projectTree = await service.getTaskTree();

@@ -1,5 +1,4 @@
 // Simple shared types for the local-first task navigation platform
-export type Priority = 'low' | 'medium' | 'high';
 
 // Simple field constraints
 export const CONSTRAINTS = {

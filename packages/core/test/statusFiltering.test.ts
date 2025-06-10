@@ -27,43 +27,43 @@ describe('Status Filtering', () => {
       await store.addTask({
         title: 'Pending Task 1',
         status: 'pending',
-        priority: 'medium',
+        priorityScore: 50,
       });
 
       await store.addTask({
         title: 'Pending Task 2',
         status: 'pending',
-        priority: 'medium',
+        priorityScore: 50,
       });
 
       await store.addTask({
         title: 'In Progress Task',
         status: 'in-progress',
-        priority: 'medium',
+        priorityScore: 50,
       });
 
       await store.addTask({
         title: 'Done Task 1',
         status: 'done',
-        priority: 'medium',
+        priorityScore: 50,
       });
 
       await store.addTask({
         title: 'Done Task 2',
         status: 'done',
-        priority: 'medium',
+        priorityScore: 50,
       });
 
       await store.addTask({
         title: 'Archived Task',
         status: 'archived',
-        priority: 'medium',
+        priorityScore: 50,
       });
 
       await store.addTask({
         title: 'Cancelled Task',
         status: 'cancelled',
-        priority: 'medium',
+        priorityScore: 50,
       });
     });
 
@@ -122,31 +122,31 @@ describe('Status Filtering', () => {
       await store.addTask({
         title: 'Active Task 1',
         status: 'pending',
-        priority: 'high',
+        priorityScore: 80,
       });
 
       await store.addTask({
         title: 'Active Task 2',
         status: 'in-progress',
-        priority: 'medium',
+        priorityScore: 50,
       });
 
       await store.addTask({
         title: 'Completed Task 1',
         status: 'done',
-        priority: 'medium',
+        priorityScore: 50,
       });
 
       await store.addTask({
         title: 'Completed Task 2',
         status: 'done',
-        priority: 'low',
+        priorityScore: 10,
       });
 
       await store.addTask({
         title: 'Old Task',
         status: 'archived',
-        priority: 'medium',
+        priorityScore: 50,
       });
     });
 
@@ -194,13 +194,13 @@ describe('Status Filtering', () => {
       await store.addTask({
         title: 'Test Task',
         status: 'pending',
-        priority: 'medium',
+        priorityScore: 50,
       });
 
       await store.addTask({
         title: 'Done Task',
         status: 'done',
-        priority: 'medium',
+        priorityScore: 50,
       });
 
       // When no statuses provided, should show only active tasks (pending + in-progress)
@@ -222,14 +222,14 @@ describe('Status Filtering', () => {
       const parentTask = await store.addTask({
         title: 'Parent Task',
         status: 'pending',
-        priority: 'high',
+        priorityScore: 80,
       });
 
       await store.addTask({
         parentId: parentTask.id,
         title: 'Child Task',
         status: 'done',
-        priority: 'medium',
+        priorityScore: 50,
       });
 
       // Test that status filtering works with hierarchy

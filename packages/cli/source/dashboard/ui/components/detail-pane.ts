@@ -1,6 +1,7 @@
 import type { Task } from "@astrotask/core";
 import blessed from "blessed";
 import type { StoreApi } from "zustand";
+import { scoreToPriorityLevel } from "../../../utils/priority.js";
 import type { DashboardStore } from "../../store/index.js";
 import { StatusRenderer } from "../../utils/status-renderer.js";
 
@@ -159,11 +160,8 @@ export class DetailPane {
 		}
 
 		// Priority with icon and score
-		const priorityIcon = this.getPriorityIcon(task.priority);
-		const priorityScore = task.priorityScore ?? 50; // Default to 50 if not set
-		const priorityDisplay = priorityIcon
-			? `${priorityIcon} ${task.priority} (${priorityScore})`
-			: `${task.priority} (${priorityScore})`;
+		const priorityIcon = this.getPriorityIcon(task.priorityScore ?? 50);
+		const priorityDisplay = priorityIcon ? ` ${priorityIcon}` : "";
 		lines.push(`Priority: ${priorityDisplay}`);
 
 		lines.push("");
@@ -232,7 +230,9 @@ export class DetailPane {
 					const status = depTaskNode.task.status;
 					const statusIcon = this.getDependencyStatusIcon(status);
 					const statusColor = this.getDependencyStatusColor(status);
-					const priorityIcon = this.getPriorityIcon(depTaskNode.task.priority);
+					const priorityIcon = this.getPriorityIcon(
+						depTaskNode.task.priorityScore ?? 50,
+					);
 					const priorityDisplay = priorityIcon ? ` ${priorityIcon}` : "";
 					lines.push(
 						`  ${statusIcon} {${statusColor}-fg}${depTaskNode.task.title}{/${statusColor}-fg}${priorityDisplay}`,
@@ -255,7 +255,7 @@ export class DetailPane {
 					const statusIcon = this.getDependencyStatusIcon(status);
 					const statusColor = this.getDependencyStatusColor(status);
 					const priorityIcon = this.getPriorityIcon(
-						dependentTaskNode.task.priority,
+						dependentTaskNode.task.priorityScore ?? 50,
 					);
 					const priorityDisplay = priorityIcon ? ` ${priorityIcon}` : "";
 					lines.push(
@@ -278,7 +278,7 @@ export class DetailPane {
 				);
 				if (blockingTaskNode) {
 					const priorityIcon = this.getPriorityIcon(
-						blockingTaskNode.task.priority,
+						blockingTaskNode.task.priorityScore ?? 50,
 					);
 					const status = blockingTaskNode.task.status;
 					const statusIcon = this.getStatusIcon(status);
@@ -325,7 +325,7 @@ export class DetailPane {
 		// Show current task status
 		const statusIcon = this.getDependencyStatusIcon(task.status);
 		const statusColor = this.getDependencyStatusColor(task.status);
-		const priorityIcon = this.getPriorityIcon(task.priority);
+		const priorityIcon = this.getPriorityIcon(task.priorityScore ?? 50);
 		const priorityDisplay = priorityIcon ? ` ${priorityIcon}` : "";
 		const blockIcon = isBlocked ? " [BLOCKED]" : "";
 		lines.push(`{bold}CURRENT TASK:{/bold}`);
@@ -390,7 +390,9 @@ export class DetailPane {
 				const status = taskNode.task.status;
 				const statusIcon = this.getDependencyStatusIcon(status);
 				const statusColor = this.getDependencyStatusColor(status);
-				const priorityIcon = this.getPriorityIcon(taskNode.task.priority);
+				const priorityIcon = this.getPriorityIcon(
+					taskNode.task.priorityScore ?? 50,
+				);
 				const priorityDisplay = priorityIcon ? ` ${priorityIcon}` : "";
 
 				lines.push(
@@ -447,7 +449,8 @@ export class DetailPane {
 		return this.statusRenderer.getColor(status);
 	}
 
-	private getPriorityIcon(priority: Task["priority"]): string {
+	private getPriorityIcon(priorityScore: number): string {
+		const priority = scoreToPriorityLevel(priorityScore);
 		switch (priority) {
 			case "high":
 				return "!";

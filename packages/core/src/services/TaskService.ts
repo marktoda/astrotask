@@ -11,11 +11,11 @@ import type { ReconciliationPlan } from '../entities/TrackingTaskTree.js';
 import type { ITaskReconciliationService } from '../entities/TrackingTypes.js';
 import type { TaskDependencyGraph, TaskWithDependencies } from '../schemas/dependency.js';
 import type { CreateTask, Task, TaskStatus } from '../schemas/task.js';
+import { createModuleLogger } from '../utils/logger.js';
 import {
   type StatusTransitionResult,
   validateStatusTransition,
 } from '../utils/statusTransitions.js';
-import { createModuleLogger } from '../utils/logger.js';
 import { DependencyService } from './DependencyService.js';
 
 /**
@@ -113,7 +113,6 @@ export class TaskService implements ITaskReconciliationService {
       title: 'Project Tasks',
       description: 'Project root containing all task hierarchies',
       status: 'pending' as const,
-      priority: 'medium' as const,
       priorityScore: 50,
       prd: null,
       contextDigest: null,
@@ -519,7 +518,6 @@ export class TaskService implements ITaskReconciliationService {
         title: originalTask.title,
         description: originalTask.description,
         status: originalTask.status,
-        priority: originalTask.priority,
         parentId: originalTask.parentId,
         prd: originalTask.prd,
         contextDigest: originalTask.contextDigest,
@@ -553,7 +551,7 @@ export class TaskService implements ITaskReconciliationService {
       title: childData.task.title,
       description: childData.task.description || undefined,
       status: childData.task.status,
-      priority: childData.task.priority,
+      priorityScore: childData.task.priorityScore,
       prd: childData.task.prd || undefined,
       contextDigest: childData.task.contextDigest || undefined,
     };
@@ -619,7 +617,7 @@ export class TaskService implements ITaskReconciliationService {
         title: childData.task.title,
         description: childData.task.description || undefined,
         status: childData.task.status,
-        priority: childData.task.priority,
+        priorityScore: childData.task.priorityScore,
         prd: childData.task.prd || undefined,
         contextDigest: childData.task.contextDigest || undefined,
       };
@@ -747,7 +745,7 @@ export class TaskService implements ITaskReconciliationService {
    */
   async getAvailableTasksWithEffectiveStatus(filter?: {
     status?: TaskStatus;
-    priority?: string;
+    priorityScore?: number;
     useEffectiveStatus?: boolean;
   }): Promise<Task[]> {
     const useEffective = filter?.useEffectiveStatus ?? true;
@@ -770,8 +768,8 @@ export class TaskService implements ITaskReconciliationService {
         continue;
       }
 
-      // Apply priority filter
-      if (filter?.priority && task.priority !== filter.priority) {
+      // Apply priorityScore filter if provided
+      if (filter?.priorityScore !== undefined && task.priorityScore < filter.priorityScore) {
         continue;
       }
 
@@ -872,7 +870,9 @@ export class TaskService implements ITaskReconciliationService {
    * Get tasks that can be started immediately (no incomplete dependencies).
    * Tasks are sorted by priority score (highest first), then by creation date.
    */
-  async getAvailableTasks(filter?: { status?: TaskStatus; priority?: string }): Promise<Task[]> {
+  async getAvailableTasks(filter?: { status?: TaskStatus; priorityScore?: number }): Promise<
+    Task[]
+  > {
     const executableTasks = await this.dependencyService.getExecutableTasks();
 
     let filteredTasks = executableTasks;
@@ -882,7 +882,7 @@ export class TaskService implements ITaskReconciliationService {
         if (filter.status && task.status !== filter.status) {
           return false;
         }
-        if (filter.priority && task.priority !== filter.priority) {
+        if (filter.priorityScore !== undefined && task.priorityScore < filter.priorityScore) {
           return false;
         }
         return true;
@@ -898,8 +898,8 @@ export class TaskService implements ITaskReconciliationService {
         return bScore - aScore; // Higher scores first
       }
 
-      // If same priority score, sort by creation date (older tasks first)
-      return a.createdAt.getTime() - b.createdAt.getTime();
+      // If same priority score, sort by task ID for consistent ordering
+      return a.id.localeCompare(b.id);
     });
   }
 

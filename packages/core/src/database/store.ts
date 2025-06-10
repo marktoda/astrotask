@@ -8,8 +8,8 @@ import type {
 import type { CreateTask, Task, TaskStatus } from '../schemas/task.js';
 import { generateNextTaskId } from '../utils/taskId.js';
 import type { DatabaseClient, DrizzleOps } from './adapters/types.js';
-import * as schema from './schema.js';
 import * as sqliteSchema from './schema-sqlite.js';
+import * as schema from './schema.js';
 
 /**
  * Store interface for database operations
@@ -68,7 +68,13 @@ export class DatabaseStore<
   /** Adapter type to determine which schema to use */
   private readonly adapterType: string;
 
-  constructor(client: TClient, sql: TDrizzle, adapterType: string, _isSyncing = false, isEncrypted = false) {
+  constructor(
+    client: TClient,
+    sql: TDrizzle,
+    adapterType: string,
+    _isSyncing = false,
+    isEncrypted = false
+  ) {
     this.pgLite = client;
     this.sql = sql;
     this.adapterType = adapterType;
@@ -130,7 +136,6 @@ export class DatabaseStore<
         title: this.getSchema().tasks.title,
         description: this.getSchema().tasks.description,
         status: this.getSchema().tasks.status,
-        priority: this.getSchema().tasks.priority,
         priorityScore: this.getSchema().tasks.priorityScore,
         prd: this.getSchema().tasks.prd,
         contextDigest: this.getSchema().tasks.contextDigest,
@@ -140,8 +145,8 @@ export class DatabaseStore<
       .from(this.getSchema().tasks)
       .where(whereClause)
       .orderBy(desc(this.getSchema().tasks.createdAt));
-    
-    return results as Task[];
+
+    return this.transformTaskRows(results);
   }
 
   async addTask(data: CreateTask): Promise<Task> {
@@ -156,7 +161,6 @@ export class DatabaseStore<
       title: data.title,
       description: data.description ?? null,
       status: data.status,
-      priority: data.priority,
       priorityScore: data.priorityScore ?? 50,
       prd: data.prd ?? null,
       contextDigest: data.contextDigest ?? null,
@@ -177,7 +181,6 @@ export class DatabaseStore<
         title: this.getSchema().tasks.title,
         description: this.getSchema().tasks.description,
         status: this.getSchema().tasks.status,
-        priority: this.getSchema().tasks.priority,
         priorityScore: this.getSchema().tasks.priorityScore,
         prd: this.getSchema().tasks.prd,
         contextDigest: this.getSchema().tasks.contextDigest,
@@ -188,7 +191,8 @@ export class DatabaseStore<
       .where(eq(this.getSchema().tasks.id, id))
       .limit(1);
 
-    return (tasks[0] as Task) || null;
+    const transformedTasks = this.transformTaskRows(tasks);
+    return transformedTasks[0] || null;
   }
 
   async updateTask(
@@ -200,13 +204,19 @@ export class DatabaseStore<
       updatedAt: new Date(),
     };
 
-    await this.sql.update(this.getSchema().tasks).set(updateData).where(eq(this.getSchema().tasks.id, id));
+    await this.sql
+      .update(this.getSchema().tasks)
+      .set(updateData)
+      .where(eq(this.getSchema().tasks.id, id));
 
     return this.getTask(id);
   }
 
   async deleteTask(id: string): Promise<boolean> {
-    const result = await this.sql.delete(this.getSchema().tasks).where(eq(this.getSchema().tasks.id, id)).returning();
+    const result = await this.sql
+      .delete(this.getSchema().tasks)
+      .where(eq(this.getSchema().tasks.id, id))
+      .returning();
 
     return result.length > 0;
   }
@@ -257,5 +267,17 @@ export class DatabaseStore<
   async close(): Promise<void> {
     // Close database connection
     await this.pgLite.close();
+  }
+
+  /**
+   * Transform database rows to proper Task objects with Date conversion
+   * SQLite returns timestamps as numbers, but Task type expects Date objects
+   */
+  private transformTaskRows(results: Record<string, unknown>[]): Task[] {
+    return results.map((row) => ({
+      ...row,
+      createdAt: typeof row.createdAt === 'number' ? new Date(row.createdAt) : row.createdAt,
+      updatedAt: typeof row.updatedAt === 'number' ? new Date(row.updatedAt) : row.updatedAt,
+    })) as Task[];
   }
 }

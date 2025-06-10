@@ -366,7 +366,7 @@ Consider the technical requirements, dependencies, potential risks, and implemen
         (task) =>
           `Task ${task.id}: ${task.title}
 Description: ${task.description || 'No description provided'}
-Priority: ${task.priority}
+Priority Score: ${task.priorityScore}
 Status: ${task.status}
 PRD Context: ${task.prd || 'No PRD context available'}
 ---`
@@ -446,7 +446,7 @@ PRD Context: ${task.prd || 'No PRD context available'}
 
     if (task.description && task.description.length > 200) score += 1;
     if (task.prd && task.prd.length > 500) score += 1;
-    if (task.priority === 'high') score += 1;
+    if (task.priorityScore > 70) score += 1; // High priority score increases complexity
 
     score = Math.max(1, Math.min(10, score));
     const subtasks = Math.max(1, Math.min(20, Math.ceil(score * 0.8)));

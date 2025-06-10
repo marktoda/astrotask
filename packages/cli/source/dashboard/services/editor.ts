@@ -9,7 +9,7 @@ export interface TaskTemplate {
 	title: string;
 	description: string;
 	details: string;
-	priority: "low" | "medium" | "high";
+	priorityScore: number;
 	status: "pending" | "in-progress" | "done" | "cancelled" | "archived";
 	tags: string[];
 	notes: string;
@@ -86,8 +86,8 @@ details: |
   - What tests to write
   - Dependencies or prerequisites
 
-# Priority (low, medium, high)
-priority: medium
+# Priority Score (0-100, higher = more important)
+priorityscore: 50
 
 # Status (pending, in-progress, done, cancelled, archived)
 status: pending
@@ -138,8 +138,8 @@ ${
 		: "  Detailed implementation instructions, acceptance criteria,\n  technical notes, or any other relevant information.\n  \n  Examples:\n  - What files need to be modified\n  - What functions to implement\n  - What tests to write\n  - Dependencies or prerequisites"
 }
 
-# Priority (low, medium, high)
-priority: ${existingTask.priority}
+# Priority Score (0-100, higher = more important)
+priorityscore: ${existingTask.priorityScore}
 
 # Status (pending, in-progress, done, cancelled, archived)
 status: ${existingTask.status}
@@ -214,13 +214,15 @@ notes: |
 		}
 
 		// Enhanced validation with user feedback
-		const validatedPriority = this.validatePriority(task.priority);
+		const validatedPriorityScore = this.validatePriorityScore(
+			task.priorityScore,
+		);
 		const validatedStatus = this.validateStatus(task.status);
 
 		// Warn about invalid values
-		if (task.priority && !validatedPriority) {
+		if (task.priorityScore !== undefined && validatedPriorityScore === null) {
 			throw new Error(
-				`Invalid priority "${task.priority}". Valid values are: low, medium, high`,
+				`Invalid priority score "${task.priorityScore}". Must be a number between 0 and 100`,
 			);
 		}
 		if (task.status && !validatedStatus) {
@@ -234,7 +236,7 @@ notes: |
 			title: task.title.trim(),
 			description: task.description?.trim() || "",
 			details: task.details?.trim() || "",
-			priority: validatedPriority || "medium",
+			priorityScore: validatedPriorityScore ?? 50,
 			status: validatedStatus || "pending",
 			tags: this.parseTags(task.tags || []),
 			notes: task.notes?.trim() || "",
@@ -256,8 +258,29 @@ notes: |
 			case "details":
 				task.details = value;
 				break;
+			case "priorityscore":
 			case "priority":
-				task.priority = value as any;
+				const numValue = Number(value);
+				if (!isNaN(numValue) && numValue >= 0 && numValue <= 100) {
+					task.priorityScore = numValue;
+				} else if (typeof value === "string") {
+					// Handle legacy priority strings
+					const priorityMap: Record<string, number> = {
+						low: 10,
+						medium: 50,
+						high: 80,
+					};
+					const normalizedValue = value.toLowerCase().trim();
+					if (normalizedValue in priorityMap) {
+						task.priorityScore = priorityMap[normalizedValue];
+					} else {
+						// Store the invalid value so validation can catch it
+						task.priorityScore = value as any;
+					}
+				} else {
+					// Store the invalid value so validation can catch it
+					task.priorityScore = value as any;
+				}
 				break;
 			case "status":
 				task.status = value as any;
@@ -271,11 +294,16 @@ notes: |
 		}
 	}
 
-	private validatePriority(priority: any): "low" | "medium" | "high" | null {
-		if (typeof priority === "string") {
-			const p = priority.toLowerCase();
-			if (["low", "medium", "high"].includes(p)) {
-				return p as "low" | "medium" | "high";
+	private validatePriorityScore(priorityScore: any): number | null {
+		if (typeof priorityScore === "number") {
+			if (priorityScore >= 0 && priorityScore <= 100) {
+				return priorityScore;
+			}
+		}
+		if (typeof priorityScore === "string") {
+			const num = Number(priorityScore);
+			if (!isNaN(num) && num >= 0 && num <= 100) {
+				return num;
 			}
 		}
 		return null;

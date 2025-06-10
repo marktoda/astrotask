@@ -217,7 +217,7 @@ describe('Task ID Generation', () => {
           title: `Test Task ${i}`,
           description: 'Test task',
           status: 'pending',
-          priority: 'medium',
+          priorityScore: 50,
         });
       }
     });
@@ -229,7 +229,7 @@ describe('Task ID Generation', () => {
         title: 'Existing Task',
         description: 'Test task',
         status: 'pending',
-        priority: 'medium',
+        priorityScore: 50,
       });
 
       // Generate many IDs and ensure none collide with AAAA
@@ -270,7 +270,7 @@ describe('Task ID Generation', () => {
           title: `Test Subtask ${i}`,
           description: 'Test subtask',
           status: 'pending',
-          priority: 'medium',
+          priorityScore: 50,
         });
       }
     });
@@ -367,7 +367,7 @@ describe('Task ID Generation', () => {
         title: 'Test Task',
         description: 'Test task with no parent',
         status: 'pending',
-        priority: 'medium',
+        priorityScore: 50,
         // parentId omitted - will be undefined/null
       });
 
@@ -382,7 +382,7 @@ describe('Task ID Generation', () => {
         title: 'Root Task',
         description: 'Root task',
         status: 'pending',
-        priority: 'medium',
+        priorityScore: 50,
       });
 
       // Then create a subtask
@@ -390,7 +390,7 @@ describe('Task ID Generation', () => {
         title: 'Subtask',
         description: 'Subtask of root task',
         status: 'pending',
-        priority: 'medium',
+        priorityScore: 50,
         parentId: rootTask.id,
       });
 
@@ -405,7 +405,7 @@ describe('Task ID Generation', () => {
         title: 'Task 1',
         description: 'Task with undefined parent',
         status: 'pending',
-        priority: 'medium',
+        priorityScore: 50,
         // parentId is undefined
       });
 
@@ -414,7 +414,7 @@ describe('Task ID Generation', () => {
         title: 'Task 2',
         description: 'Task with null parent',
         status: 'pending',
-        priority: 'medium',
+        priorityScore: 50,
         parentId: undefined,
       });
 
@@ -456,7 +456,7 @@ describe('Task ID Generation', () => {
           title: `Existing Task ${i}`,
           description: 'Test task',
           status: 'pending',
-          priority: 'medium',
+          priorityScore: 50,
         });
         existingIds.add(id);
       }

@@ -12,11 +12,8 @@ export const taskStatus = z
   .enum(['pending', 'in-progress', 'blocked', 'done', 'cancelled', 'archived'])
   .default('pending');
 
-// Task priority enum - for user-friendly categorization and UI grouping
-// Use alongside priorityScore for fine-grained control
-export const taskPriority = z.enum(['low', 'medium', 'high']).default('medium');
-
 // Priority score schema - 0-100 float for fine-grained ordering
+// Maps to user-readable terms: < 20 = low, 20-70 = medium, > 70 = high
 export const priorityScore = z.number().min(0).max(100).default(50);
 
 // Database Task schema - matches what Drizzle returns (Date objects, nullable fields)
@@ -26,7 +23,6 @@ export const taskSchema = z.object({
   title: title,
   description: description.nullable(), // Database returns null, not undefined
   status: taskStatus,
-  priority: taskPriority,
   priorityScore: priorityScore,
 
   // Core content fields from design doc
@@ -76,25 +72,28 @@ export const createTaskApiSchema = createTaskSchema.extend({
   priorityScore: priorityScore.optional(),
 });
 
-// Helper function to convert priority enum to priority score
-export function priorityToScore(priority: TaskPriority): number {
-  switch (priority) {
-    case 'high':
-      return 75;
+// Priority level type for user-readable display
+export type PriorityLevel = 'low' | 'medium' | 'high';
+
+// Helper function to convert priority score to user-readable level
+export function scoreToPriorityLevel(score: number): PriorityLevel {
+  if (score < 20) return 'low';
+  if (score <= 70) return 'medium';
+  return 'high';
+}
+
+// Helper function to get default score for a priority level
+export function priorityLevelToScore(level: PriorityLevel): number {
+  switch (level) {
+    case 'low':
+      return 10;
     case 'medium':
       return 50;
-    case 'low':
-      return 25;
+    case 'high':
+      return 80;
     default:
       return 50;
   }
-}
-
-// Helper function to suggest priority enum based on score (for UI grouping)
-export function scoreToPriority(score: number): TaskPriority {
-  if (score >= 67) return 'high';
-  if (score >= 34) return 'medium';
-  return 'low';
 }
 
 // Basic transformation functions for database <-> API compatibility
@@ -133,24 +132,13 @@ export type UpdateTask = z.infer<typeof updateTaskSchema>;
 export type TaskApi = z.infer<typeof taskApiSchema>;
 export type CreateTaskApi = z.infer<typeof createTaskApiSchema>;
 export type TaskStatus = z.infer<typeof taskStatus>;
-export type TaskPriority = z.infer<typeof taskPriority>;
 export type PriorityScore = z.infer<typeof priorityScore>;
 
 // ===== PRIORITY UTILITIES =====
 
 /**
- * Get priority score for a task, with fallback to enum-based score conversion
+ * Get priority score for a task, with fallback to default
  */
-export function getEffectivePriorityScore(task: { priority: TaskPriority; priorityScore?: number | null }): number {
-  return task.priorityScore ?? priorityToScore(task.priority);
-}
-
-/**
- * Update priority score based on enum (for backward compatibility)
- */
-export function updatePriorityScore(createTaskData: any): any {
-  if (createTaskData.priority && !createTaskData.priorityScore) {
-    createTaskData.priorityScore = priorityToScore(createTaskData.priority);
-  }
-  return createTaskData;
+export function getEffectivePriorityScore(task: { priorityScore?: number | null }): number {
+  return task.priorityScore ?? 50;
 }

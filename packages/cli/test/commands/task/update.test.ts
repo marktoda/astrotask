@@ -9,7 +9,7 @@ describe('Update Task Command', () => {
         title: 'Updated Task',
         description: 'Updated description',
         status: 'in-progress' as const,
-        priority: 'high' as const,
+        priorityScore: 80,
         parent: 'PARENT-456',
       };
 
@@ -34,7 +34,7 @@ describe('Update Task Command', () => {
       expect(result.title).toBeUndefined();
       expect(result.description).toBeUndefined();
       expect(result.status).toBeUndefined();
-      expect(result.priority).toBeUndefined();
+      expect(result.priorityScore).toBeUndefined();
       expect(result.parent).toBeUndefined();
     });
 
@@ -59,22 +59,22 @@ describe('Update Task Command', () => {
       expect(() => options.parse(invalidOptions)).toThrow();
     });
 
-    it('should validate priority enum values', () => {
-      const validPriorities = ['low', 'medium', 'high'];
+    it('should validate priority score values', () => {
+      const validPriorityScores = [0, 25, 50, 75, 100];
       
-      for (const priority of validPriorities) {
+      for (const priorityScore of validPriorityScores) {
         const testOptions = {
           id: 'TASK-123',
-          priority,
+          priorityScore,
         };
         expect(() => options.parse(testOptions)).not.toThrow();
       }
     });
 
-    it('should reject invalid priority values', () => {
+    it('should reject invalid priority score values', () => {
       const invalidOptions = {
         id: 'TASK-123',
-        priority: 'urgent', // Invalid priority
+        priorityScore: 150, // Out of range (0-100)
       };
 
       expect(() => options.parse(invalidOptions)).toThrow();
@@ -134,20 +134,17 @@ describe('Update Task Command', () => {
       }
     });
 
-    it('should provide helpful error message for invalid priority', () => {
+    it('should provide helpful error message for invalid priority score', () => {
       const invalidOptions = {
         id: 'TASK-123',
-        priority: 'invalid-priority',
+        priorityScore: -10, // Invalid score
       };
 
       try {
         options.parse(invalidOptions);
         expect.fail('Should have thrown an error');
       } catch (error: any) {
-        expect(error.message).toContain('Invalid enum value');
-        expect(error.message).toContain('low');
-        expect(error.message).toContain('medium');
-        expect(error.message).toContain('high');
+        expect(error.message).toContain('Number must be greater than or equal to 0');
       }
     });
   });

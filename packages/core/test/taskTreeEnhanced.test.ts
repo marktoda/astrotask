@@ -2,14 +2,14 @@ import { describe, it, expect } from 'vitest';
 import { TaskTree, type BatchUpdateOperation } from '../src/entities/TaskTree.js';
 import type { Task } from '../src/schemas/task.js';
 
-function createMockTask(id: string, title: string, status: string = 'pending', priority: string = 'medium'): Task {
+function createMockTask(id: string, title: string, status: string = 'pending', priorityScore: number = 50): Task {
   return {
     id,
     parentId: null,
     title,
     description: null,
     status: status as any,
-    priority: priority as any,
+    priorityScore,
     prd: null,
     contextDigest: null,
     createdAt: new Date(),
@@ -81,31 +81,31 @@ describe('TaskTree Enhanced Features', () => {
     });
 
     it('chains multiple operations', () => {
-      const task = createMockTask('1', 'Original', 'pending', 'low');
+      const task = createMockTask('1', 'Original', 'pending', 80);
       const tree = TaskTree.fromTask(task);
       
       const operations: BatchUpdateOperation[] = [
         { type: 'update_task', taskId: '1', updates: { title: 'Updated' } },
         { type: 'update_task', taskId: '1', updates: { status: 'in-progress' } },
-        { type: 'update_task', taskId: '1', updates: { priority: 'high' } }
+        { type: 'update_task', taskId: '1', updates: { priorityScore: 80 } }
       ];
       
       const result = tree.batchUpdate(operations);
       expect(result.task.title).toBe('Updated');
       expect(result.task.status).toBe('in-progress');
-      expect(result.task.priority).toBe('high');
+      expect(result.task.priorityScore).toBe(80);
     });
   });
 
   describe('static batch operations', () => {
     it('finds tasks across multiple trees', () => {
-      const tree1 = TaskTree.fromTask(createMockTask('1', 'High Priority Task', 'pending', 'high'));
-      const tree2 = TaskTree.fromTask(createMockTask('2', 'Low Priority Task', 'pending', 'low'));
-      const tree3 = TaskTree.fromTask(createMockTask('3', 'Another High Priority', 'done', 'high'));
+      const tree1 = TaskTree.fromTask(createMockTask('1', 'High Priority Task', 'pending', 90));
+      const tree2 = TaskTree.fromTask(createMockTask('2', 'Low Priority Task', 'pending', 50));
+      const tree3 = TaskTree.fromTask(createMockTask('3', 'Another High Priority', 'done', 90));
       
       const results = TaskTree.batchFind(
         [tree1, tree2, tree3],
-        (task) => task.priority === 'high'
+        (task) => task.priorityScore === 90
       );
       
       expect(results.size).toBe(2);
@@ -115,8 +115,8 @@ describe('TaskTree Enhanced Features', () => {
     });
 
     it('transforms multiple trees', () => {
-      const tree1 = TaskTree.fromTask(createMockTask('1', 'Task 1', 'pending'));
-      const tree2 = TaskTree.fromTask(createMockTask('2', 'Task 2', 'pending'));
+      const tree1 = TaskTree.fromTask(createMockTask('1', 'Task 1', 'pending', 50));
+      const tree2 = TaskTree.fromTask(createMockTask('2', 'Task 2', 'pending', 50));
       
       const transformed = TaskTree.batchTransform(
         [tree1, tree2],
@@ -132,11 +132,11 @@ describe('TaskTree Enhanced Features', () => {
   describe('tree aggregation', () => {
     it('aggregates metrics across trees', () => {
       // Create a complex tree structure
-      const root1 = createMockTask('1', 'Root 1', 'done', 'high');
-      const child1 = createMockTask('2', 'Child 1', 'pending', 'medium');
-      const grandchild1 = createMockTask('3', 'Grandchild 1', 'in-progress', 'low');
+      const root1 = createMockTask('1', 'Root 1', 'done', 90);
+      const child1 = createMockTask('2', 'Child 1', 'pending', 50);
+      const grandchild1 = createMockTask('3', 'Grandchild 1', 'in-progress', 70);
       
-      const root2 = createMockTask('4', 'Root 2', 'pending', 'high');
+      const root2 = createMockTask('4', 'Root 2', 'pending', 90);
       
       const tree1 = TaskTree.fromTask(root1, [
         TaskTree.fromTask(child1, [
@@ -159,11 +159,10 @@ describe('TaskTree Enhanced Features', () => {
         'in-progress': 1
       });
       
-      // Priority distribution
+      // Priority distribution - using priority score ranges
       expect(metrics.priorityDistribution).toEqual({
-        'high': 2,
-        'medium': 1,
-        'low': 1
+        'high': 2,   // tasks with priorityScore 90 (2)
+        'medium': 2  // tasks with priorityScore 50 (1) and 70 (1)
       });
     });
 

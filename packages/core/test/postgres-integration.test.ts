@@ -35,7 +35,7 @@ describe('PostgreSQL Integration', () => {
       title: 'PostgreSQL Test Task',
       description: 'Testing PostgreSQL integration',
       status: 'pending',
-      priority: 'medium',
+      priorityScore: 50,
     });
 
     expect(task).toBeDefined();

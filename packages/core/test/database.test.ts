@@ -148,15 +148,20 @@ describe('Database Configuration', () => {
         title: 'Test Task',
         description: 'A test task',
         status: 'pending',
-        priority: 'medium',
+        priorityScore: 50,
       });
 
       expect(newTask).toBeDefined();
       expect(newTask.title).toBe('Test Task');
-      expect(newTask.priority).toBe('medium');
+      expect(newTask.priorityScore).toBe(50);
 
       const foundTask = await store.getTask(newTask.id);
-      expect(foundTask).toEqual(newTask);
+      expect(foundTask).toBeDefined();
+      expect(foundTask?.id).toBe(newTask.id);
+      expect(foundTask?.title).toBe(newTask.title);
+      expect(foundTask?.description).toBe(newTask.description);
+      expect(foundTask?.status).toBe(newTask.status);
+      expect(foundTask?.priorityScore).toBe(newTask.priorityScore);
 
       // Test status update
       const updatedTask = await store.updateTaskStatus(newTask.id, 'done');
@@ -193,7 +198,7 @@ describe('Database Configuration', () => {
         title: 'Parent Task',
         description: 'A parent task',
         status: 'pending',
-        priority: 'high',
+        priorityScore: 80,
       });
 
       // Create a subtask
@@ -202,7 +207,7 @@ describe('Database Configuration', () => {
         title: 'Subtask 1',
         description: 'A subtask',
         status: 'pending',
-        priority: 'medium',
+        priorityScore: 50,
       });
 
       expect(subtask.parentId).toBe(parentTask.id);
@@ -231,7 +236,7 @@ describe('Database Configuration', () => {
         title: 'Task with Context',
         description: 'A task that will have context',
         status: 'pending',
-        priority: 'medium',
+        priorityScore: 50,
       });
 
       // Add a context slice

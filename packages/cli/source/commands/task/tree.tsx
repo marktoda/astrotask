@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import zod from "zod";
 import { useDatabase } from "../../context/DatabaseContext.js";
 import { StatusRenderer } from "../../dashboard/utils/status-renderer.js";
+import { formatPriority } from "../../utils/priority.js";
 
 export const description =
 	"Visualize task hierarchy as an interactive tree. By default, shows only pending and in-progress tasks. Use --show-all to include completed and archived tasks.";
@@ -273,7 +274,7 @@ function TreeNodeComponent({
 					</>
 				)}
 				{/* Priority display */}
-				<Text color="magenta"> [{task.priority}{task.priorityScore ? ` (${task.priorityScore})` : ''}]</Text>
+				<Text color="magenta"> [{formatPriority(task.priorityScore)}]</Text>
 			</Text>
 
 			{/* Description if present */}

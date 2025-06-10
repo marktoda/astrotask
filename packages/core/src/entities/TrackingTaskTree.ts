@@ -218,21 +218,34 @@ export class TrackingTaskTree implements ITaskTree {
   }
 
   /**
-   * Update this task in place and record the operation
+   * Update this node's task data and record the operation for tracking
    */
   withTask(updates: Partial<Task>): this {
-    const operation: PendingOperation = {
+    // Transform dates if they are being updated
+    const transformedUpdates = { ...updates };
+    if (updates.createdAt) {
+      transformedUpdates.createdAt = this.transformTaskDates({
+        ...this._task,
+        createdAt: updates.createdAt,
+      }).createdAt;
+    }
+    if (updates.updatedAt) {
+      transformedUpdates.updatedAt = this.transformTaskDates({
+        ...this._task,
+        updatedAt: updates.updatedAt,
+      }).updatedAt;
+    }
+
+    // Apply updates to current task
+    this._task = { ...this._task, ...transformedUpdates };
+
+    // Record the operation for eventual reconciliation
+    this._pendingOperations.push({
       type: 'task_update',
       taskId: this.id,
-      updates: updates as Record<string, unknown>,
+      updates: transformedUpdates,
       timestamp: new Date(),
-    };
-
-    // Add operation to this node
-    this._pendingOperations.push(operation);
-
-    // Update task data in place
-    Object.assign(this._task, updates);
+    });
 
     return this;
   }
@@ -405,7 +418,12 @@ export class TrackingTaskTree implements ITaskTree {
           }
         }
       } else if (op.type === 'child_add') {
-        childAddOperations.push(op);
+        // Transform task dates in child_add operations
+        const transformedOp = {
+          ...op,
+          childData: this.transformTreeTaskDates(op.childData as TaskTreeData),
+        };
+        childAddOperations.push(transformedOp);
       } else if (op.type === 'child_remove') {
         childRemoveOperations.push(op);
       }
@@ -576,9 +594,7 @@ export class TrackingTaskTree implements ITaskTree {
   toMarkdown(indentLevel = 0): string {
     const indent = '  '.repeat(indentLevel);
     const status = this._task.status === 'done' ? '[x]' : '[ ]';
-    const priority = this._task.priority !== 'medium' || this._task.priorityScore !== 50 
-      ? ` (${this._task.priority}${this._task.priorityScore !== 50 ? ` ${this._task.priorityScore}` : ''})` 
-      : '';
+    const priority = this._task.priorityScore !== 50 ? ` (score: ${this._task.priorityScore})` : '';
 
     let markdown = `${indent}- ${status} ${this._task.title}${priority}\n`;
 
@@ -646,6 +662,46 @@ export class TrackingTaskTree implements ITaskTree {
     }
 
     return null;
+  }
+
+  /**
+   * Ensure dates are valid Date objects, transforming them if needed
+   */
+  private transformTaskDates(task: Task): Task {
+    const ensureDate = (value: unknown): Date => {
+      if (value instanceof Date && !Number.isNaN(value.getTime())) {
+        return value;
+      }
+      // Handle string dates or invalid dates
+      if (typeof value === 'string') {
+        const parsed = new Date(value);
+        if (!Number.isNaN(parsed.getTime())) {
+          return parsed;
+        }
+      }
+      // Handle number timestamps
+      if (typeof value === 'number' && !Number.isNaN(value)) {
+        return new Date(value);
+      }
+      // Fallback to current time for invalid dates
+      return new Date();
+    };
+
+    return {
+      ...task,
+      createdAt: ensureDate(task.createdAt),
+      updatedAt: ensureDate(task.updatedAt),
+    };
+  }
+
+  /**
+   * Transform all task dates in the tree data
+   */
+  private transformTreeTaskDates(data: TaskTreeData): TaskTreeData {
+    return {
+      task: this.transformTaskDates(data.task),
+      children: data.children.map((child) => this.transformTreeTaskDates(child)),
+    };
   }
 }
 

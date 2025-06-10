@@ -61,7 +61,6 @@ export const taskTreeSchema: z.ZodType<TaskTreeData> = z.lazy(() =>
       title: z.string(),
       description: z.string().nullable(),
       status: z.enum(['pending', 'in-progress', 'blocked', 'done', 'cancelled', 'archived']),
-      priority: z.enum(['low', 'medium', 'high']),
       priorityScore: z.number().min(0).max(100),
       prd: z.string().nullable(),
       contextDigest: z.string().nullable(),
@@ -92,12 +91,48 @@ export class TaskTree implements ITaskTree {
   private readonly _parent: TaskTree | null;
 
   constructor(data: TaskTreeData, parent: TaskTree | null = null) {
-    // Validate input data
-    taskTreeSchema.parse(data);
+    // Transform dates before validation to handle corrupted data
+    const transformedData = this.transformTaskTreeDates(data);
 
-    this._task = data.task;
+    // Validate input data
+    taskTreeSchema.parse(transformedData);
+
+    this._task = transformedData.task;
     this._parent = parent;
-    this._children = data.children.map((childData) => new TaskTree(childData, this));
+    this._children = transformedData.children.map((childData) => new TaskTree(childData, this));
+  }
+
+  /**
+   * Transform task tree data to ensure dates are valid Date objects
+   */
+  private transformTaskTreeDates(data: TaskTreeData): TaskTreeData {
+    const ensureDate = (value: unknown): Date => {
+      if (value instanceof Date && !Number.isNaN(value.getTime())) {
+        return value;
+      }
+      // Handle string dates or invalid dates
+      if (typeof value === 'string') {
+        const parsed = new Date(value);
+        if (!Number.isNaN(parsed.getTime())) {
+          return parsed;
+        }
+      }
+      // Handle number timestamps
+      if (typeof value === 'number' && !Number.isNaN(value)) {
+        return new Date(value);
+      }
+      // Fallback to current time for invalid dates
+      return new Date();
+    };
+
+    return {
+      task: {
+        ...data.task,
+        createdAt: ensureDate(data.task.createdAt),
+        updatedAt: ensureDate(data.task.updatedAt),
+      },
+      children: data.children.map((child) => this.transformTaskTreeDates(child)),
+    };
   }
 
   // Core getters
@@ -451,9 +486,11 @@ export class TaskTree implements ITaskTree {
         const statusCount = statusCounts.get(node.status) || 0;
         statusCounts.set(node.status, statusCount + 1);
 
-        // Count priorities
-        const priorityCount = priorityCounts.get(node.task.priority) || 0;
-        priorityCounts.set(node.task.priority, priorityCount + 1);
+        // Count priorities by level
+        const priorityLevel =
+          node.task.priorityScore < 20 ? 'low' : node.task.priorityScore <= 70 ? 'medium' : 'high';
+        const priorityCount = priorityCounts.get(priorityLevel) || 0;
+        priorityCounts.set(priorityLevel, priorityCount + 1);
       });
     }
 
@@ -478,9 +515,10 @@ export class TaskTree implements ITaskTree {
   toMarkdown(indentLevel = 0): string {
     const indent = '  '.repeat(indentLevel);
     const status = this._task.status === 'done' ? '[x]' : '[ ]';
-    const priority = this._task.priority !== 'medium' || this._task.priorityScore !== 50 
-      ? ` (${this._task.priority}${this._task.priorityScore !== 50 ? ` ${this._task.priorityScore}` : ''})` 
-      : '';
+    const priorityLevel =
+      this._task.priorityScore < 20 ? 'low' : this._task.priorityScore <= 70 ? 'medium' : 'high';
+    const priority =
+      this._task.priorityScore !== 50 ? ` (${priorityLevel} ${this._task.priorityScore})` : '';
 
     let markdown = `${indent}- ${status} ${this._task.title}${priority}\n`;
 

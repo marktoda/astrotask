@@ -3,6 +3,7 @@ import { Box, Text } from "ink";
 import { useEffect, useState } from "react";
 import zod from "zod";
 import { useDatabase, useTaskService } from "../../context/DatabaseContext.js";
+import { formatPriority } from "../../utils/priority.js";
 
 export const description =
 	"Get a specific task by ID with full context information, similar to next task but for a specific task";
@@ -44,7 +45,7 @@ export default function Get({ options }: Props) {
 			try {
 				// Get the task by ID
 				const task = await store.getTask(options.id);
-				
+
 				if (!task) {
 					setResult({
 						task: null,
@@ -78,9 +79,7 @@ export default function Get({ options }: Props) {
 					context,
 				});
 			} catch (err) {
-				setError(
-					err instanceof Error ? err.message : "Failed to get task",
-				);
+				setError(err instanceof Error ? err.message : "Failed to get task");
 			} finally {
 				setLoading(false);
 			}
@@ -121,19 +120,6 @@ export default function Get({ options }: Props) {
 		}
 	};
 
-	const getPriorityColor = (priority: string) => {
-		switch (priority) {
-			case "high":
-				return "red";
-			case "medium":
-				return "yellow";
-			case "low":
-				return "blue";
-			default:
-				return "white";
-		}
-	};
-
 	// If task not found
 	if (!result.task) {
 		return (
@@ -158,12 +144,10 @@ export default function Get({ options }: Props) {
 				</Text>
 				<Text bold>{task.title}</Text>
 				<Box>
-					<Text color={getStatusColor(task.status)}>
-						Status: {task.status}
-					</Text>
+					<Text color={getStatusColor(task.status)}>Status: {task.status}</Text>
 					<Text> | </Text>
-					<Text color={getPriorityColor(task.priority)}>
-						Priority: {task.priority}
+					<Text color="magenta">
+						Priority: {formatPriority(task.priorityScore)}
 					</Text>
 				</Box>
 				{task.description && (
@@ -263,13 +247,16 @@ export default function Get({ options }: Props) {
 								Context ({context.contextSlices.length}):
 							</Text>
 							{context.contextSlices.map((slice) => (
-								<Box key={slice.id} flexDirection="column" marginLeft={2} marginBottom={1}>
+								<Box
+									key={slice.id}
+									flexDirection="column"
+									marginLeft={2}
+									marginBottom={1}
+								>
 									<Text bold color="white">
 										{slice.title}
 									</Text>
-									<Text color="gray">
-										{slice.description}
-									</Text>
+									<Text color="gray">{slice.description}</Text>
 								</Box>
 							))}
 						</Box>
@@ -318,4 +305,4 @@ export default function Get({ options }: Props) {
 			</Box>
 		</Box>
 	);
-} 
+}

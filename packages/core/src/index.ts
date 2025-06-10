@@ -53,7 +53,6 @@ export {
   createTaskSchema,
   updateTaskSchema,
   taskStatus,
-  taskPriority,
   validateTask,
   contextSliceSchema,
   createContextSliceSchema,
@@ -83,7 +82,6 @@ export {
   validateStringConstraints,
   type ValidationError,
   type ValidationResult,
-  type Priority,
 } from './schemas/index.js';
 
 // TaskTree utilities
@@ -212,15 +210,14 @@ export type {
   Task,
   CreateTask,
   TaskStatus,
-  TaskPriority,
   PriorityScore,
+  PriorityLevel,
 } from './schemas/task.js';
-export { 
+export {
   taskToApi,
-  priorityToScore,
-  scoreToPriority,
+  scoreToPriorityLevel,
+  priorityLevelToScore,
   getEffectivePriorityScore,
-  updatePriorityScore,
   priorityScore,
 } from './schemas/task.js';
 
