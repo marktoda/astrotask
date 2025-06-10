@@ -80,7 +80,7 @@ export interface DashboardActions {
 	updateTaskStatus: (taskId: string, status: Task["status"]) => void;
 	updateTask: (taskId: string, updates: Partial<Task>) => void;
 	renameTask: (taskId: string, newTitle: string) => void;
-	deleteTask: (taskId: string) => void;
+	deleteTask: (taskId: string, cascade?: boolean) => { deletedCount: number };
 
 	// Helper to trigger re-renders after mutations
 	triggerTreeUpdate: () => void;
@@ -569,42 +569,71 @@ export function createDashboardStore(
 			}
 		},
 
-		deleteTask: (taskId) => {
+		deleteTask: (taskId, cascade = false) => {
+			console.log(`deleteTask called with taskId: ${taskId}, cascade: ${cascade}`);
+			
 			const { trackingTree } = get();
 
 			if (!trackingTree) {
 				set({ statusMessage: "No task tree loaded" });
-				return;
+				return { deletedCount: 0 };
 			}
 
 			// Find the task anywhere in the tree
 			const taskNode = trackingTree.find((task) => task.id === taskId);
 			if (!taskNode) {
 				set({ statusMessage: `Task ${taskId} not found` });
-				return;
+				return { deletedCount: 0 };
 			}
 
 			const parent = taskNode.getParent();
 
-			if (parent) {
-				parent.removeChild(taskId); // Mutation recorded automatically
-			} else if (trackingTree.id === taskId) {
+			if (trackingTree.id === taskId) {
 				// Deleting root - handle specially
 				set({ statusMessage: "Cannot delete root task" });
-				return;
+				return { deletedCount: 0 };
+			}
+
+			let deletedCount = 1; // Count the main task being deleted
+
+			if (cascade) {
+				// Get all descendants before deletion
+				const descendants = taskNode.getAllDescendants();
+				console.log(`Found ${descendants.length} descendants to delete`);
+				deletedCount += descendants.length;
+
+				// Remove each descendant individually (mutations recorded automatically)
+				for (const descendant of descendants) {
+					console.log(`Deleting descendant: ${descendant.id} (${descendant.title})`);
+					const descendantParent = descendant.getParent();
+					if (descendantParent) {
+						descendantParent.removeChild(descendant.id);
+					}
+				}
+			}
+
+			// Remove the main task
+			if (parent) {
+				parent.removeChild(taskId); // Mutation recorded automatically
 			}
 
 			// Trigger UI update immediately (optimistic update)
 			get().triggerTreeUpdate();
 			get().updateUnsavedChangesFlag();
 
-			set({ statusMessage: "Task deleted" });
+			const message = cascade && deletedCount > 1
+				? `Deleted task and ${deletedCount - 1} children (${deletedCount} total)`
+				: "Task deleted";
+			
+			set({ statusMessage: message });
 
 			// Enable auto-flush if not already enabled
 			// This will save changes automatically after a short delay
 			if (!get().autoFlushEnabled) {
 				get().enableAutoFlush();
 			}
+
+			return { deletedCount };
 		},
 
 		// Persistence control - now works for ALL pending operations

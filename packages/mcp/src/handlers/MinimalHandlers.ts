@@ -22,6 +22,7 @@ import type {
   AddTaskContextInput,
   AddDependencyInput,
   UpdateStatusInput,
+  DeleteTaskInput,
 } from './types.js';
 
 export class MinimalHandlers implements MCPHandler {
@@ -401,6 +402,65 @@ export class MinimalHandlers implements MCPHandler {
       };
     } catch (error) {
       this.logger.error('Updating task status failed', {
+        error: error instanceof Error ? error.message : String(error),
+        requestId: this.context.requestId,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Delete task with optional cascading to descendants
+   */
+  async deleteTask(args: DeleteTaskInput): Promise<{
+    deletedTask: Task;
+    message: string;
+    deletedCount: number;
+    cascaded: boolean;
+  }> {
+    try {
+      // Verify task exists
+      const existingTask = await this.context.astrotask.store.getTask(args.taskId);
+      if (!existingTask) {
+        throw new Error(`Task ${args.taskId} not found`);
+      }
+
+      let deletedCount = 1;
+      let cascaded = false;
+
+      if (args.cascade) {
+        // Get all descendants before deletion
+        const descendants = await this.context.astrotask.tasks.getTaskDescendants(args.taskId);
+        
+        // Delete all descendants first (bottom-up to avoid orphaning)
+        for (const descendant of descendants.reverse()) {
+          const deleted = await this.context.astrotask.store.deleteTask(descendant.id);
+          if (deleted) {
+            deletedCount++;
+          }
+        }
+        
+        cascaded = descendants.length > 0;
+      }
+
+      // Delete the main task
+      const deleted = await this.context.astrotask.store.deleteTask(args.taskId);
+      if (!deleted) {
+        throw new Error(`Failed to delete task ${args.taskId}`);
+      }
+
+      const message = cascaded
+        ? `Deleted task "${existingTask.title}" and ${deletedCount - 1} descendants (${deletedCount} total)`
+        : `Deleted task "${existingTask.title}"`;
+
+      return {
+        deletedTask: existingTask,
+        message,
+        deletedCount,
+        cascaded,
+      };
+    } catch (error) {
+      this.logger.error('Deleting task failed', {
         error: error instanceof Error ? error.message : String(error),
         requestId: this.context.requestId,
       });

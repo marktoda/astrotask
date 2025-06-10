@@ -261,8 +261,8 @@ export class CommandPalette {
 					}
 
 					try {
-						await stateData.deleteTask(taskId);
-						stateData.setStatusMessage(`Task "${taskId}" deleted successfully`);
+						stateData.deleteTask(taskId);
+						// Status message is already set by deleteTask
 					} catch (error) {
 						stateData.setStatusMessage(
 							`Error deleting task: ${error instanceof Error ? error.message : String(error)}`,

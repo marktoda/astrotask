@@ -281,18 +281,22 @@ export class TaskTreeComponent {
 			}
 		});
 
-		// Delete task - changed from Shift+D to Delete to avoid conflict with mark done
-		this.list.key(["delete", "C-d"], () => {
+		// Delete task - using multiple key bindings for better compatibility
+		this.list.key(["delete", "C-d", "x"], () => {
 			const selectedIndex = (this.list as any).selected;
 			const item = this.currentItems[selectedIndex];
 
 			if (item) {
 				// Show immediate status feedback
 				state().setStatusMessage(`Deleting task: ${item.task.title}...`);
+				
+				// Debug logging
+				console.log(`Delete key pressed for task: ${item.task.title}`);
 
-				this.confirmDelete(item.task, () => {
+				this.confirmDelete(item.task, (cascade) => {
 					try {
-						state().deleteTask(item.taskId);
+						state().deleteTask(item.taskId, cascade);
+						// Status message is already set by deleteTask, no need to override
 					} catch (error) {
 						console.error("Error in deleteTask:", error);
 						state().setStatusMessage(`Error deleting task: ${error}`);
@@ -376,7 +380,9 @@ export class TaskTreeComponent {
 		});
 	}
 
-	private confirmDelete(task: Task, callback: () => void) {
+	private confirmDelete(task: Task, callback: (cascade: boolean) => void) {
+		console.log(`confirmDelete called for task: ${task.title}`);
+		
 		// Temporarily disable renders to prevent jittering
 		const originalRender = this.render.bind(this);
 		let renderingDisabled = true;
@@ -388,12 +394,27 @@ export class TaskTreeComponent {
 			}
 		};
 
-		const question = blessed.question({
+		// Get child count for the task
+		const state = this.store.getState();
+		const taskNode = state.trackingTree?.find((t) => t.id === task.id);
+		const childCount = taskNode ? taskNode.getAllDescendants().length : 0;
+		
+		console.log(`Task ${task.title} has ${childCount} children`);
+
+		// Create the dialog text based on whether task has children
+		let promptText: string;
+		if (childCount > 0) {
+			promptText = `Delete "${task.title}" and ${childCount} children? (y/t/n)`;
+		} else {
+			promptText = `Delete "${task.title}"? (y/n)`;
+		}
+
+		const prompt = blessed.prompt({
 			parent: this.list.screen,
 			top: "center",
 			left: "center",
 			height: "shrink",
-			width: "50%",
+			width: Math.max(50, promptText.length + 10),
 			border: {
 				type: "line",
 			},
@@ -410,30 +431,37 @@ export class TaskTreeComponent {
 			renderingDisabled = false;
 			this.render = originalRender;
 
-			// Remove the question
-			if (question.parent) {
-				question.destroy();
+			// Remove the prompt
+			if (prompt.parent) {
+				prompt.destroy();
 			}
 
 			// Force a render to update display
 			this.list.screen.render();
 		};
 
-		question.ask(`Delete task "${task.title}"? (y/n)`, (err, value) => {
+		prompt.input(promptText, "", (err, value) => {
 			cleanup();
-			// Handle both boolean true (blessed returns this) and string "y"
-			const shouldDelete =
-				!err &&
-				value &&
-				((value as any) === true ||
-					(typeof value === "string" && value.toLowerCase() === "y"));
-			if (shouldDelete) {
-				callback();
+			console.log(`Prompt response: ${value}, error: ${err}`);
+			
+			if (err || !value) return;
+
+			const response = value.toLowerCase().trim();
+			
+			if (response === "y" || response === "yes") {
+				// Delete with cascade (if has children) or simple delete (if no children)
+				console.log(`Calling callback with cascade: ${childCount > 0}`);
+				callback(childCount > 0);
+			} else if (response === "t" && childCount > 0) {
+				// Delete task only (no cascade)
+				console.log("Calling callback with cascade: false");
+				callback(false);
 			}
+			// Any other response cancels the operation
 		});
 
 		// Handle escape/cancel
-		question.key(["escape", "C-c", "n"], () => {
+		prompt.key(["escape", "C-c"], () => {
 			cleanup();
 		});
 	}

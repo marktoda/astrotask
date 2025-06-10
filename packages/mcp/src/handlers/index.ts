@@ -19,6 +19,7 @@ export {
   addTaskContextSchema,
   addDependencySchema,
   updateStatusSchema,
+  deleteTaskSchema,
   type GetNextTaskInput,
   type AddTaskInput,
   type AddTasksInput,
@@ -26,6 +27,7 @@ export {
   type AddTaskContextInput,
   type AddDependencyInput,
   type UpdateStatusInput,
+  type DeleteTaskInput,
   type HandlerContext,
   type MCPHandler
 } from './types.js';

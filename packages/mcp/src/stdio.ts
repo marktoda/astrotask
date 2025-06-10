@@ -10,7 +10,8 @@ import {
   listTasksSchema,
   addTaskContextSchema,
   addDependencySchema,
-  updateStatusSchema
+  updateStatusSchema,
+  deleteTaskSchema
 } from './handlers/index.js';
 import { wrapMCPHandler } from './utils/response.js';
 
@@ -96,11 +97,20 @@ async function main() {
     })
   );
 
+  server.tool('deleteTask',
+    deleteTaskSchema.shape,
+    wrapMCPHandler(async (args) => {
+      const context = createHandlerContext();
+      const handlers = new MinimalHandlers(context);
+      return handlers.deleteTask(args);
+    })
+  );
+
   // Begin listening on stdio
   const transport = new StdioServerTransport();
   await server.connect(transport);
 
-  logger.info('Astrotask MCP Server (stdio) started with 6 enhanced tools: getNextTask, addTasks, listTasks, addTaskContext, addDependency, updateStatus');
+  logger.info('Astrotask MCP Server (stdio) started with 7 enhanced tools: getNextTask, addTasks, listTasks, addTaskContext, addDependency, updateStatus, deleteTask');
 
   // Set up graceful shutdown with Astrotask SDK cleanup
   const setupShutdownHandlers = () => {

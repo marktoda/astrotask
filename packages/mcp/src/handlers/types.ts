@@ -188,6 +188,21 @@ export const updateStatusSchema = z.object({
 }).describe("Update the status of an existing task, commonly used to mark tasks as done or in-progress");
 
 /**
+ * Schema for deleting an existing task with optional cascading to children.
+ * Provides safe task deletion with confirmation and impact assessment.
+ */
+export const deleteTaskSchema = z.object({
+  taskId: z
+    .string()
+    .describe("ID of the existing task to delete. The task must already exist in the system."),
+  cascade: z
+    .boolean()
+    .optional()
+    .default(false)
+    .describe("Whether to delete all descendant tasks along with the target task. When false, only the specified task is deleted (children become orphaned). When true, all children and grandchildren are also deleted.")
+}).describe("Delete an existing task with optional cascading to all descendant tasks");
+
+/**
  * TypeScript types inferred from the schemas
  */
 export type GetNextTaskInput = z.infer<typeof getNextTaskSchema>;
@@ -197,3 +212,4 @@ export type ListTasksInput = z.infer<typeof listTasksSchema>;
 export type AddTaskContextInput = z.infer<typeof addTaskContextSchema>;
 export type AddDependencyInput = z.infer<typeof addDependencySchema>;
 export type UpdateStatusInput = z.infer<typeof updateStatusSchema>;
+export type DeleteTaskInput = z.infer<typeof deleteTaskSchema>;
