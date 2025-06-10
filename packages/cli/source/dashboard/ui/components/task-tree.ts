@@ -155,15 +155,18 @@ export class TaskTreeComponent {
 			const selectedIndex = (this.list as any).selected;
 			const item = this.currentItems[selectedIndex];
 			if (item) {
-				// New behavior: Toggle between pending and in-progress
+				// New behavior: Cycle through status: pending -> in-progress -> done -> pending
 				if (item.task.status === "pending") {
 					state().updateTaskStatus(item.taskId, "in-progress");
 					state().setStatusMessage(`Started: ${item.task.title}`);
 				} else if (item.task.status === "in-progress") {
+					state().updateTaskStatus(item.taskId, "done");
+					state().setStatusMessage(`Completed: ${item.task.title} ✓`);
+				} else if (item.task.status === "done") {
 					state().updateTaskStatus(item.taskId, "pending");
-					state().setStatusMessage(`Paused: ${item.task.title}`);
+					state().setStatusMessage(`Reopened: ${item.task.title}`);
 				} else {
-					// For other statuses, expand/collapse if has children
+					// For other statuses (blocked, cancelled, archived), expand/collapse if has children
 					if (item.hasChildren) {
 						state().toggleTaskExpanded(item.taskId);
 					}
@@ -185,7 +188,7 @@ export class TaskTreeComponent {
 			}
 		});
 
-		// Space to also toggle pending⇄in-progress (same as Enter for consistency)
+		// Space to also toggle status (same as Enter for consistency)
 		this.list.key(["space"], async () => {
 			const now = Date.now();
 			if (now - this.lastKeyPress < this.keyDebounceMs) return;
@@ -194,17 +197,20 @@ export class TaskTreeComponent {
 			const selectedIndex = (this.list as any).selected;
 			const item = this.currentItems[selectedIndex];
 			if (item) {
-				// New behavior: Toggle between pending and in-progress only
+				// New behavior: Cycle through status: pending -> in-progress -> done -> pending
 				if (item.task.status === "pending") {
 					state().updateTaskStatus(item.taskId, "in-progress");
 					state().setStatusMessage(`Started: ${item.task.title}`);
 				} else if (item.task.status === "in-progress") {
+					state().updateTaskStatus(item.taskId, "done");
+					state().setStatusMessage(`Completed: ${item.task.title} ✓`);
+				} else if (item.task.status === "done") {
 					state().updateTaskStatus(item.taskId, "pending");
-					state().setStatusMessage(`Paused: ${item.task.title}`);
+					state().setStatusMessage(`Reopened: ${item.task.title}`);
 				} else {
 					// For other statuses, show a message
 					state().setStatusMessage(
-						`Cannot toggle - task is ${item.task.status}. Use Shift+D to mark done, or b to block/unblock.`,
+						`Cannot toggle - task is ${item.task.status}. Use Enter/Space to cycle status, or b to block/unblock.`,
 					);
 				}
 			}
@@ -623,6 +629,21 @@ export class TaskTreeComponent {
 
 		const items: TaskTreeItem[] = [];
 
+		// Helper function to sort children by status - done tasks go to bottom
+		const sortChildrenByStatus = (children: readonly (TaskTree | TrackingTaskTree)[]) => {
+			return [...children].sort((a, b) => {
+				const aIsDone = a.task.status === "done" || a.task.status === "archived";
+				const bIsDone = b.task.status === "done" || b.task.status === "archived";
+				
+				// If one is done and the other isn't, put done task last
+				if (aIsDone && !bIsDone) return 1;
+				if (!aIsDone && bIsDone) return -1;
+				
+				// If both have same "doneness", maintain original order (stable sort)
+				return 0;
+			});
+		};
+
 		const addTreeNode = (node: TaskTree | TrackingTaskTree, depth: number) => {
 			// Apply status filtering: skip completed tasks if showCompletedTasks is false
 			const isCompleted =
@@ -649,16 +670,18 @@ export class TaskTreeComponent {
 					index: items.length, // Store the index for reference
 				});
 
-				// Add children if expanded
+				// Add children if expanded, sorted with done tasks at bottom
 				if (isExpanded && hasChildren) {
-					for (const child of node.getChildren()) {
+					const sortedChildren = sortChildrenByStatus(node.getChildren());
+					for (const child of sortedChildren) {
 						addTreeNode(child, depth + 1);
 					}
 				}
 			} else if (node.getChildren().length > 0) {
 				// Even if we skip the parent task, we still need to process children
 				// in case they should be visible (e.g., incomplete children of completed parent)
-				for (const child of node.getChildren()) {
+				const sortedChildren = sortChildrenByStatus(node.getChildren());
+				for (const child of sortedChildren) {
 					addTreeNode(child, depth); // Keep same depth since parent is hidden
 				}
 			}
@@ -675,7 +698,9 @@ export class TaskTreeComponent {
 			}
 		} else {
 			// Show all root-level tasks (children of the project root) when no specific project is selected
-			for (const rootTask of trackingTree.getChildren()) {
+			// Sort root tasks with done tasks at bottom
+			const sortedRootTasks = sortChildrenByStatus(trackingTree.getChildren());
+			for (const rootTask of sortedRootTasks) {
 				addTreeNode(rootTask, 0);
 			}
 		}
@@ -697,6 +722,26 @@ export class TaskTreeComponent {
 
 		const items: TaskTreeItem[] = [];
 		const visited = new Set<string>();
+
+		// Helper function to sort dependents by status - done tasks go to bottom
+		const sortDependentsByStatus = (dependentIds: string[]) => {
+			return [...dependentIds].sort((aId, bId) => {
+				const aTask = trackingTree.find((task) => task.id === aId);
+				const bTask = trackingTree.find((task) => task.id === bId);
+				
+				if (!aTask || !bTask) return 0;
+				
+				const aIsDone = aTask.task.status === "done" || aTask.task.status === "archived";
+				const bIsDone = bTask.task.status === "done" || bTask.task.status === "archived";
+				
+				// If one is done and the other isn't, put done task last
+				if (aIsDone && !bIsDone) return 1;
+				if (!aIsDone && bIsDone) return -1;
+				
+				// If both have same "doneness", maintain original order (stable sort)
+				return 0;
+			});
+		};
 
 		// Helper function to add a task and its dependents
 		const addDependencyNode = (taskId: string, depth: number) => {
@@ -737,9 +782,10 @@ export class TaskTreeComponent {
 					index: items.length,
 				});
 
-				// Add dependents if expanded
+				// Add dependents if expanded, sorted with done tasks at bottom
 				if (isExpanded && hasChildren) {
-					for (const dependentId of dependents) {
+					const sortedDependents = sortDependentsByStatus(dependents);
+					for (const dependentId of sortedDependents) {
 						addDependencyNode(dependentId, depth + 1);
 					}
 				}
@@ -747,7 +793,8 @@ export class TaskTreeComponent {
 				// Even if we skip the task, we still need to process its dependents
 				// in case they should be visible
 				const dependents = trackingDependencyGraph.getDependents(taskId);
-				for (const dependentId of dependents) {
+				const sortedDependents = sortDependentsByStatus(dependents);
+				for (const dependentId of sortedDependents) {
 					addDependencyNode(dependentId, depth); // Keep same depth since parent is hidden
 				}
 			}
@@ -764,8 +811,25 @@ export class TaskTreeComponent {
 			return dependencies.length === 0;
 		});
 
-		// Add each root task and its dependency tree
-		for (const rootTaskId of rootTasks) {
+		// Sort root tasks with done tasks at bottom, then add each root task and its dependency tree
+		const sortedRootTasks = rootTasks.sort((aId, bId) => {
+			const aTask = trackingTree.find((task) => task.id === aId);
+			const bTask = trackingTree.find((task) => task.id === bId);
+			
+			if (!aTask || !bTask) return 0;
+			
+			const aIsDone = aTask.task.status === "done" || aTask.task.status === "archived";
+			const bIsDone = bTask.task.status === "done" || bTask.task.status === "archived";
+			
+			// If one is done and the other isn't, put done task last
+			if (aIsDone && !bIsDone) return 1;
+			if (!aIsDone && bIsDone) return -1;
+			
+			// If both have same "doneness", maintain original order (stable sort)
+			return 0;
+		});
+
+		for (const rootTaskId of sortedRootTasks) {
 			addDependencyNode(rootTaskId, 0);
 		}
 

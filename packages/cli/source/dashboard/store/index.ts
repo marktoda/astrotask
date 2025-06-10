@@ -27,7 +27,7 @@ export interface DashboardState {
 	loadingContextSlices: Set<string>; // Track which task IDs are currently loading
 
 	// Status filtering state
-	showCompletedTasks: boolean; // When false, hide done/archived tasks (default: false)
+	showCompletedTasks: boolean; // When false, hide done/archived tasks (default: true)
 	statusFilterCounts: {
 		total: number;
 		visible: number;
@@ -195,7 +195,7 @@ export function createDashboardStore(
 		lastFlushTime: 0,
 		autoFlushEnabled: false,
 		isFlushingChanges: false,
-		showCompletedTasks: false,
+		showCompletedTasks: true,
 		statusFilterCounts: { total: 0, visible: 0, hidden: 0 },
 
 		// Helper to trigger re-renders after mutations
