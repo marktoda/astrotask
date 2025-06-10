@@ -1,7 +1,7 @@
 {
   "mcpServers": {
     "astrotask": {
-      "command": "./.cursor/run-astrotask.sh",
+      "command": "/home/toda/dev/astrotask/.cursor/run-astrotask.sh",
       "args": [],
       "env": {}
     }

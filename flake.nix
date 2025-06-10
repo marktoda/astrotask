@@ -36,6 +36,7 @@
           mkdir -p "$NPM_CONFIG_PREFIX"
 
           npm install -g @astrotask/cli
+          npm install -g @astrotask/mcp
 
           # Set Biome binary path for consistency
           export BIOME_BINARY="${pkgs.biome}/bin/biome"
