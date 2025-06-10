@@ -12,6 +12,7 @@ import { z } from 'zod';
 import {
   taskStatus,
   taskPriority,
+  priorityScore,
   type TaskStatus,
   type TaskPriority,
   Astrotask
@@ -78,6 +79,9 @@ export const addTaskSchema = z.object({
     .optional()
     .default('medium')
     .describe("Task priority level affecting execution order. Options: 'low', 'medium' (default), 'high'. Higher priority tasks are worked on first."),
+  priorityScore: priorityScore
+    .optional()
+    .describe("Fine-grained priority score (0-100). Higher numbers indicate higher priority. If not provided, defaults to score based on priority field (high=75, medium=50, low=25)."),
   status: taskStatus
     .optional()
     .default('pending')

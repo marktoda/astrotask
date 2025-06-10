@@ -62,6 +62,7 @@ export const taskTreeSchema: z.ZodType<TaskTreeData> = z.lazy(() =>
       description: z.string().nullable(),
       status: z.enum(['pending', 'in-progress', 'blocked', 'done', 'cancelled', 'archived']),
       priority: z.enum(['low', 'medium', 'high']),
+      priorityScore: z.number().min(0).max(100),
       prd: z.string().nullable(),
       contextDigest: z.string().nullable(),
       createdAt: z.date(),
@@ -477,7 +478,9 @@ export class TaskTree implements ITaskTree {
   toMarkdown(indentLevel = 0): string {
     const indent = '  '.repeat(indentLevel);
     const status = this._task.status === 'done' ? '[x]' : '[ ]';
-    const priority = this._task.priority !== 'medium' ? ` (${this._task.priority})` : '';
+    const priority = this._task.priority !== 'medium' || this._task.priorityScore !== 50 
+      ? ` (${this._task.priority}${this._task.priorityScore !== 50 ? ` ${this._task.priorityScore}` : ''})` 
+      : '';
 
     let markdown = `${indent}- ${status} ${this._task.title}${priority}\n`;
 

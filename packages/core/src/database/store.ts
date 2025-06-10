@@ -5,10 +5,11 @@ import type {
   ContextSlice,
   CreateContextSlice as NewContextSlice,
 } from '../schemas/contextSlice.js';
-import type { CreateTask as NewTask, Task, TaskStatus } from '../schemas/task.js';
+import type { CreateTask, Task, TaskStatus } from '../schemas/task.js';
 import { generateNextTaskId } from '../utils/taskId.js';
 import type { DatabaseClient, DrizzleOps } from './adapters/types.js';
 import * as schema from './schema.js';
+import * as sqliteSchema from './schema-sqlite.js';
 
 /**
  * Store interface for database operations
@@ -32,8 +33,8 @@ export interface Store<TDrizzle extends DrizzleOps = DrizzleOps> {
     parentId?: string | null;
     includeProjectRoot?: boolean;
   }): Promise<Task[]>;
-  addTask(data: NewTask): Promise<Task>;
-  addTaskWithId(data: NewTask & { id: string }): Promise<Task>;
+  addTask(data: CreateTask): Promise<Task>;
+  addTaskWithId(data: CreateTask & { id: string }): Promise<Task>;
   getTask(id: string): Promise<Task | null>;
   updateTask(id: string, updates: Partial<Omit<Task, 'id' | 'createdAt'>>): Promise<Task | null>;
   deleteTask(id: string): Promise<boolean>;
@@ -64,11 +65,21 @@ export class DatabaseStore<
   /** Native Drizzle ORM instance for the selected dialect */
   public readonly sql: TDrizzle;
   public readonly isEncrypted: boolean;
+  /** Adapter type to determine which schema to use */
+  private readonly adapterType: string;
 
-  constructor(client: TClient, sql: TDrizzle, _isSyncing = false, isEncrypted = false) {
+  constructor(client: TClient, sql: TDrizzle, adapterType: string, _isSyncing = false, isEncrypted = false) {
     this.pgLite = client;
     this.sql = sql;
+    this.adapterType = adapterType;
     this.isEncrypted = isEncrypted;
+  }
+
+  /**
+   * Get the appropriate schema based on adapter type
+   */
+  private getSchema() {
+    return this.adapterType === 'sqlite' ? sqliteSchema : schema;
   }
 
   // Task operations
@@ -86,45 +97,59 @@ export class DatabaseStore<
       if (filters.statuses.length === 1) {
         const status = filters.statuses[0];
         if (status) {
-          conditions.push(eq(schema.tasks.status, status));
+          conditions.push(eq(this.getSchema().tasks.status, status));
         }
       } else if (filters.statuses.length > 1) {
-        conditions.push(inArray(schema.tasks.status, filters.statuses));
+        conditions.push(inArray(this.getSchema().tasks.status, filters.statuses));
       }
       // If statuses is an empty array, don't add any status filter (show all)
     } else {
       // Default behavior when no statuses parameter is provided: show pending and in-progress
-      conditions.push(inArray(schema.tasks.status, ['pending', 'in-progress']));
+      conditions.push(inArray(this.getSchema().tasks.status, ['pending', 'in-progress']));
     }
 
     if (filters.parentId !== undefined) {
       if (filters.parentId === null) {
-        conditions.push(isNull(schema.tasks.parentId));
+        conditions.push(isNull(this.getSchema().tasks.parentId));
       } else {
-        conditions.push(eq(schema.tasks.parentId, filters.parentId));
+        conditions.push(eq(this.getSchema().tasks.parentId, filters.parentId));
       }
     }
 
     // Exclude PROJECT_ROOT from normal listings unless explicitly requested
     if (!filters.includeProjectRoot) {
-      conditions.push(ne(schema.tasks.id, TASK_IDENTIFIERS.PROJECT_ROOT));
+      conditions.push(ne(this.getSchema().tasks.id, TASK_IDENTIFIERS.PROJECT_ROOT));
     }
 
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
-    return await this.sql
-      .select()
-      .from(schema.tasks)
+    const results = await this.sql
+      .select({
+        id: this.getSchema().tasks.id,
+        parentId: this.getSchema().tasks.parentId,
+        title: this.getSchema().tasks.title,
+        description: this.getSchema().tasks.description,
+        status: this.getSchema().tasks.status,
+        priority: this.getSchema().tasks.priority,
+        priorityScore: this.getSchema().tasks.priorityScore,
+        prd: this.getSchema().tasks.prd,
+        contextDigest: this.getSchema().tasks.contextDigest,
+        createdAt: this.getSchema().tasks.createdAt,
+        updatedAt: this.getSchema().tasks.updatedAt,
+      })
+      .from(this.getSchema().tasks)
       .where(whereClause)
-      .orderBy(desc(schema.tasks.createdAt));
+      .orderBy(desc(this.getSchema().tasks.createdAt));
+    
+    return results as Task[];
   }
 
-  async addTask(data: NewTask): Promise<Task> {
+  async addTask(data: CreateTask): Promise<Task> {
     const id = await generateNextTaskId(this, data.parentId);
     return await this.addTaskWithId({ ...data, id });
   }
 
-  async addTaskWithId(data: NewTask & { id: string }): Promise<Task> {
+  async addTaskWithId(data: CreateTask & { id: string }): Promise<Task> {
     const now = new Date();
     const task: Task = {
       id: data.id,
@@ -132,6 +157,7 @@ export class DatabaseStore<
       description: data.description ?? null,
       status: data.status,
       priority: data.priority,
+      priorityScore: data.priorityScore ?? 50,
       prd: data.prd ?? null,
       contextDigest: data.contextDigest ?? null,
       parentId: data.parentId ?? TASK_IDENTIFIERS.PROJECT_ROOT,
@@ -139,18 +165,30 @@ export class DatabaseStore<
       updatedAt: now,
     };
 
-    await this.sql.insert(schema.tasks).values(task);
+    await this.sql.insert(this.getSchema().tasks).values(task);
     return task;
   }
 
   async getTask(id: string): Promise<Task | null> {
     const tasks = await this.sql
-      .select()
-      .from(schema.tasks)
-      .where(eq(schema.tasks.id, id))
+      .select({
+        id: this.getSchema().tasks.id,
+        parentId: this.getSchema().tasks.parentId,
+        title: this.getSchema().tasks.title,
+        description: this.getSchema().tasks.description,
+        status: this.getSchema().tasks.status,
+        priority: this.getSchema().tasks.priority,
+        priorityScore: this.getSchema().tasks.priorityScore,
+        prd: this.getSchema().tasks.prd,
+        contextDigest: this.getSchema().tasks.contextDigest,
+        createdAt: this.getSchema().tasks.createdAt,
+        updatedAt: this.getSchema().tasks.updatedAt,
+      })
+      .from(this.getSchema().tasks)
+      .where(eq(this.getSchema().tasks.id, id))
       .limit(1);
 
-    return tasks[0] || null;
+    return (tasks[0] as Task) || null;
   }
 
   async updateTask(
@@ -162,13 +200,13 @@ export class DatabaseStore<
       updatedAt: new Date(),
     };
 
-    await this.sql.update(schema.tasks).set(updateData).where(eq(schema.tasks.id, id));
+    await this.sql.update(this.getSchema().tasks).set(updateData).where(eq(this.getSchema().tasks.id, id));
 
     return this.getTask(id);
   }
 
   async deleteTask(id: string): Promise<boolean> {
-    const result = await this.sql.delete(schema.tasks).where(eq(schema.tasks.id, id)).returning();
+    const result = await this.sql.delete(this.getSchema().tasks).where(eq(this.getSchema().tasks.id, id)).returning();
 
     return result.length > 0;
   }
@@ -194,9 +232,9 @@ export class DatabaseStore<
   async listContextSlices(taskId: string): Promise<ContextSlice[]> {
     return await this.sql
       .select()
-      .from(schema.contextSlices)
-      .where(eq(schema.contextSlices.taskId, taskId))
-      .orderBy(desc(schema.contextSlices.createdAt));
+      .from(this.getSchema().contextSlices)
+      .where(eq(this.getSchema().contextSlices.taskId, taskId))
+      .orderBy(desc(this.getSchema().contextSlices.createdAt));
   }
 
   async addContextSlice(data: NewContextSlice): Promise<ContextSlice> {
@@ -211,7 +249,7 @@ export class DatabaseStore<
       updatedAt: now,
     };
 
-    await this.sql.insert(schema.contextSlices).values(contextSlice);
+    await this.sql.insert(this.getSchema().contextSlices).values(contextSlice);
     return contextSlice;
   }
 

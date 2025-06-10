@@ -364,6 +364,7 @@ export class PRDTaskGenerator implements TaskGenerator {
       description: this.extractSummaryFromContent(input.content),
       status: 'pending',
       priority: 'high',
+      priorityScore: 75, // High priority = 75
       prd: input.content,
       contextDigest: `Generated from PRD at ${now.toISOString()}`,
       createdAt: now,
@@ -395,6 +396,7 @@ export class PRDTaskGenerator implements TaskGenerator {
       description: createTask.description || null,
       status: createTask.status,
       priority: createTask.priority,
+      priorityScore: createTask.priorityScore ?? 50, // Use provided score or default to 50
       prd: createTask.prd || null,
       contextDigest: createTask.contextDigest || null,
       createdAt: new Date(),

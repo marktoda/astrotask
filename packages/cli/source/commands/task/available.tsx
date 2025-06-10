@@ -104,6 +104,10 @@ export default function Available({ options }: Props) {
 									{" "}
 									[{task.status}]
 								</Text>
+								<Text color="magenta">
+									{" "}
+									[{task.priority}{task.priorityScore ? ` (${task.priorityScore})` : ''}]
+								</Text>
 							</Text>
 							{task.description && (
 								<Box marginLeft={2}>
@@ -129,6 +133,10 @@ export default function Available({ options }: Props) {
 									{" "}
 									[{task.status}]
 								</Text>
+								<Text color="magenta">
+									{" "}
+									[{task.priority}{task.priorityScore ? ` (${task.priorityScore})` : ''}]
+								</Text>
 							</Text>
 							{task.description && (
 								<Box marginLeft={2}>
@@ -153,6 +161,10 @@ export default function Available({ options }: Props) {
 								<Text color={getStatusColor(task.status)}>
 									{" "}
 									[{task.status}]
+								</Text>
+								<Text color="magenta">
+									{" "}
+									[{task.priority}{task.priorityScore ? ` (${task.priorityScore})` : ''}]
 								</Text>
 							</Text>
 							{task.description && (

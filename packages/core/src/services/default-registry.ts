@@ -46,6 +46,7 @@ export function createDefaultRegistry(config: RegistryConfig): DefaultRegistryRe
   const store = new DatabaseStore(
     config.adapter.client,
     config.adapter.drizzle,
+    config.adapter.type,
     cfg.STORE_IS_SYNCING,
     cfg.STORE_IS_ENCRYPTED
   );

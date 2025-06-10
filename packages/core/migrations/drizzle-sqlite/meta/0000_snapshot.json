@@ -1,8 +1,8 @@
 {
-  "id": "dd183a99-de17-413a-a6a1-7b6de62d17c3",
-  "prevId": "00000000-0000-0000-0000-000000000000",
-  "version": "7",
+  "version": "6",
   "dialect": "sqlite",
+  "id": "960e3e61-f9fc-4adf-a11f-9096abf86646",
+  "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "context_slices": {
       "name": "context_slices",
@@ -57,16 +57,25 @@
           "autoincrement": false
         }
       },
-      "indexes": {
-        "idx_context_slices_task_id": {
-          "name": "idx_context_slices_task_id",
-          "columns": ["task_id"],
-          "isUnique": false
+      "indexes": {},
+      "foreignKeys": {
+        "context_slices_task_id_tasks_id_fk": {
+          "name": "context_slices_task_id_tasks_id_fk",
+          "tableFrom": "context_slices",
+          "tableTo": "tasks",
+          "columnsFrom": [
+            "task_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
-      "foreignKeys": {},
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {}
+      "uniqueConstraints": {},
+      "checkConstraints": {}
     },
     "task_dependencies": {
       "name": "task_dependencies",
@@ -101,23 +110,49 @@
         }
       },
       "indexes": {
-        "idx_task_dependencies_dependent": {
-          "name": "idx_task_dependencies_dependent",
-          "columns": ["dependent_task_id"],
-          "isUnique": false
-        },
-        "idx_task_dependencies_dependency": {
-          "name": "idx_task_dependencies_dependency",
-          "columns": ["dependency_task_id"],
-          "isUnique": false
-        }
-      },
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {
         "unique_dependency": {
           "name": "unique_dependency",
-          "columns": ["dependent_task_id", "dependency_task_id"]
+          "columns": [
+            "dependent_task_id",
+            "dependency_task_id"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "task_dependencies_dependent_task_id_tasks_id_fk": {
+          "name": "task_dependencies_dependent_task_id_tasks_id_fk",
+          "tableFrom": "task_dependencies",
+          "tableTo": "tasks",
+          "columnsFrom": [
+            "dependent_task_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "task_dependencies_dependency_task_id_tasks_id_fk": {
+          "name": "task_dependencies_dependency_task_id_tasks_id_fk",
+          "tableFrom": "task_dependencies",
+          "tableTo": "tasks",
+          "columnsFrom": [
+            "dependency_task_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "no_self_dependency": {
+          "name": "no_self_dependency",
+          "value": "\"task_dependencies\".\"dependent_task_id\" != \"task_dependencies\".\"dependency_task_id\""
         }
       }
     },
@@ -168,6 +203,14 @@
           "autoincrement": false,
           "default": "'medium'"
         },
+        "priority_score": {
+          "name": "priority_score",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 50
+        },
         "prd": {
           "name": "prd",
           "type": "text",
@@ -197,25 +240,42 @@
           "autoincrement": false
         }
       },
-      "indexes": {
-        "idx_tasks_parent_id": {
-          "name": "idx_tasks_parent_id",
-          "columns": ["parent_id"],
-          "isUnique": false
-        },
-        "idx_tasks_status": {
-          "name": "idx_tasks_status",
-          "columns": ["status"],
-          "isUnique": false
+      "indexes": {},
+      "foreignKeys": {
+        "tasks_parent_id_tasks_id_fk": {
+          "name": "tasks_parent_id_tasks_id_fk",
+          "tableFrom": "tasks",
+          "tableTo": "tasks",
+          "columnsFrom": [
+            "parent_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
-      "foreignKeys": {},
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {}
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "status_check": {
+          "name": "status_check",
+          "value": "\"tasks\".\"status\" IN ('pending', 'in-progress', 'blocked', 'done', 'cancelled', 'archived')"
+        },
+        "priority_check": {
+          "name": "priority_check",
+          "value": "\"tasks\".\"priority\" IN ('low', 'medium', 'high')"
+        },
+        "priority_score_check": {
+          "name": "priority_score_check",
+          "value": "\"tasks\".\"priority_score\" >= 0 AND \"tasks\".\"priority_score\" <= 100"
+        }
+      }
     }
   },
+  "views": {},
   "enums": {},
-  "schemas": {},
   "_meta": {
     "schemas": {},
     "tables": {},
@@ -224,4 +284,4 @@
   "internal": {
     "indexes": {}
   }
-} 
+}

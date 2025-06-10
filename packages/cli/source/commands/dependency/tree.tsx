@@ -177,7 +177,7 @@ export default function DependencyTree({ options }: Props) {
 						[{node.task.status}]
 					</Text>
 				)}
-				<Text color="magenta"> [{node.task.priority}]</Text>
+				<Text color="magenta"> [{node.task.priority}{node.task.priorityScore ? ` (${node.task.priorityScore})` : ''}]</Text>
 				{options.showBlocked && node.isBlocked && (
 					<Text color="red" bold>
 						{" "}

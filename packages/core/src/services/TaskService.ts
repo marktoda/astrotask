@@ -114,6 +114,7 @@ export class TaskService implements ITaskReconciliationService {
       description: 'Project root containing all task hierarchies',
       status: 'pending' as const,
       priority: 'medium' as const,
+      priorityScore: 50,
       prd: null,
       contextDigest: null,
       createdAt: new Date(),
@@ -869,22 +870,36 @@ export class TaskService implements ITaskReconciliationService {
 
   /**
    * Get tasks that can be started immediately (no incomplete dependencies).
+   * Tasks are sorted by priority score (highest first), then by creation date.
    */
   async getAvailableTasks(filter?: { status?: TaskStatus; priority?: string }): Promise<Task[]> {
     const executableTasks = await this.dependencyService.getExecutableTasks();
 
-    if (!filter) {
-      return executableTasks;
+    let filteredTasks = executableTasks;
+
+    if (filter) {
+      filteredTasks = executableTasks.filter((task) => {
+        if (filter.status && task.status !== filter.status) {
+          return false;
+        }
+        if (filter.priority && task.priority !== filter.priority) {
+          return false;
+        }
+        return true;
+      });
     }
 
-    return executableTasks.filter((task) => {
-      if (filter.status && task.status !== filter.status) {
-        return false;
+    // Sort by priority score (highest first), then by creation date (oldest first)
+    return filteredTasks.sort((a, b) => {
+      const aScore = a.priorityScore ?? 50; // Default to 50 if not set
+      const bScore = b.priorityScore ?? 50; // Default to 50 if not set
+
+      if (aScore !== bScore) {
+        return bScore - aScore; // Higher scores first
       }
-      if (filter.priority && task.priority !== filter.priority) {
-        return false;
-      }
-      return true;
+
+      // If same priority score, sort by creation date (older tasks first)
+      return a.createdAt.getTime() - b.createdAt.getTime();
     });
   }
 

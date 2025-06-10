@@ -576,7 +576,9 @@ export class TrackingTaskTree implements ITaskTree {
   toMarkdown(indentLevel = 0): string {
     const indent = '  '.repeat(indentLevel);
     const status = this._task.status === 'done' ? '[x]' : '[ ]';
-    const priority = this._task.priority !== 'medium' ? ` (${this._task.priority})` : '';
+    const priority = this._task.priority !== 'medium' || this._task.priorityScore !== 50 
+      ? ` (${this._task.priority}${this._task.priorityScore !== 50 ? ` ${this._task.priorityScore}` : ''})` 
+      : '';
 
     let markdown = `${indent}- ${status} ${this._task.title}${priority}\n`;
 

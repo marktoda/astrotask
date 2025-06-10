@@ -1,6 +1,6 @@
 // @ts-nocheck
 import { relations, sql } from 'drizzle-orm';
-import { check, foreignKey, pgTable, text, timestamp, unique } from 'drizzle-orm/pg-core';
+import { check, foreignKey, pgTable, text, timestamp, unique, real } from 'drizzle-orm/pg-core';
 
 /*
   Drizzle ORM schema definition for Astrolabe using PostgreSQL (PGlite).
@@ -33,6 +33,9 @@ export const tasks = pgTable(
     priority: text('priority', { enum: ['low', 'medium', 'high'] })
       .notNull()
       .default('medium'),
+    priorityScore: real('priority_score')
+      .notNull()
+      .default(50.0),
 
     prd: text('prd'),
     contextDigest: text('context_digest'),
@@ -50,6 +53,7 @@ export const tasks = pgTable(
       sql`${table.status} IN ('pending', 'in-progress', 'blocked', 'done', 'cancelled', 'archived')`
     ),
     check('priority_check', sql`${table.priority} IN ('low', 'medium', 'high')`),
+    check('priority_score_check', sql`${table.priorityScore} >= 0 AND ${table.priorityScore} <= 100`),
   ]
 );
 

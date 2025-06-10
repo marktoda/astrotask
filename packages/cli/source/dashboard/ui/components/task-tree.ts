@@ -629,7 +629,7 @@ export class TaskTreeComponent {
 
 		const items: TaskTreeItem[] = [];
 
-		// Helper function to sort children by status - done tasks go to bottom
+		// Helper function to sort children by status and priority score - done tasks go to bottom, higher priority scores go first within each group
 		const sortChildrenByStatus = (children: readonly (TaskTree | TrackingTaskTree)[]) => {
 			return [...children].sort((a, b) => {
 				const aIsDone = a.task.status === "done" || a.task.status === "archived";
@@ -639,8 +639,15 @@ export class TaskTreeComponent {
 				if (aIsDone && !bIsDone) return 1;
 				if (!aIsDone && bIsDone) return -1;
 				
-				// If both have same "doneness", maintain original order (stable sort)
-				return 0;
+				// If both have same "doneness", sort by priority score (higher scores first)
+				const aScore = a.task.priorityScore ?? 50;
+				const bScore = b.task.priorityScore ?? 50;
+				if (aScore !== bScore) {
+					return bScore - aScore; // Higher scores first
+				}
+				
+				// If same priority score, sort by creation date (older tasks first)
+				return a.task.createdAt.getTime() - b.task.createdAt.getTime();
 			});
 		};
 
@@ -723,7 +730,7 @@ export class TaskTreeComponent {
 		const items: TaskTreeItem[] = [];
 		const visited = new Set<string>();
 
-		// Helper function to sort dependents by status - done tasks go to bottom
+		// Helper function to sort dependents by status and priority score - done tasks go to bottom, higher priority scores go first within each group
 		const sortDependentsByStatus = (dependentIds: string[]) => {
 			return [...dependentIds].sort((aId, bId) => {
 				const aTask = trackingTree.find((task) => task.id === aId);
@@ -738,8 +745,15 @@ export class TaskTreeComponent {
 				if (aIsDone && !bIsDone) return 1;
 				if (!aIsDone && bIsDone) return -1;
 				
-				// If both have same "doneness", maintain original order (stable sort)
-				return 0;
+				// If both have same "doneness", sort by priority score (higher scores first)
+				const aScore = aTask.task.priorityScore ?? 50;
+				const bScore = bTask.task.priorityScore ?? 50;
+				if (aScore !== bScore) {
+					return bScore - aScore; // Higher scores first
+				}
+				
+				// If same priority score, sort by creation date (older tasks first)
+				return aTask.task.createdAt.getTime() - bTask.task.createdAt.getTime();
 			});
 		};
 
@@ -811,7 +825,7 @@ export class TaskTreeComponent {
 			return dependencies.length === 0;
 		});
 
-		// Sort root tasks with done tasks at bottom, then add each root task and its dependency tree
+		// Sort root tasks with done tasks at bottom and higher priority scores first within each group, then add each root task and its dependency tree
 		const sortedRootTasks = rootTasks.sort((aId, bId) => {
 			const aTask = trackingTree.find((task) => task.id === aId);
 			const bTask = trackingTree.find((task) => task.id === bId);
@@ -825,8 +839,15 @@ export class TaskTreeComponent {
 			if (aIsDone && !bIsDone) return 1;
 			if (!aIsDone && bIsDone) return -1;
 			
-			// If both have same "doneness", maintain original order (stable sort)
-			return 0;
+			// If both have same "doneness", sort by priority score (higher scores first)
+			const aScore = aTask.task.priorityScore ?? 50;
+			const bScore = bTask.task.priorityScore ?? 50;
+			if (aScore !== bScore) {
+				return bScore - aScore; // Higher scores first
+			}
+			
+			// If same priority score, sort by creation date (older tasks first)
+			return aTask.task.createdAt.getTime() - bTask.task.createdAt.getTime();
 		});
 
 		for (const rootTaskId of sortedRootTasks) {
@@ -869,6 +890,8 @@ export class TaskTreeComponent {
 	}
 
 	private getPriorityIcon(priority: Task["priority"]): string {
+		// Priority icons for visual distinction in tree view
+		// Priority scores are displayed elsewhere in the UI
 		switch (priority) {
 			case "high":
 				return " !"; // Keep consistent with detail-pane

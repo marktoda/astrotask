@@ -63,20 +63,17 @@ export default function Next({ options }: Props) {
 					);
 				}
 
-				// Find the highest priority pending task (same logic as MCP)
+				// Find the highest priority pending task (using priority scores)
 				const nextTask =
 					filteredTasks
 						.filter((task) => task.status === "pending")
 						.sort((a, b) => {
-							// Sort by priority (high > medium > low), then by ID
-							const priorityOrder = { high: 3, medium: 2, low: 1 };
-							const aPriority =
-								priorityOrder[a.priority as keyof typeof priorityOrder] || 1;
-							const bPriority =
-								priorityOrder[b.priority as keyof typeof priorityOrder] || 1;
+							// Sort by priority score (higher score = higher priority), then by ID
+							const aScore = a.priorityScore ?? 50; // Default to 50 if not set
+							const bScore = b.priorityScore ?? 50; // Default to 50 if not set
 
-							if (aPriority !== bPriority) {
-								return bPriority - aPriority;
+							if (aScore !== bScore) {
+								return bScore - aScore; // Higher scores first
 							}
 
 							return a.id.localeCompare(b.id);
@@ -192,7 +189,7 @@ export default function Next({ options }: Props) {
 									</Text>
 									<Text color={getPriorityColor(task.priority)}>
 										{" "}
-										({task.priority})
+										({task.priority}{task.priorityScore ? ` ${task.priorityScore}` : ''})
 									</Text>
 								</Text>
 							</Box>
@@ -258,7 +255,7 @@ export default function Next({ options }: Props) {
 				<Text>
 					Status: <Text color={getStatusColor(task.status)}>{task.status}</Text>{" "}
 					| Priority:{" "}
-					<Text color={getPriorityColor(task.priority)}> {task.priority}</Text>
+					<Text color={getPriorityColor(task.priority)}> {task.priority}{task.priorityScore ? ` (${task.priorityScore})` : ''}</Text>
 				</Text>
 
 				{task.description && (

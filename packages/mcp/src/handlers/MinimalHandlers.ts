@@ -65,8 +65,10 @@ export class MinimalHandlers implements MCPHandler {
         filteredTasks = filteredTasks.filter((task: Task) => task.parentId === args.parentTaskId);
       }
 
-      // Select next task (first one by priority/creation order)
-      const nextTask = filteredTasks.length > 0 ? filteredTasks[0] : null;
+      // Select next task (getAvailableTasks already returns tasks sorted by priority score)
+      // Filter for pending status if not specified in the args
+      const candidateTasks = args.status ? filteredTasks : filteredTasks.filter((task: Task) => task.status === 'pending');
+      const nextTask = candidateTasks.length > 0 ? candidateTasks[0] : null;
 
       const message = nextTask 
         ? `Found task: ${nextTask.title}` 
@@ -251,6 +253,7 @@ export class MinimalHandlers implements MCPHandler {
             description: taskInput.description,
             status: taskInput.status || 'pending',
             priority: taskInput.priority || 'medium',
+            priorityScore: taskInput.priorityScore,
             parentId: parentTaskId,
           });
         } else {
@@ -260,6 +263,7 @@ export class MinimalHandlers implements MCPHandler {
             description: taskInput.description,
             status: taskInput.status || 'pending',
             priority: taskInput.priority || 'medium',
+            priorityScore: taskInput.priorityScore,
           });
         }
 

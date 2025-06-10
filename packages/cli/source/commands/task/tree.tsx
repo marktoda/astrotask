@@ -272,6 +272,8 @@ function TreeNodeComponent({
 						)}
 					</>
 				)}
+				{/* Priority display */}
+				<Text color="magenta"> [{task.priority}{task.priorityScore ? ` (${task.priorityScore})` : ''}]</Text>
 			</Text>
 
 			{/* Description if present */}

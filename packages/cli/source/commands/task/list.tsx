@@ -123,7 +123,7 @@ export default function List({ options }: Props) {
 								<Text bold>{task.title}</Text>
 								{task.status && <Text color="yellow"> [{task.status}]</Text>}
 								{task.priority && (
-									<Text color="magenta"> [{task.priority}]</Text>
+									<Text color="magenta"> [{task.priority}{task.priorityScore ? ` (${task.priorityScore})` : ''}]</Text>
 								)}
 							</Text>
 							{task.description && (
@@ -146,7 +146,7 @@ export default function List({ options }: Props) {
 								<Text bold>{task.title}</Text>
 								{task.status && <Text color="yellow"> [{task.status}]</Text>}
 								{task.priority && (
-									<Text color="magenta"> [{task.priority}]</Text>
+									<Text color="magenta"> [{task.priority}{task.priorityScore ? ` (${task.priorityScore})` : ''}]</Text>
 								)}
 								<Text color="gray"> (parent: {task.parentId})</Text>
 							</Text>

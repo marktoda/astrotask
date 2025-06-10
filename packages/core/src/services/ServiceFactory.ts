@@ -52,6 +52,7 @@ export function createServices(config: ServiceFactoryConfig): ServiceContainer {
   const store = new DatabaseStore(
     adapter.client,
     adapter.drizzle,
+    adapter.type,
     cfg.STORE_IS_SYNCING,
     cfg.STORE_IS_ENCRYPTED
   );

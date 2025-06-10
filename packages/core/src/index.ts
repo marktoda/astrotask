@@ -210,11 +210,19 @@ export * from './utils/llm.js';
 // Re-export task types
 export type {
   Task,
-  CreateTask as NewTask,
+  CreateTask,
   TaskStatus,
   TaskPriority,
+  PriorityScore,
 } from './schemas/task.js';
-export { taskToApi } from './schemas/task.js';
+export { 
+  taskToApi,
+  priorityToScore,
+  scoreToPriority,
+  getEffectivePriorityScore,
+  updatePriorityScore,
+  priorityScore,
+} from './schemas/task.js';
 
 // Re-export context slice types
 export type {

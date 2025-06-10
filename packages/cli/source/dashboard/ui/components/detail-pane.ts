@@ -158,11 +158,12 @@ export class DetailPane {
 			lines.push(`Complexity: {gray-fg}Not analyzed{/gray-fg}`);
 		}
 
-		// Priority with icon
+		// Priority with icon and score
 		const priorityIcon = this.getPriorityIcon(task.priority);
+		const priorityScore = task.priorityScore ?? 50; // Default to 50 if not set
 		const priorityDisplay = priorityIcon
-			? `${priorityIcon} ${task.priority}`
-			: task.priority;
+			? `${priorityIcon} ${task.priority} (${priorityScore})`
+			: `${task.priority} (${priorityScore})`;
 		lines.push(`Priority: ${priorityDisplay}`);
 
 		lines.push("");

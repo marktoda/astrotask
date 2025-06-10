@@ -124,12 +124,14 @@ export class SqliteAdapter implements DatabaseBackend<BetterSQLite3Database<type
           "description" text,
           "status" text DEFAULT 'pending' NOT NULL,
           "priority" text DEFAULT 'medium' NOT NULL,
+          "priority_score" real DEFAULT 50.0 NOT NULL,
           "prd" text,
           "context_digest" text,
           "created_at" integer NOT NULL,
           "updated_at" integer NOT NULL,
-          CONSTRAINT "status_check" CHECK ("tasks"."status" IN ('pending', 'in-progress', 'done', 'cancelled', 'archived')),
-          CONSTRAINT "priority_check" CHECK ("tasks"."priority" IN ('low', 'medium', 'high'))
+          CONSTRAINT "status_check" CHECK ("tasks"."status" IN ('pending', 'in-progress', 'blocked', 'done', 'cancelled', 'archived')),
+          CONSTRAINT "priority_check" CHECK ("tasks"."priority" IN ('low', 'medium', 'high')),
+          CONSTRAINT "priority_score_check" CHECK ("tasks"."priority_score" >= 0 AND "tasks"."priority_score" <= 100)
         )`,
       },
     ];

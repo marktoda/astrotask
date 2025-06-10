@@ -1,17 +1,18 @@
-import type { NewTask } from "@astrotask/core";
-import { taskPriority } from "@astrotask/core";
+import type { CreateTask, Task } from "@astrotask/core";
+import { taskPriority, priorityScore } from "@astrotask/core";
 import { Text } from "ink";
 import { useEffect, useState } from "react";
 import zod from "zod";
 import { useDatabase } from "../../context/DatabaseContext.js";
 
-export const description = "Add a task";
+export const description = "Add a new task with the specified title, description, and priority";
 
 export const options = zod.object({
 	title: zod.string().describe("Task title"),
 	description: zod.string().optional().describe("Task description"),
 	parent: zod.string().optional().describe("Parent task ID"),
 	priority: taskPriority.describe("Task priority"),
+	priorityScore: priorityScore.optional().describe("Priority score (0-100, higher = more important)"),
 });
 
 type Props = {
@@ -20,41 +21,43 @@ type Props = {
 
 export default function Add({ options }: Props) {
 	const db = useDatabase();
-	const [result, setResult] = useState<string | null>(null);
+	const [task, setTask] = useState<Task | null>(null);
 	const [error, setError] = useState<string | null>(null);
+	const [loading, setLoading] = useState(false);
 
 	useEffect(() => {
 		async function createTask() {
 			try {
-				const newTask: NewTask = {
+				setLoading(true);
+				const newTask: CreateTask = {
 					title: options.title,
 					description: options.description || "",
+					parentId: options.parent,
 					status: "pending",
 					priority: options.priority,
-					parentId: options.parent,
+					priorityScore: options.priorityScore,
 				};
 
 				const task = await db.addTask(newTask);
-				setResult(`Task created successfully: ${task.id} [${task.priority}]`);
+				setTask(task);
 			} catch (err) {
 				setError(err instanceof Error ? err.message : "Failed to create task");
+			} finally {
+				setLoading(false);
 			}
 		}
 		createTask();
 	}, [options, db]);
 
-	// Exit the process after operation is complete
-	useEffect(() => {
-		if (result || error) {
-			// Use setTimeout to ensure the component has fully rendered
-			setTimeout(() => {
-				process.exit(error ? 1 : 0);
-			}, 100);
-		}
-	}, [result, error]);
-
+	if (loading) return <Text>Creating task...</Text>;
 	if (error) return <Text color="red">Error: {error}</Text>;
-	if (result) return <Text color="green">{result}</Text>;
+	if (!task) return <Text color="red">No task created</Text>;
 
-	return <Text>Creating task...</Text>;
+	const scoreText = task.priorityScore ? ` (score: ${task.priorityScore})` : '';
+
+	return (
+		<Text color="green">
+			✅ Created task: <Text bold>{task.id}</Text> - {task.title} [{task.priority}{scoreText}]
+		</Text>
+	);
 }
