@@ -21,9 +21,9 @@ import { StatusRenderer } from "./status-renderer.js";
 export interface TaskLineConfig {
 	/** Width for the index column (default: 3) */
 	indexWidth: number;
-	/** Width for the fold indicator column (default: 3) */
+	/** Width for the fold indicator column (default: 2) */
 	foldWidth: number;
-	/** Width for the status glyph column (default: 4) */
+	/** Width for the status glyph column (default: 2) */
 	glyphWidth: number;
 	/** Whether to show line numbers/indices (default: true) */
 	showIndex: boolean;
@@ -79,8 +79,8 @@ export class TaskLineFormatter {
 	constructor(config: Partial<TaskLineConfig> = {}) {
 		this.config = {
 			indexWidth: 3,
-			foldWidth: 3,
-			glyphWidth: 4,
+			foldWidth: 2,
+			glyphWidth: 2,
 			showIndex: true,
 			dimFoldTriangles: true,
 			statusRenderer: StatusRenderer.create(),
@@ -100,8 +100,8 @@ export class TaskLineFormatter {
 		const glyphCol = this.formatGlyphColumn(task.status);
 		const titleCol = this.formatTitleColumn(task, info);
 
-		// Combine columns with proper spacing between them
-		const fullLine = `${indexCol} ${foldCol} ${glyphCol} ${titleCol}`;
+		// Combine columns with proper spacing - add space between fold and glyph
+		const fullLine = `${indexCol} ${foldCol} ${glyphCol}${titleCol}`;
 
 		return {
 			fullLine,
@@ -128,18 +128,20 @@ export class TaskLineFormatter {
 	}
 
 	/**
-	 * Format the fold indicator column with depth indentation
+	 * Format the fold indicator column with indentation
 	 */
 	private formatFoldColumn(
 		hasChildren: boolean,
 		isExpanded: boolean,
 		depth: number,
 	): string {
-		const indent = "  ".repeat(depth); // 2 spaces per depth level
-
+		// Apply indentation based on depth
+		const indent = "  ".repeat(depth);
+		
+		// Create the fold indicator with larger, more visible arrows
 		let foldIndicator = " ";
 		if (hasChildren) {
-			foldIndicator = isExpanded ? "▾" : "▸";
+			foldIndicator = isExpanded ? "▼" : "▶";
 		}
 
 		// Apply dim styling if configured (blessed.js format)
@@ -148,12 +150,8 @@ export class TaskLineFormatter {
 				? `{gray-fg}${foldIndicator}{/gray-fg}`
 				: foldIndicator;
 
-		// Create the complete column with indentation
-		const column = `${indent}${styledIndicator}`;
-
-		// Ensure minimum width for consistent alignment
-		const minWidth = Math.max(this.config.foldWidth, 2 + depth * 2);
-		return column.padEnd(minWidth, " ");
+		// Return indentation + fold indicator
+		return `${indent}${styledIndicator}`;
 	}
 
 	/**
@@ -171,9 +169,10 @@ export class TaskLineFormatter {
 	}
 
 	/**
-	 * Format the title column with additional indicators
+	 * Format the title column with additional indicators (no indentation here)
 	 */
 	private formatTitleColumn(task: Task, info: TaskLineInfo): string {
+		// No indentation in title - it's handled in fold column
 		let title = task.title;
 
 		// Add priority indicator if present

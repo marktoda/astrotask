@@ -67,14 +67,9 @@ export class DashboardLayout {
 		this.taskTree = new TaskTreeComponent(mainContainer, store);
 		this.detailPane = new DetailPane(mainContainer, store);
 		this.statusBar = new StatusBar(screen, store);
-		this.legend = new Legend(screen, store, this.footerHintRenderer); // Pass footer hint renderer
+		this.legend = new Legend(screen, store);
 		this.commandPalette = new CommandPalette(screen, store);
 		this.helpOverlay = new HelpOverlay(screen, store);
-
-		// Set up the callback now that legend exists
-		(this.footerHintRenderer as any).onStateChange = () => {
-			this.legend.render(store.getState());
-		};
 
 		// Set up layout
 		this.setupLayout();

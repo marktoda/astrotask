@@ -73,16 +73,16 @@ export const HIGH_CONTRAST_COLORS = {
  */
 export const STATUS_GLYPHS: Record<TaskStatus, StatusGlyph> = {
 	pending: {
-		unicode: "◻",
-		ascii: "[ ]",
+		unicode: "○",
+		ascii: "( )",
 		color: STATUS_COLORS.pending,
-		description: "Pending - White Medium Square",
+		description: "Pending - Empty Circle",
 	},
 	"in-progress": {
-		unicode: "⟳",
-		ascii: "{>}",
+		unicode: "●",
+		ascii: "(>)",
 		color: STATUS_COLORS["in-progress"],
-		description: "In-Progress - Clockwise Gapped Circle Arrow",
+		description: "In-Progress - Filled Circle",
 	},
 	blocked: {
 		unicode: "⛔",
@@ -91,10 +91,10 @@ export const STATUS_GLYPHS: Record<TaskStatus, StatusGlyph> = {
 		description: "Blocked - No Entry Sign",
 	},
 	done: {
-		unicode: "✔",
+		unicode: "✓",
 		ascii: "[x]",
 		color: STATUS_COLORS.done,
-		description: "Done - Heavy Check Mark",
+		description: "Done - Check Mark",
 	},
 	cancelled: {
 		unicode: "✗",
