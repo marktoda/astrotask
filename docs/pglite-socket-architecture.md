@@ -136,7 +136,7 @@ PGLITE_SOCKET_PORT=45432        # Port for socket server
 PGLITE_SOCKET_HOST=127.0.0.1   # Host binding (localhost only for security)
 
 # Database configuration
-DATABASE_PATH=./data/astrotask.db  # Path to PGLite database files
+DATABASE_URI=./data/astrotask.db  # Path to PGLite database files
 DATABASE_URL=postgres://localhost:45432/astrotask  # URL for CLI/clients
 ```
 
@@ -147,7 +147,7 @@ DATABASE_URL=postgres://localhost:45432/astrotask  # URL for CLI/clients
 export async function createDatabaseConnection(context: 'mcp' | 'cli' | 'test') {
   if (context === 'mcp') {
     // Direct PGLite connection for MCP server
-    return createDatabase({ dataDir: DATABASE_PATH });
+    return createDatabase({ dataDir: DATABASE_URI });
   } else {
     // Socket connection for CLI and other clients
     const pgClient = new PGliteSocketHandler({

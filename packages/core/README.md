@@ -245,14 +245,14 @@ Configure the core library through environment variables or configuration object
 // Environment variables
 process.env.LOG_LEVEL = 'debug';
 process.env.NODE_ENV = 'development';
-process.env.DATABASE_PATH = './tasks.db';
+process.env.DATABASE_URI = './tasks.db';
 
 // Or programmatic configuration
 import { cfg } from '@astrotask/core';
 
 console.log(cfg.LOG_LEVEL);  // Current log level
 console.log(cfg.NODE_ENV);   // Current environment
-console.log(cfg.DATABASE_PATH); // Database location
+console.log(cfg.DATABASE_URI); // Database location
 ```
 
 ## Error Handling

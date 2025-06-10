@@ -211,7 +211,7 @@ Configure the MCP server through environment variables:
 
 ```bash
 # Database configuration
-DATABASE_PATH=./tasks.db
+DATABASE_URI=./tasks.db
 DATABASE_ENCRYPTED=true
 DATABASE_KEY=your-encryption-key
 
@@ -252,7 +252,7 @@ Configure Cursor to use Astrotask MCP server:
       "command": "npx",
       "args": ["@astrotask/mcp"],
       "env": {
-        "DATABASE_PATH": "./tasks.db",
+        "DATABASE_URI": "./tasks.db",
         "LOG_LEVEL": "info"
       }
     }
@@ -273,7 +273,7 @@ Add to your Claude Desktop MCP configuration:
       "command": "npx",
       "args": ["@astrotask/mcp"],
       "env": {
-        "DATABASE_PATH": "/path/to/your/tasks.db"
+        "DATABASE_URI": "/path/to/your/tasks.db"
       }
     }
   }

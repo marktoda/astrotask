@@ -488,7 +488,7 @@ The core library reads configuration from environment variables:
 
 ```bash
 # Database configuration
-DATABASE_PATH=./tasks.db
+DATABASE_URI=./tasks.db
 
 # Logging configuration
 LOG_LEVEL=info          # debug, info, warn, error
@@ -508,7 +508,7 @@ import { cfg } from '@astrotask/core';
 console.log(cfg.LOG_LEVEL);    // Current log level
 console.log(cfg.NODE_ENV);     // Current environment
 console.log(cfg.PORT);         // Application port
-console.log(cfg.DATABASE_PATH); // Database location
+console.log(cfg.DATABASE_URI); // Database location
 ```
 
 ### Configuration Schema
@@ -518,7 +518,7 @@ interface Config {
   LOG_LEVEL: 'debug' | 'info' | 'warn' | 'error';
   NODE_ENV: 'development' | 'production' | 'test';
   PORT: number;
-  DATABASE_PATH: string;
+  DATABASE_URI: string;
   DB_VERBOSE: boolean;
   DB_TIMEOUT: number;
 }

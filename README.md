@@ -114,7 +114,7 @@ await astrotask.tasks.addTask({
       "command": "npx",
       "args": ["@astrotask/mcp"],
       "env": {
-        "DATABASE_PATH": "/home/toda/dev/astrotask/data/astrotask.db"
+        "DATABASE_URI": "/home/toda/dev/astrotask/data/astrotask.db"
       }
     }
   }

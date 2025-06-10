@@ -72,7 +72,7 @@ function generateMcpConfig(
 						command: "npx",
 						args: [mcpServerPath],
 						env: {
-							DATABASE_PATH: absoluteDbPath,
+							DATABASE_URI: absoluteDbPath,
 						},
 					},
 				},
@@ -85,7 +85,7 @@ function generateMcpConfig(
 						command: "npx",
 						args: [mcpServerPath],
 						env: {
-							DATABASE_PATH: absoluteDbPath,
+							DATABASE_URI: absoluteDbPath,
 						},
 					},
 				},
@@ -99,7 +99,7 @@ function generateMcpConfig(
 						command: "npx",
 						args: [mcpServerPath],
 						env: {
-							DATABASE_PATH: absoluteDbPath,
+							DATABASE_URI: absoluteDbPath,
 						},
 					},
 				},
@@ -113,7 +113,7 @@ function generateMcpConfig(
 						command: "npx",
 						args: [mcpServerPath],
 						env: {
-							DATABASE_PATH: absoluteDbPath,
+							DATABASE_URI: absoluteDbPath,
 						},
 					},
 				},
