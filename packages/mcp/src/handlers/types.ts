@@ -203,9 +203,20 @@ export const deleteTaskSchema = z.object({
 }).describe("Delete an existing task with optional cascading to all descendant tasks");
 
 /**
+ * Schema for getting a specific task by its ID.
+ * Returns the task with full context including ancestors, descendants, dependencies, and context slices.
+ */
+export const getTaskSchema = z.object({
+  taskId: z
+    .string()
+    .describe("ID of the task to retrieve. The task must exist in the system.")
+}).describe("Get a specific task by ID with full context information, similar to getNextTask but for a specific task");
+
+/**
  * TypeScript types inferred from the schemas
  */
 export type GetNextTaskInput = z.infer<typeof getNextTaskSchema>;
+export type GetTaskInput = z.infer<typeof getTaskSchema>;
 export type AddTaskInput = z.infer<typeof addTaskSchema>;
 export type AddTasksInput = z.infer<typeof addTasksSchema>;
 export type ListTasksInput = z.infer<typeof listTasksSchema>;

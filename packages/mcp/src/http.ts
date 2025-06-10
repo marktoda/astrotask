@@ -9,6 +9,7 @@ import { createAstrotask, createModuleLogger, logShutdown, cfg } from '@astrotas
 import {
   MinimalHandlers,
   getNextTaskSchema,
+  getTaskSchema,
   addTasksSchema,
   listTasksSchema,
   addTaskContextSchema,
@@ -75,13 +76,22 @@ async function createMCPServer(): Promise<McpServer> {
     version: '0.3.0',
   });
 
-  // Register the 6 essential tools with enhanced schema documentation
+  // Register the 7 essential tools with enhanced schema documentation
   server.tool('getNextTask',
     getNextTaskSchema.shape,
     wrapMCPHandler(async (args) => {
       const context = await createHandlerContext();
       const handlers = new MinimalHandlers(context);
       return handlers.getNextTask(args);
+    })
+  );
+
+  server.tool('getTask',
+    getTaskSchema.shape,
+    wrapMCPHandler(async (args) => {
+      const context = await createHandlerContext();
+      const handlers = new MinimalHandlers(context);
+      return handlers.getTask(args);
     })
   );
 

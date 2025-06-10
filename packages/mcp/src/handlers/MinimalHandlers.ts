@@ -18,6 +18,7 @@ import { createModuleLogger } from '@astrotask/core';
 import type { HandlerContext, MCPHandler } from './types.js';
 import type {
   GetNextTaskInput,
+  GetTaskInput,
   AddTaskInput,
   AddTaskContextInput,
   AddDependencyInput,
@@ -103,6 +104,68 @@ export class MinimalHandlers implements MCPHandler {
     } catch (error) {
       this.logger.error('Getting next task failed', {
         error: error instanceof Error ? error.message : String(error),
+        requestId: this.context.requestId,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Get a specific task by ID with full context
+   */
+  async getTask(args: GetTaskInput): Promise<{
+    task: Task | null;
+    message: string;
+    context?: {
+      ancestors: Task[];
+      descendants: TaskTreeData[];
+      root: TaskTreeData | null;
+      dependencies: Task[];
+      dependents: Task[];
+      isBlocked: boolean;
+      blockedBy: Task[];
+      contextSlices: ContextSlice[];
+    };
+  }> {
+    try {
+      // Get the task by ID
+      const task = await this.context.astrotask.store.getTask(args.taskId);
+      
+      if (!task) {
+        return {
+          task: null,
+          message: `Task with ID ${args.taskId} not found`,
+        };
+      }
+
+      // Get full context for the task
+      const taskWithContext = await this.context.astrotask.tasks.getTaskWithContext(task.id);
+      let context = undefined;
+
+      if (taskWithContext) {
+        const contextSlices = await this.context.astrotask.store.listContextSlices(task.id);
+        
+        context = {
+          ancestors: taskWithContext.ancestors,
+          descendants: taskWithContext.descendants.map((tree) => tree.toPlainObject()),
+          root: taskWithContext.root ? taskWithContext.root.toPlainObject() : null,
+          dependencies: taskWithContext.dependencies,
+          dependents: taskWithContext.dependents,
+          isBlocked: taskWithContext.isBlocked,
+          blockedBy: taskWithContext.blockedBy,
+          contextSlices,
+        };
+      }
+
+      return {
+        task,
+        message: `Found task: ${task.title}`,
+        context
+      };
+    } catch (error) {
+      this.logger.error('Getting task failed', {
+        error: error instanceof Error ? error.message : String(error),
+        taskId: args.taskId,
         requestId: this.context.requestId,
       });
       throw error;

@@ -6,6 +6,7 @@ import { createAstrotask, createModuleLogger, logShutdown, cfg } from '@astrotas
 import {
   MinimalHandlers,
   getNextTaskSchema,
+  getTaskSchema,
   addTasksSchema,
   listTasksSchema,
   addTaskContextSchema,
@@ -42,13 +43,22 @@ async function main() {
     timestamp: new Date().toISOString(),
   });
 
-  // Register the 6 essential tools with enhanced schema documentation
+  // Register the 7 essential tools with enhanced schema documentation
   server.tool('getNextTask',
     getNextTaskSchema.shape,
     wrapMCPHandler(async (args) => {
       const context = createHandlerContext();
       const handlers = new MinimalHandlers(context);
       return handlers.getNextTask(args);
+    })
+  );
+
+  server.tool('getTask',
+    getTaskSchema.shape,
+    wrapMCPHandler(async (args) => {
+      const context = createHandlerContext();
+      const handlers = new MinimalHandlers(context);
+      return handlers.getTask(args);
     })
   );
 
@@ -110,7 +120,7 @@ async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
 
-  logger.info('Astrotask MCP Server (stdio) started with 7 enhanced tools: getNextTask, addTasks, listTasks, addTaskContext, addDependency, updateStatus, deleteTask');
+  logger.info('Astrotask MCP Server (stdio) started with 8 enhanced tools: getNextTask, getTask, addTasks, listTasks, addTaskContext, addDependency, updateStatus, deleteTask');
 
   // Set up graceful shutdown with Astrotask SDK cleanup
   const setupShutdownHandlers = () => {

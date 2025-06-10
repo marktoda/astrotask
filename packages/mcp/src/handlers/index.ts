@@ -13,6 +13,7 @@
 export { MinimalHandlers } from './MinimalHandlers.js';
 export { 
   getNextTaskSchema,
+  getTaskSchema,
   addTaskSchema,
   addTasksSchema,
   listTasksSchema,
@@ -21,6 +22,7 @@ export {
   updateStatusSchema,
   deleteTaskSchema,
   type GetNextTaskInput,
+  type GetTaskInput,
   type AddTaskInput,
   type AddTasksInput,
   type ListTasksInput,
