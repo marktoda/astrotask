@@ -5,7 +5,7 @@
 import { PGlite } from '@electric-sql/pglite';
 import { type PgliteDatabase, drizzle } from 'drizzle-orm/pglite';
 import { pgliteSchema } from '../schema.js';
-import type { DatabaseBackend, DatabaseClient, DbCapabilities } from './types.js';
+import type { DatabaseBackend, DbCapabilities } from './types.js';
 
 /**
  * PGLite backend adapter
@@ -38,18 +38,6 @@ export class PgLiteAdapter implements DatabaseBackend<PgliteDatabase<typeof pgli
 
   get rawClient(): PGlite {
     return this.pglite;
-  }
-
-  get client(): DatabaseClient {
-    return {
-      query: async (sql, params) => {
-        return await this.pglite.query(sql, params);
-      },
-      close: async () => {
-        await this.close();
-      },
-      ...(this.config.dataDir ? { dataDir: this.config.dataDir } : {}),
-    };
   }
 
   async migrate(migrationsDir: string): Promise<void> {

@@ -3,7 +3,7 @@
  */
 
 import type { IDatabaseAdapter } from '../database/adapters/index.js';
-import { postgresSchema, pgliteSchema, sqliteSchema } from '../database/schema.js';
+import { pgliteSchema, postgresSchema, sqliteSchema } from '../database/schema.js';
 import { DatabaseStore, type Store } from '../database/store.js';
 import { cfg } from '../utils/config.js';
 import { createModuleLogger } from '../utils/logger.js';
@@ -50,15 +50,16 @@ export function createServices(config: ServiceFactoryConfig): ServiceContainer {
   const { adapter, llmService } = config;
 
   // Get the appropriate schema based on adapter type
-  const schema = adapter.type === 'sqlite' 
-    ? sqliteSchema 
-    : adapter.type === 'pglite' 
-      ? pgliteSchema 
-      : postgresSchema;
+  const schema =
+    adapter.type === 'sqlite'
+      ? sqliteSchema
+      : adapter.type === 'pglite'
+        ? pgliteSchema
+        : postgresSchema;
 
   // Create store
   const store = new DatabaseStore(
-    adapter.client,
+    adapter.rawClient,
     adapter.drizzle,
     schema,
     cfg.STORE_IS_SYNCING,

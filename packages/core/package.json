@@ -8,7 +8,7 @@
     "doc": "docs"
   },
   "scripts": {
-    "build": "tsc && cp -r migrations/drizzle dist/migrations/",
+    "build": "tsc && mkdir -p dist/migrations && (cp -r migrations/drizzle dist/migrations/ 2>/dev/null || true) && (cp -r migrations/drizzle-sqlite dist/migrations/ 2>/dev/null || true)",
     "start": "tsx src/index.ts",
     "dev": "tsx watch src/index.ts",
     "type-check": "tsc --noEmit",
@@ -21,8 +21,12 @@
     "test:watch": "vitest",
     "test:clean": "node scripts/cleanup-test-data.js",
     "db:generate": "drizzle-kit generate",
+    "db:generate:postgres": "DATABASE_URI=postgresql://localhost/astrotask drizzle-kit generate",
+    "db:generate:sqlite": "DATABASE_URI=sqlite://./data/astrotask.db drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "db:studio:postgres": "DATABASE_URI=postgresql://localhost/astrotask drizzle-kit studio",
+    "db:studio:sqlite": "DATABASE_URI=sqlite://./data/astrotask.db drizzle-kit studio"
   },
   "keywords": [
     "task-management",

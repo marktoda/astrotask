@@ -56,8 +56,8 @@ describe('PostgreSQL Integration', () => {
   });
 
   it('should handle PostgreSQL-specific queries', async () => {
-    // Test raw SQL query through pgLite compatibility layer
-    const result = await store.pgLite.query('SELECT version()');
+    // Test raw SQL query through the unified query interface
+    const result = await store.query('SELECT version()');
     expect(result.rows).toBeDefined();
     expect(result.rows[0]).toBeDefined();
     expect(result.rows[0].version).toMatch(/PostgreSQL/);

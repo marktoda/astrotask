@@ -6,7 +6,7 @@ import Database from 'better-sqlite3';
 import { type BetterSQLite3Database, drizzle as drizzleSqlite } from 'drizzle-orm/better-sqlite3';
 import { createModuleLogger } from '../../utils/logger.js';
 import { sqliteSchema } from '../schema.js';
-import type { DatabaseBackend, DatabaseClient, DbCapabilities } from './types.js';
+import type { DatabaseBackend, DbCapabilities } from './types.js';
 
 const logger = createModuleLogger('SqliteAdapter');
 
@@ -16,7 +16,7 @@ const logger = createModuleLogger('SqliteAdapter');
 export class SqliteAdapter implements DatabaseBackend<BetterSQLite3Database<typeof sqliteSchema>> {
   public readonly type = 'sqlite' as const;
   public readonly capabilities: DbCapabilities = {
-    concurrentWrites: false, // WAL mode allows multiple readers + 1 writer
+    concurrentWrites: true, // WAL mode allows multiple readers + 1 writer, handles concurrency natively
     listenNotify: false,
     extensions: new Set(),
   };
@@ -57,111 +57,12 @@ export class SqliteAdapter implements DatabaseBackend<BetterSQLite3Database<type
     return this.sqlite;
   }
 
-  get client(): DatabaseClient {
-    return {
-      query: async (sql, params) => {
-        try {
-          const stmt = this.sqlite.prepare(sql);
-          const rows = params ? stmt.all(...params) : stmt.all();
-          // biome-ignore lint/suspicious/noExplicitAny: Better-sqlite3 returns unknown rows that need type assertion
-          return { rows: rows as any[] };
-        } catch (error) {
-          logger.error({ error, sql, params }, 'SQLite query error');
-          throw error;
-        }
-      },
-      close: async () => {
-        await this.close();
-      },
-      dataDir: this.config.dataDir,
-    };
-  }
-
-  async migrate(_migrationsDir: string): Promise<void> {
-    // For SQLite, we'll use schema sync instead of migrations
-    // This is more reliable than complex migration files
-    try {
-      // Try to create tables if they don't exist
-      await this.ensureTablesExist();
-    } catch (error) {
-      logger.error({ error }, 'Failed to ensure SQLite tables exist');
-      throw error;
-    }
-  }
-
-  /**
-   * Ensure all required tables exist in the SQLite database
-   */
-  private async ensureTablesExist(): Promise<void> {
-    const tables = [
-      {
-        name: 'context_slices',
-        sql: `CREATE TABLE IF NOT EXISTS "context_slices" (
-          "id" text PRIMARY KEY NOT NULL,
-          "title" text NOT NULL,
-          "description" text,
-          "context_type" text DEFAULT 'general' NOT NULL,
-          "task_id" text,
-          "context_digest" text,
-          "created_at" integer NOT NULL,
-          "updated_at" integer NOT NULL
-        )`,
-      },
-      {
-        name: 'task_dependencies',
-        sql: `CREATE TABLE IF NOT EXISTS "task_dependencies" (
-          "id" text PRIMARY KEY NOT NULL,
-          "dependent_task_id" text NOT NULL,
-          "dependency_task_id" text NOT NULL,
-          "created_at" integer NOT NULL,
-          CONSTRAINT "unique_dependency" UNIQUE("dependent_task_id","dependency_task_id"),
-          CONSTRAINT "no_self_dependency" CHECK ("task_dependencies"."dependent_task_id" != "task_dependencies"."dependency_task_id")
-        )`,
-      },
-      {
-        name: 'tasks',
-        sql: `CREATE TABLE IF NOT EXISTS "tasks" (
-          "id" text PRIMARY KEY NOT NULL,
-          "parent_id" text,
-          "title" text NOT NULL,
-          "description" text,
-          "status" text DEFAULT 'pending' NOT NULL,
-          "priority_score" real DEFAULT 50.0 NOT NULL,
-          "prd" text,
-          "context_digest" text,
-          "created_at" integer NOT NULL,
-          "updated_at" integer NOT NULL,
-          CONSTRAINT "status_check" CHECK ("tasks"."status" IN ('pending', 'in-progress', 'blocked', 'done', 'cancelled', 'archived')),
-          CONSTRAINT "priority_score_check" CHECK ("tasks"."priority_score" >= 0 AND "tasks"."priority_score" <= 100)
-        )`,
-      },
-    ];
-
-    const indexes = [
-      'CREATE INDEX IF NOT EXISTS "idx_context_slices_task_id" ON "context_slices" ("task_id")',
-      'CREATE INDEX IF NOT EXISTS "idx_task_dependencies_dependent" ON "task_dependencies" ("dependent_task_id")',
-      'CREATE INDEX IF NOT EXISTS "idx_task_dependencies_dependency" ON "task_dependencies" ("dependency_task_id")',
-      'CREATE INDEX IF NOT EXISTS "idx_tasks_parent_id" ON "tasks" ("parent_id")',
-      'CREATE INDEX IF NOT EXISTS "idx_tasks_status" ON "tasks" ("status")',
-    ];
-
-    // Create tables
-    for (const table of tables) {
-      this.sqlite.exec(table.sql);
-      logger.debug(`Ensured table ${table.name} exists`);
-    }
-
-    // Create indexes
-    for (const indexSql of indexes) {
-      this.sqlite.exec(indexSql);
-    }
-
-    logger.debug('All SQLite tables and indexes ensured');
+  async migrate(migrationsDir: string): Promise<void> {
+    const { migrate } = await import('drizzle-orm/better-sqlite3/migrator');
+    await migrate(this.drizzle, { migrationsFolder: migrationsDir });
   }
 
   async close(): Promise<void> {
-    if (this.sqlite) {
-      this.sqlite.close();
-    }
+    this.sqlite.close();
   }
 }

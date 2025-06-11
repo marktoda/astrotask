@@ -29,13 +29,13 @@ describe('Database Configuration', () => {
       const store = await createLocalDatabase(testDbPath);
 
       expect(store).toBeDefined();
-      expect(store.pgLite).toBeDefined();
+      expect(store.rawClient).toBeDefined();
       expect(store.sql).toBeDefined();
       expect(store.isEncrypted).toBe(false);
       expect(typeof store.close).toBe('function');
 
       // Test basic database operation
-      const result = await store.pgLite.query('SELECT 1 as test');
+      const result = await store.query('SELECT 1 as test');
       expect(result.rows[0]).toEqual({ test: 1 });
 
       await store.close();
@@ -107,13 +107,13 @@ describe('Database Configuration', () => {
       });
 
       expect(store).toBeDefined();
-      expect(store.pgLite).toBeDefined();
+      expect(store.rawClient).toBeDefined();
       expect(store.sql).toBeDefined();
       expect(store.isEncrypted).toBe(false);
       expect(typeof store.close).toBe('function');
 
       // Test basic database operation
-      const result = await store.pgLite.query('SELECT 1 as test');
+      const result = await store.query('SELECT 1 as test');
       expect(result.rows[0]).toEqual({ test: 1 });
 
       await store.close();
@@ -127,9 +127,9 @@ describe('Database Configuration', () => {
 
       // Verify tables were created by migration
       // Use a simple query that works across all database types
-      await expect(store.pgLite.query('SELECT COUNT(*) FROM tasks')).resolves.toBeDefined();
-      await expect(store.pgLite.query('SELECT COUNT(*) FROM context_slices')).resolves.toBeDefined();
-      await expect(store.pgLite.query('SELECT COUNT(*) FROM task_dependencies')).resolves.toBeDefined();
+      await expect(store.query('SELECT COUNT(*) FROM tasks')).resolves.toBeDefined();
+      await expect(store.query('SELECT COUNT(*) FROM context_slices')).resolves.toBeDefined();
+      await expect(store.query('SELECT COUNT(*) FROM task_dependencies')).resolves.toBeDefined();
 
       await store.close();
     });

@@ -8,7 +8,7 @@
 import { join } from 'node:path';
 import { createModuleLogger } from '../utils/logger.js';
 import type { IDatabaseAdapter } from './adapters/index.js';
-import { AdapterHelpers, needsExternalLocking } from './adapters/index.js';
+import { AdapterHelpers } from './adapters/index.js';
 import { withDatabaseLock } from './lock.js';
 import type { DbUrl } from './url-parser.js';
 
@@ -73,8 +73,8 @@ export class MigrationRunner {
       let migrationsApplied = 0;
 
       // Run migrations with appropriate locking strategy
-      if (needsExternalLocking(adapter) && this.config.useLocking !== false && parsed) {
-        // File-based databases need external locking
+      if (this.config.useLocking === true && parsed) {
+        // External locking explicitly requested (opt-in only)
         const lockPath = AdapterHelpers.getLockPath(parsed);
         lockUsed = true;
 
@@ -82,7 +82,7 @@ export class MigrationRunner {
           migrationsApplied = await this.executeMigrations(adapter, migrationsDir);
         });
       } else {
-        // Server-based databases handle concurrency internally
+        // Default: databases handle concurrency natively
         migrationsApplied = await this.executeMigrations(adapter, migrationsDir);
       }
 

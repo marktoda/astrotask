@@ -1,22 +1,22 @@
 /**
  * Database initialization and factory functions
  *
- * This module provides database creation with support for both PGlite and PostgreSQL.
- * PGlite is used for local-only file-based databases, while PostgreSQL is used
- * for full PostgreSQL connection strings.
+ * This module provides database creation with support for PostgreSQL, PGLite, and SQLite.
+ * Simplified factory pattern with direct adapter creation and minimal abstraction layers.
  */
 
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cfg } from '../utils/config.js';
 import { createModuleLogger } from '../utils/logger.js';
-import { openDatabase } from './factory.js';
+import { AdapterHelpers, createAdapter } from './adapters/index.js';
+import { initializeDatabase } from './initialization.js';
 import type { LockOptions } from './lock.js';
-import { DatabaseLockError } from './lock.js';
+import { DatabaseLockError, withDatabaseLock } from './lock.js';
 import { LockingStore } from './lockingStore.js';
-import { postgresSchema, pgliteSchema, sqliteSchema } from './schema.js';
+import { pgliteSchema, postgresSchema, sqliteSchema } from './schema.js';
 import { DatabaseStore, type Store } from './store.js';
-import { isFileBasedUrl, parseDbUrl } from './url-parser.js';
+import { parseDbUrl } from './url-parser.js';
 
 const logger = createModuleLogger('database');
 
@@ -29,7 +29,7 @@ export interface DatabaseOptions {
   dataDir?: string;
   /** Verbose logging */
   verbose?: boolean;
-  /** Enable cooperative locking (wraps store with LockingStore) */
+  /** Enable cooperative locking (wraps store with LockingStore) - opt-in only for special cases */
   enableLocking?: boolean;
   /** Lock options (only used when enableLocking is true) */
   lockOptions?: LockOptions;
@@ -39,9 +39,7 @@ export interface DatabaseOptions {
 
 /**
  * Create a database connection with automatic backend detection
- *
- * If dataDir is a PostgreSQL connection string, uses PostgreSQL.
- * Otherwise, uses PGLite for local file-based database.
+ * Simplified factory that combines URL parsing, adapter creation, and migration
  */
 export async function createDatabase(options: DatabaseOptions = {}): Promise<Store> {
   const dataDir = options.dataDir ?? cfg.DATABASE_URI;
@@ -49,55 +47,58 @@ export async function createDatabase(options: DatabaseOptions = {}): Promise<Sto
   const migrationsDir = options.migrationsDir ?? DEFAULT_MIGRATIONS_DIR;
 
   try {
-    // Parse URL once
+    // Parse URL and create adapter in one step
     const parsed = parseDbUrl(dataDir);
+    const backend = createAdapter(parsed, { debug: verbose });
 
-    // Open database with the new factory
-    const backend = await openDatabase(parsed, {
-      migrationsDir,
-      debug: verbose,
-      ...(options.enableLocking !== undefined ? { useLocking: options.enableLocking } : {}),
-    });
+    // Initialize backend
+    await backend.init();
 
-    // Get the appropriate schema based on backend type
-    const schema = backend.type === 'sqlite' 
-      ? sqliteSchema 
-      : backend.type === 'pglite' 
-        ? pgliteSchema 
-        : postgresSchema;
+    // Run migrations with minimal locking logic
+    if (options.enableLocking === true && parsed.kind === 'sqlite-file') {
+      // Opt-in external locking for SQLite file migrations only
+      const lockPath = AdapterHelpers.getLockPath(parsed);
+      await withDatabaseLock(lockPath, { processType: 'migration' }, async () => {
+        await backend.migrate(migrationsDir);
+      });
+    } else {
+      // Default: rely on database's native concurrency handling
+      await backend.migrate(migrationsDir);
+    }
 
-    // Create the store
-    const baseStore = new DatabaseStore(
-      backend.client,
-      backend.drizzle,
-      schema,
-      false,
-      false
+    // Initialize business data
+    await initializeDatabase(backend);
+
+    // Select appropriate schema
+    const schema =
+      backend.type === 'sqlite'
+        ? sqliteSchema
+        : backend.type === 'pglite'
+          ? pgliteSchema
+          : postgresSchema;
+
+    // Create store directly
+    const baseStore = new DatabaseStore(backend.rawClient, backend.drizzle, schema, false, false);
+
+    // Optional locking wrapper (opt-in only)
+    if (options.enableLocking === true) {
+      const lockPath = AdapterHelpers.getLockPath(parsed);
+      return new LockingStore(baseStore, lockPath, options.lockOptions);
+    }
+
+    logger.debug(
+      {
+        backend: backend.type,
+        capabilities: {
+          concurrentWrites: backend.capabilities.concurrentWrites,
+          listenNotify: backend.capabilities.listenNotify,
+          extensions: Array.from(backend.capabilities.extensions),
+        },
+      },
+      'Database created successfully'
     );
 
-    // Determine if we should use locking
-    // Server-based databases should NEVER use file-based locking as they handle concurrency natively
-    const shouldUseLocking =
-      isFileBasedUrl(parsed) && // Only use locking for file-based databases
-      (options.enableLocking ?? true); // Default to true for file-based databases
-
-    // Get the actual file path for locking (not the URL)
-    const lockPath = shouldUseLocking
-      ? parsed.kind === 'sqlite-file' || parsed.kind === 'pglite-file'
-        ? parsed.file
-        : parsed.kind === 'pglite-mem'
-          ? `memory-${parsed.label}.db`
-          : parsed.kind === 'pglite-idb'
-            ? `idb-${parsed.label}.db`
-            : dataDir
-      : dataDir;
-
-    // Wrap with locking if needed
-    const store = shouldUseLocking
-      ? new LockingStore(baseStore, lockPath, options.lockOptions)
-      : baseStore;
-
-    return store;
+    return baseStore;
   } catch (error) {
     // Handle lock errors with user-friendly messages
     if (error instanceof DatabaseLockError) {
@@ -197,7 +198,6 @@ export { DatabaseLock, DatabaseLockError, withDatabaseLock } from './lock.js';
 export type { LockOptions } from './lock.js';
 export type { DatabaseBackend, DbCapabilities } from './adapters/index.js';
 export { parseDbUrl, type DbUrl } from './url-parser.js';
-export { openDatabase } from './factory.js';
 
 // Migration runner exports
 export {

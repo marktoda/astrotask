@@ -31,6 +31,8 @@ export interface DrizzleOps {
   update: (...args: any[]) => any;
   // biome-ignore lint/suspicious/noExplicitAny: Drizzle types require any for cross-dialect compatibility
   delete: (...args: any[]) => any;
+  // biome-ignore lint/suspicious/noExplicitAny: Transaction support across all dialects
+  transaction: <T>(fn: (tx: any) => Promise<T>) => Promise<T>;
 }
 
 /**
@@ -62,15 +64,6 @@ export interface QueryResult<T = Record<string, unknown>> {
 }
 
 /**
- * Type-safe database client interface for SQL operations
- */
-export interface DatabaseClient {
-  query<T = Record<string, unknown>>(sql: string, params?: SqlParam[]): Promise<QueryResult<T>>;
-  close(): Promise<void>;
-  dataDir?: string;
-}
-
-/**
  * Common interface for database backends.
  * Generic parameter preserves the exact Drizzle type for callers while ensuring
  * we expose at least the shared DrizzleOps surface.
@@ -89,9 +82,6 @@ export interface DatabaseBackend<TDrizzle extends DrizzleOps = DrizzleOps> {
 
   /** Backend type for logging/debugging */
   readonly type: 'pglite' | 'postgres' | 'sqlite';
-
-  /** PGLite-compatible client interface for backward compatibility */
-  readonly client: DatabaseClient;
 
   /** Initialize the backend connection */
   init(): Promise<void>;
@@ -123,9 +113,13 @@ export function isServerBased(backend: DatabaseBackend): boolean {
 
 /**
  * Check if a backend needs external locking for safe concurrent access
+ * Modern SQLite with WAL mode handles concurrency natively, so only very
+ * specialized cases (like some migration scenarios) may need external locking
  */
-export function needsExternalLocking(backend: DatabaseBackend): boolean {
-  return isFileBased(backend);
+export function needsExternalLocking(): boolean {
+  // With WAL mode and proper timeouts, SQLite handles concurrency well
+  // Only legacy systems or special migration scenarios need external locking
+  return false; // Simplified: rely on native database concurrency features
 }
 
 /**

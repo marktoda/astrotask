@@ -6,7 +6,7 @@ import { type PostgresJsDatabase, drizzle as drizzlePostgres } from 'drizzle-orm
 import postgres from 'postgres';
 import { createModuleLogger } from '../../utils/logger.js';
 import { postgresSchema } from '../schema.js';
-import type { DatabaseBackend, DatabaseClient, DbCapabilities, SqlParam } from './types.js';
+import type { DatabaseBackend, DbCapabilities } from './types.js';
 
 const logger = createModuleLogger('PostgresAdapter');
 
@@ -49,18 +49,6 @@ export class PostgresAdapter implements DatabaseBackend<PostgresJsDatabase<typeo
 
   get rawClient(): postgres.Sql {
     return this.sql;
-  }
-
-  get client(): DatabaseClient {
-    return {
-      query: async <T = Record<string, unknown>>(sql: string, params?: SqlParam[]) => {
-        const result = await this.sql.unsafe(sql, params);
-        return { rows: result as unknown as T[] };
-      },
-      close: async () => {
-        await this.close();
-      },
-    };
   }
 
   async migrate(migrationsDir: string): Promise<void> {

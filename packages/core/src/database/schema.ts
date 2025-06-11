@@ -1,21 +1,13 @@
 import { relations, sql } from 'drizzle-orm';
-import { 
-  check, 
-  foreignKey, 
-  pgTable, 
-  real, 
-  text, 
-  timestamp, 
-  unique
-} from 'drizzle-orm/pg-core';
+import { check, foreignKey, pgTable, real, text, timestamp, unique } from 'drizzle-orm/pg-core';
 import {
+  integer,
   check as sqliteCheck,
   foreignKey as sqliteForeignKey,
-  integer,
   real as sqliteReal,
   sqliteTable,
   text as sqliteText,
-  unique as sqliteUnique
+  unique as sqliteUnique,
 } from 'drizzle-orm/sqlite-core';
 
 /*
@@ -346,11 +338,11 @@ export const sqliteSchema = createSqliteSchema();
 export const schema = postgresSchema;
 
 // Re-export tables for backward compatibility
-export const { 
-  tasks, 
-  taskDependencies, 
+export const {
+  tasks,
+  taskDependencies,
   contextSlices,
   taskRelations,
   taskDependencyRelations,
-  contextSliceRelations 
+  contextSliceRelations,
 } = postgresSchema;

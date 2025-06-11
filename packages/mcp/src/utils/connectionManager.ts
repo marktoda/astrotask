@@ -41,7 +41,7 @@ export class ConnectionManager {
   private async isConnectionValid(store: Store): Promise<boolean> {
     try {
       // Try a simple query to check if the connection is still alive
-      await store.pgLite.query('SELECT 1');
+      await store.query('SELECT 1');
       return true;
     } catch (error) {
       // If the query fails, the connection is likely closed

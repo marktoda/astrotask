@@ -1,7 +1,7 @@
 /**
- * Database Cleanup Utilities for PGLite Connection Management
+ * Database Cleanup Utilities for Database Connection Management
  * 
- * Simple utilities to improve PGLite connection handling in MCP server,
+ * Simple utilities to improve database connection handling in MCP server,
  * particularly after write operations.
  */
 
@@ -12,16 +12,16 @@ const logger = createModuleLogger('DBCleanup');
 /**
  * Force a database checkpoint and optimize after write operations
  * This can help ensure data is written to disk and potentially
- * improve connection behavior for PGLite
+ * improve connection behavior for file-based databases
  */
 export async function optimizeAfterWrite(store: Store): Promise<void> {
   try {
     // Execute VACUUM to optimize the database file
-    // This forces PGLite to clean up and compact the database
-    await store.pgLite.query('VACUUM;');
+    // This forces the database to clean up and compact the database
+    await store.query('VACUUM;');
     
     // Execute CHECKPOINT to ensure data is written to disk
-    await store.pgLite.query('CHECKPOINT;');
+    await store.query('CHECKPOINT;');
     
     logger.debug('Database optimized after write operation');
   } catch (error) {
@@ -42,10 +42,10 @@ export async function aggressiveCleanupAfterWrite(store: Store): Promise<void> {
     await optimizeAfterWrite(store);
     
     // Execute PRAGMA optimize to analyze and optimize
-    await store.pgLite.query('PRAGMA optimize;');
+    await store.query('PRAGMA optimize;');
     
     // Force WAL checkpoint if in WAL mode
-    await store.pgLite.query('PRAGMA wal_checkpoint(FULL);');
+    await store.query('PRAGMA wal_checkpoint(FULL);');
     
     logger.debug('Aggressive database cleanup completed');
   } catch (error) {
@@ -62,7 +62,7 @@ export async function aggressiveCleanupAfterWrite(store: Store): Promise<void> {
 export async function quickCleanupAfterRead(store: Store): Promise<void> {
   try {
     // Just ensure any pending writes are flushed
-    await store.pgLite.query('PRAGMA wal_checkpoint(PASSIVE);');
+    await store.query('PRAGMA wal_checkpoint(PASSIVE);');
     
     logger.debug('Quick cleanup completed after read');
   } catch (error) {
@@ -76,18 +76,16 @@ export async function quickCleanupAfterRead(store: Store): Promise<void> {
  * Get database connection info for debugging
  */
 export async function getDatabaseInfo(store: Store): Promise<{
-  dataDir: string;
   walMode: boolean;
   cacheSize: string;
   pageCount: string;
 }> {
   try {
-    const walResult = await store.pgLite.query('PRAGMA journal_mode;');
-    const cacheResult = await store.pgLite.query('PRAGMA cache_size;');
-    const pageResult = await store.pgLite.query('PRAGMA page_count;');
+    const walResult = await store.query('PRAGMA journal_mode;');
+    const cacheResult = await store.query('PRAGMA cache_size;');
+    const pageResult = await store.query('PRAGMA page_count;');
     
     return {
-      dataDir: store.pgLite.dataDir || 'memory',
       walMode: (walResult.rows[0] as any)?.journal_mode === 'wal',
       cacheSize: (cacheResult.rows[0] as any)?.cache_size?.toString() || 'unknown',
       pageCount: (pageResult.rows[0] as any)?.page_count?.toString() || 'unknown',
@@ -97,7 +95,6 @@ export async function getDatabaseInfo(store: Store): Promise<{
       error: error instanceof Error ? error.message : String(error)
     });
     return {
-      dataDir: store.pgLite.dataDir || 'memory',
       walMode: false,
       cacheSize: 'unknown',
       pageCount: 'unknown',
