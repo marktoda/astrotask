@@ -31,10 +31,15 @@ async function main() {
   });
 
   // Create Astrotask SDK instance with configuration
+  const databaseUrl = cfg.DATABASE_URI;
+  const debug = cfg.DB_VERBOSE;
+  
   const astrotask = await createAstrotask({
-    databaseUrl: cfg.DATABASE_URI,
-    debug: cfg.DB_VERBOSE,
+    databaseUrl,
+    debug,
   });
+  
+  logger.info('Astrotask SDK initialized successfully', { databaseUrl, debug });
 
   // Create handler context factory
   const createHandlerContext = () => ({

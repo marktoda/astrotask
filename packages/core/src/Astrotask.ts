@@ -142,10 +142,12 @@ export class Astrotask {
 
       this._initialized = true;
       const duration = Date.now() - startTime;
+      const databaseUrl = this.config.databaseUrl ?? cfg.DATABASE_URI;
 
       logger.info(
         {
           adapterType: this._adapter.type,
+          databaseUrl,
           duration,
           migrationsSkipped: this.config.skipMigrations,
         },

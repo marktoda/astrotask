@@ -4,13 +4,13 @@
 
 import { PGlite } from '@electric-sql/pglite';
 import { type PgliteDatabase, drizzle } from 'drizzle-orm/pglite';
-import * as schema from '../schema.js';
+import { pgliteSchema } from '../schema.js';
 import type { DatabaseBackend, DatabaseClient, DbCapabilities } from './types.js';
 
 /**
  * PGLite backend adapter
  */
-export class PgLiteAdapter implements DatabaseBackend<PgliteDatabase<typeof schema>> {
+export class PgLiteAdapter implements DatabaseBackend<PgliteDatabase<typeof pgliteSchema>> {
   public readonly type = 'pglite' as const;
   public readonly capabilities: DbCapabilities = {
     concurrentWrites: false,
@@ -19,7 +19,7 @@ export class PgLiteAdapter implements DatabaseBackend<PgliteDatabase<typeof sche
   };
 
   private pglite!: PGlite;
-  public drizzle!: PgliteDatabase<typeof schema>;
+  public drizzle!: PgliteDatabase<typeof pgliteSchema>;
 
   constructor(
     private readonly config: {
@@ -33,7 +33,7 @@ export class PgLiteAdapter implements DatabaseBackend<PgliteDatabase<typeof sche
       dataDir: this.config.dataDir ?? 'memory://',
       debug: this.config.debug ? 1 : 0,
     });
-    this.drizzle = drizzle(this.pglite, { schema });
+    this.drizzle = drizzle(this.pglite, { schema: pgliteSchema });
   }
 
   get rawClient(): PGlite {

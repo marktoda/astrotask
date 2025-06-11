@@ -5,7 +5,7 @@
 import Database from 'better-sqlite3';
 import { type BetterSQLite3Database, drizzle as drizzleSqlite } from 'drizzle-orm/better-sqlite3';
 import { createModuleLogger } from '../../utils/logger.js';
-import * as sqliteSchema from '../schema-sqlite.js';
+import { sqliteSchema } from '../schema.js';
 import type { DatabaseBackend, DatabaseClient, DbCapabilities } from './types.js';
 
 const logger = createModuleLogger('SqliteAdapter');

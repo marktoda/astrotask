@@ -5,7 +5,7 @@
 import { type PostgresJsDatabase, drizzle as drizzlePostgres } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import { createModuleLogger } from '../../utils/logger.js';
-import * as schema from '../schema.js';
+import { postgresSchema } from '../schema.js';
 import type { DatabaseBackend, DatabaseClient, DbCapabilities, SqlParam } from './types.js';
 
 const logger = createModuleLogger('PostgresAdapter');
@@ -13,7 +13,7 @@ const logger = createModuleLogger('PostgresAdapter');
 /**
  * PostgreSQL backend adapter
  */
-export class PostgresAdapter implements DatabaseBackend<PostgresJsDatabase<typeof schema>> {
+export class PostgresAdapter implements DatabaseBackend<PostgresJsDatabase<typeof postgresSchema>> {
   public readonly type = 'postgres' as const;
   public readonly capabilities: DbCapabilities = {
     concurrentWrites: true,
@@ -22,7 +22,7 @@ export class PostgresAdapter implements DatabaseBackend<PostgresJsDatabase<typeo
   };
 
   private sql!: postgres.Sql;
-  public drizzle!: PostgresJsDatabase<typeof schema>;
+  public drizzle!: PostgresJsDatabase<typeof postgresSchema>;
 
   constructor(
     private readonly url: URL,
@@ -44,7 +44,7 @@ export class PostgresAdapter implements DatabaseBackend<PostgresJsDatabase<typeo
       logger.error({ error }, 'PostgreSQL connection error');
     });
 
-    this.drizzle = drizzlePostgres(this.sql, { schema });
+    this.drizzle = drizzlePostgres(this.sql, { schema: postgresSchema });
   }
 
   get rawClient(): postgres.Sql {

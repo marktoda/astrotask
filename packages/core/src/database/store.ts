@@ -8,8 +8,7 @@ import type {
 import type { CreateTask, Task, TaskStatus } from '../schemas/task.js';
 import { generateNextTaskId } from '../utils/taskId.js';
 import type { DatabaseClient, DrizzleOps } from './adapters/types.js';
-import * as sqliteSchema from './schema-sqlite.js';
-import * as schema from './schema.js';
+import { postgresSchema, sqliteSchema } from './schema.js';
 
 /**
  * Store interface for database operations
@@ -85,7 +84,7 @@ export class DatabaseStore<
    * Get the appropriate schema based on adapter type
    */
   private getSchema() {
-    return this.adapterType === 'sqlite' ? sqliteSchema : schema;
+    return this.adapterType === 'sqlite' ? sqliteSchema : postgresSchema;
   }
 
   // Task operations
