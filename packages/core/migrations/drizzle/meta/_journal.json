@@ -5,22 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1748728070475,
-      "tag": "20250531214750_flippant_excalibur",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1749227145966,
-      "tag": "0001_cute_rattler",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1749568673176,
-      "tag": "0002_furry_imperial_guard",
+      "when": 1749653882415,
+      "tag": "0000_whole_logan",
       "breakpoints": true
     }
   ]

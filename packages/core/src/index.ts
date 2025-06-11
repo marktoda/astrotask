@@ -205,6 +205,9 @@ export * from './utils/config.js';
 export * from './utils/models.js';
 export * from './utils/llm.js';
 
+// Acceptance criteria utilities
+export * from './utils/acceptanceCriteria.js';
+
 // Re-export task types
 export type {
   Task,

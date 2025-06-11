@@ -367,6 +367,7 @@ export class MinimalHandlers implements MCPHandler {
         taskId: args.taskId,
         title: args.title,
         description: args.description,
+        contextType: args.contextType,
       });
 
       return {

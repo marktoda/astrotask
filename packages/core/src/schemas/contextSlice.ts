@@ -6,6 +6,7 @@ export const contextSliceSchema = z.object({
   id: uuid,
   title: title,
   description: description.nullable(), // Database returns null, not undefined
+  contextType: z.string().default('general'),
 
   taskId: optionalUuid.nullable(), // Database returns null, not undefined
   contextDigest: z.string().nullable(),
@@ -27,6 +28,7 @@ export const createContextSliceSchema = contextSliceSchema
     description: description.optional(), // API uses optional, transform to null for DB
     taskId: optionalUuid.optional(), // API uses optional, transform to null for DB
     contextDigest: z.string().optional(),
+    contextType: z.string().optional().default('general'),
   });
 
 // ContextSlice update schema (all fields optional except id)
@@ -39,6 +41,7 @@ export const contextSliceApiSchema = contextSliceSchema.extend({
   description: description.optional(), // API uses optional instead of null
   taskId: optionalUuid.optional(), // API uses optional instead of null
   contextDigest: z.string().optional(),
+  contextType: z.string().optional().default('general'),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
 });
@@ -47,6 +50,7 @@ export const createContextSliceApiSchema = createContextSliceSchema.extend({
   description: description.optional(),
   taskId: optionalUuid.optional(),
   contextDigest: z.string().optional(),
+  contextType: z.string().optional().default('general'),
 });
 
 // Basic transformation functions for database <-> API compatibility
@@ -56,6 +60,7 @@ export function contextSliceToApi(contextSlice: ContextSlice): ContextSliceApi {
     description: contextSlice.description ?? undefined,
     taskId: contextSlice.taskId ?? undefined,
     contextDigest: contextSlice.contextDigest ?? undefined,
+    contextType: contextSlice.contextType ?? 'general',
     createdAt: contextSlice.createdAt.toISOString(),
     updatedAt: contextSlice.updatedAt.toISOString(),
   };
@@ -69,6 +74,7 @@ export function contextSliceFromApi(
     description: apiContextSlice.description ?? null,
     taskId: apiContextSlice.taskId ?? null,
     contextDigest: apiContextSlice.contextDigest ?? null,
+    contextType: apiContextSlice.contextType ?? 'general',
   };
 }
 

@@ -100,6 +100,7 @@ export class SqliteAdapter implements DatabaseBackend<BetterSQLite3Database<type
           "id" text PRIMARY KEY NOT NULL,
           "title" text NOT NULL,
           "description" text,
+          "context_type" text DEFAULT 'general' NOT NULL,
           "task_id" text,
           "context_digest" text,
           "created_at" integer NOT NULL,

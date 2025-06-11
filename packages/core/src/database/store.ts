@@ -253,6 +253,7 @@ export class DatabaseStore<
       id: data.id || randomUUID(),
       title: data.title,
       description: data.description ?? null,
+      contextType: data.contextType ?? 'general',
       taskId: data.taskId ?? null,
       contextDigest: data.contextDigest ?? null,
       createdAt: now,

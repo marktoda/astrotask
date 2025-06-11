@@ -99,6 +99,7 @@ export const contextSlices = sqliteTable('context_slices', {
   id: text('id').primaryKey(),
   title: text('title').notNull(),
   description: text('description'),
+  contextType: text('context_type').notNull().default('general'),
 
   taskId: text('task_id').references(() => tasks.id),
   contextDigest: text('context_digest'),

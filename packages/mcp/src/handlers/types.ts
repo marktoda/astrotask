@@ -154,7 +154,7 @@ export const addTaskContextSchema = z.object({
     .string()
     .optional()
     .default('general')
-    .describe("Category of context being added. Common types: 'implementation' (technical details), 'research' (findings/links), 'complexity' (assessment/risks), 'requirements' (clarifications), 'testing' (strategies), 'general' (miscellaneous notes).")
+    .describe("Category of context being added. Common types: 'implementation' (technical details), 'research' (findings/links), 'complexity' (assessment/risks), 'requirements' (clarifications), 'testing' (strategies), 'acceptance' (criteria for completion), 'general' (miscellaneous notes).")
 }).describe("Add a context slice to an existing task, providing additional information or clarifications");
 
 /**

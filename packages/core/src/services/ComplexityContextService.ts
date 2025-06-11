@@ -93,6 +93,7 @@ export class ComplexityContextService {
       id: randomUUID(),
       title: `Complexity Analysis: ${task.title}`,
       description: this.formatComplexityDescription(complexity),
+      contextType: 'complexity',
       taskId,
       contextDigest: this.generateComplexityDigest(complexity),
     };

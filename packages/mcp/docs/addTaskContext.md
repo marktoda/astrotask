@@ -24,6 +24,7 @@ While `contextType` is flexible, common patterns include:
 - `testing`: Testing strategies, test cases, or validation criteria
 - `documentation`: Documentation needs or content
 - `dependencies`: Dependency notes or coordination requirements
+- `acceptance`: Acceptance criteria that must be met for task completion
 
 ## Example Calls
 
@@ -84,6 +85,25 @@ While `contextType` is flexible, common patterns include:
   "title": "Progress Update - Day 2", 
   "description": "Completed basic CRUD operations. Discovered issue with concurrent updates - need to implement optimistic locking. Will research solutions tomorrow.",
   "contextType": "general"
+}
+```
+
+### Add acceptance criteria
+```json
+{
+  "taskId": "task_auth1",
+  "title": "User login returns JWT token",
+  "description": "POST /auth/login with valid credentials returns 200 status and JWT token in response body. Token expires in 24 hours.",
+  "contextType": "acceptance"
+}
+```
+
+```json
+{
+  "taskId": "task_perf1",
+  "title": "Dashboard loads in under 2 seconds",
+  "description": "Initial dashboard render completes within 2000ms on average network conditions. Measure using Chrome DevTools Performance tab.",
+  "contextType": "acceptance"
 }
 ```
 

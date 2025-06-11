@@ -1,6 +1,6 @@
 {
-  "id": "2c7838c3-e49f-4cb4-8176-b4d0d4272dec",
-  "prevId": "dd183a99-de17-413a-a6a1-7b6de62d17c3",
+  "id": "753569fa-54b8-434e-8f3c-90ee9f0711fa",
+  "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -25,6 +25,13 @@
           "type": "text",
           "primaryKey": false,
           "notNull": false
+        },
+        "context_type": {
+          "name": "context_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'general'"
         },
         "task_id": {
           "name": "task_id",
@@ -189,12 +196,12 @@
           "notNull": true,
           "default": "'pending'"
         },
-        "priority": {
-          "name": "priority",
-          "type": "text",
+        "priority_score": {
+          "name": "priority_score",
+          "type": "real",
           "primaryKey": false,
           "notNull": true,
-          "default": "'medium'"
+          "default": 50
         },
         "prd": {
           "name": "prd",
@@ -247,9 +254,9 @@
           "name": "status_check",
           "value": "\"tasks\".\"status\" IN ('pending', 'in-progress', 'blocked', 'done', 'cancelled', 'archived')"
         },
-        "priority_check": {
-          "name": "priority_check",
-          "value": "\"tasks\".\"priority\" IN ('low', 'medium', 'high')"
+        "priority_score_check": {
+          "name": "priority_score_check",
+          "value": "\"tasks\".\"priority_score\" >= 0 AND \"tasks\".\"priority_score\" <= 100"
         }
       },
       "isRLSEnabled": false
