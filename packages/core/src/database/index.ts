@@ -14,6 +14,7 @@ import { openDatabase } from './factory.js';
 import type { LockOptions } from './lock.js';
 import { DatabaseLockError } from './lock.js';
 import { LockingStore } from './lockingStore.js';
+import { postgresSchema, pgliteSchema, sqliteSchema } from './schema.js';
 import { DatabaseStore, type Store } from './store.js';
 import { isFileBasedUrl, parseDbUrl } from './url-parser.js';
 
@@ -58,11 +59,18 @@ export async function createDatabase(options: DatabaseOptions = {}): Promise<Sto
       ...(options.enableLocking !== undefined ? { useLocking: options.enableLocking } : {}),
     });
 
+    // Get the appropriate schema based on backend type
+    const schema = backend.type === 'sqlite' 
+      ? sqliteSchema 
+      : backend.type === 'pglite' 
+        ? pgliteSchema 
+        : postgresSchema;
+
     // Create the store
     const baseStore = new DatabaseStore(
       backend.client,
       backend.drizzle,
-      backend.type,
+      schema,
       false,
       false
     );

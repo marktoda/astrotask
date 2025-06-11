@@ -1,4 +1,5 @@
 import type { IDatabaseAdapter } from '../database/adapters/index.js';
+import { postgresSchema, pgliteSchema, sqliteSchema } from '../database/schema.js';
 import { DatabaseStore, type Store } from '../database/store.js';
 import { cfg } from '../utils/config.js';
 import { createModuleLogger } from '../utils/logger.js';
@@ -41,12 +42,19 @@ export function createDefaultRegistry(config: RegistryConfig): DefaultRegistryRe
   const reg = new Registry();
   const logger = createModuleLogger('ServiceFactory');
 
+  // Get the appropriate schema based on adapter type
+  const schema = config.adapter.type === 'sqlite' 
+    ? sqliteSchema 
+    : config.adapter.type === 'pglite' 
+      ? pgliteSchema 
+      : postgresSchema;
+
   // Create store - this is created directly and not part of the DI system
   // since it's fundamental infrastructure that other services depend on
   const store = new DatabaseStore(
     config.adapter.client,
     config.adapter.drizzle,
-    config.adapter.type,
+    schema,
     cfg.STORE_IS_SYNCING,
     cfg.STORE_IS_ENCRYPTED
   );
