@@ -62,7 +62,6 @@ export function createServices(config: ServiceFactoryConfig): ServiceContainer {
     adapter.rawClient,
     adapter.drizzle,
     schema,
-    cfg.STORE_IS_SYNCING,
     cfg.STORE_IS_ENCRYPTED
   );
 

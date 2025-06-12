@@ -105,7 +105,6 @@ export class DatabaseStore<TRawClient = unknown, TDrizzle extends DrizzleOps = D
     rawClient: TRawClient,
     sql: TDrizzle,
     schema: typeof postgresSchema | typeof sqliteSchema,
-    _isSyncing = false,
     isEncrypted = false
   ) {
     this.rawClient = rawClient;

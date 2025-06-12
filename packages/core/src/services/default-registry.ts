@@ -56,7 +56,6 @@ export function createDefaultRegistry(config: RegistryConfig): DefaultRegistryRe
     config.adapter.rawClient,
     config.adapter.drizzle,
     schema,
-    cfg.STORE_IS_SYNCING,
     cfg.STORE_IS_ENCRYPTED
   );
 

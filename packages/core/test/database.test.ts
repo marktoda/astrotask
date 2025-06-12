@@ -2,7 +2,7 @@ import { describe, expect, it, afterEach, beforeEach } from 'vitest';
 import { join } from 'path';
 import { existsSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
-import { createDatabase, createLocalDatabase, createSyncedDatabase } from '../src/database/index';
+import { createDatabase, createLocalDatabase } from '../src/database/index';
 import { TASK_IDENTIFIERS } from '../src/entities/TaskTreeConstants';
 import { cfg } from '../src/utils/config';
 
@@ -243,6 +243,7 @@ describe('Database Configuration', () => {
       const contextSlice = await store.addContextSlice({
         title: 'Context 1',
         description: 'Some context',
+        contextType: 'general',
         taskId: task.id,
       });
 
@@ -268,13 +269,7 @@ describe('Database Configuration', () => {
       await store.close();
     });
 
-    it('should create local database with createSyncedDatabase (deprecated)', async () => {
-      const store = await createSyncedDatabase(testDbPath, '');
-      
-      expect(store).toBeDefined();
-      
-      await store.close();
-    });
+
   });
 
   describe('Database Configuration Constants', () => {

@@ -58,7 +58,6 @@ export const configSchema = z.object({
   EXPANSION_CREATE_CONTEXT_SLICES: z.coerce.boolean().default(true),
 
   // Store settings
-  STORE_IS_SYNCING: z.coerce.boolean().default(false), // deprecated
   STORE_IS_ENCRYPTED: z.coerce.boolean().default(false), // not implemented yet
 });
 

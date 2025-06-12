@@ -12,7 +12,7 @@ let config;
 if (isPostgres) {
   // PostgreSQL/PGLite configuration
   config = defineConfig({
-    schema: './src/database/schema.ts',
+    schema: './drizzle-schema.ts',
     out: './migrations/drizzle',
     dialect: 'postgresql',
     dbCredentials: {
@@ -28,7 +28,7 @@ if (isPostgres) {
     : databaseUrl;
     
   config = defineConfig({
-    schema: './src/database/schema.ts',
+    schema: './drizzle-schema.ts',
     out: './migrations/drizzle-sqlite',
     dialect: 'sqlite',
     dbCredentials: {

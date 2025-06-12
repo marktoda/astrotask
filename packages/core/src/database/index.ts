@@ -12,8 +12,9 @@ import { createModuleLogger } from '../utils/logger.js';
 import { AdapterHelpers, createAdapter } from './adapters/index.js';
 import { initializeDatabase } from './initialization.js';
 import type { LockOptions } from './lock.js';
-import { DatabaseLockError, withDatabaseLock } from './lock.js';
+import { DatabaseLockError } from './lock.js';
 import { LockingStore } from './lockingStore.js';
+import { createMigrationRunner } from './migrate.js';
 import { pgliteSchema, postgresSchema, sqliteSchema } from './schema.js';
 import { DatabaseStore, type Store } from './store.js';
 import { parseDbUrl } from './url-parser.js';
@@ -22,7 +23,7 @@ const logger = createModuleLogger('database');
 
 // Get the directory of this file
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const DEFAULT_MIGRATIONS_DIR = resolve(__dirname, '..', '..', 'migrations', 'drizzle');
+const MIGRATIONS_BASE_DIR = resolve(__dirname, '..', '..', 'migrations');
 
 export interface DatabaseOptions {
   /** Database file path or connection string */
@@ -44,7 +45,6 @@ export interface DatabaseOptions {
 export async function createDatabase(options: DatabaseOptions = {}): Promise<Store> {
   const dataDir = options.dataDir ?? cfg.DATABASE_URI;
   const verbose = options.verbose ?? cfg.DB_VERBOSE;
-  const migrationsDir = options.migrationsDir ?? DEFAULT_MIGRATIONS_DIR;
 
   try {
     // Parse URL and create adapter in one step
@@ -54,31 +54,26 @@ export async function createDatabase(options: DatabaseOptions = {}): Promise<Sto
     // Initialize backend
     await backend.init();
 
-    // Run migrations with minimal locking logic
-    if (options.enableLocking === true && parsed.kind === 'sqlite-file') {
-      // Opt-in external locking for SQLite file migrations only
-      const lockPath = AdapterHelpers.getLockPath(parsed);
-      await withDatabaseLock(lockPath, { processType: 'migration' }, async () => {
-        await backend.migrate(migrationsDir);
-      });
+    // Run migrations using the MigrationRunner which automatically selects the correct directory
+    if (options.migrationsDir) {
+      // Use custom migrations directory if provided
+      await backend.migrate(options.migrationsDir);
     } else {
-      // Default: rely on database's native concurrency handling
-      await backend.migrate(migrationsDir);
+      // Use MigrationRunner to automatically select correct migrations directory
+      const migrationRunner = createMigrationRunner(MIGRATIONS_BASE_DIR, {
+        useLocking: options.enableLocking === true && parsed.kind === 'sqlite-file',
+      });
+      await migrationRunner.runMigrations(backend, parsed);
     }
 
     // Initialize business data
     await initializeDatabase(backend);
 
-    // Select appropriate schema
-    const schema =
-      backend.type === 'sqlite'
-        ? sqliteSchema
-        : backend.type === 'pglite'
-          ? pgliteSchema
-          : postgresSchema;
+    // Select appropriate schema based on backend type
+    const schema = getSchemaForBackend(backend.type);
 
     // Create store directly
-    const baseStore = new DatabaseStore(backend.rawClient, backend.drizzle, schema, false, false);
+    const baseStore = new DatabaseStore(backend.rawClient, backend.drizzle, schema, false);
 
     // Optional locking wrapper (opt-in only)
     if (options.enableLocking === true) {
@@ -119,63 +114,44 @@ export async function createDatabase(options: DatabaseOptions = {}): Promise<Sto
 }
 
 /**
- * Create a local-only database (alias for createDatabase for backward compatibility)
+ * Helper function to select the appropriate schema based on backend type
  */
-export async function createLocalDatabase(dataDir?: string): Promise<Store> {
-  return createDatabase({
-    dataDir: dataDir ?? cfg.DATABASE_URI,
-  });
+function getSchemaForBackend(backendType: string) {
+  switch (backendType) {
+    case 'sqlite':
+      return sqliteSchema;
+    case 'pglite':
+      return pgliteSchema;
+    case 'postgres':
+      return postgresSchema;
+    default:
+      throw new Error(`Unsupported backend type: ${backendType}`);
+  }
 }
 
 /**
- * Create a local-only database with cooperative locking enabled
+ * Create a local-only database (simplified alias)
+ */
+export async function createLocalDatabase(dataDir?: string): Promise<Store> {
+  return createDatabase({ dataDir: dataDir ?? cfg.DATABASE_URI });
+}
+
+/**
+ * Create a database with cooperative locking enabled
+ * Simplified version that auto-detects process type
  */
 export async function createLockedDatabase(
   dataDir?: string,
   lockOptions?: LockOptions
 ): Promise<Store> {
-  const dbOptions: DatabaseOptions = {
+  return createDatabase({
     dataDir: dataDir ?? cfg.DATABASE_URI,
     enableLocking: true,
-  };
-
-  if (lockOptions) {
-    dbOptions.lockOptions = lockOptions;
-  }
-
-  return createDatabase(dbOptions);
-}
-
-/**
- * Create a database with locking enabled using process type detection
- */
-export async function createDatabaseWithLocking(
-  options: Omit<DatabaseOptions, 'enableLocking'> & {
-    /** Process type for lock identification (auto-detected if not provided) */
-    processType?: string;
-  } = {}
-): Promise<Store> {
-  const { processType, ...dbOptions } = options;
-
-  // Auto-detect process type if not provided
-  const detectedProcessType =
-    processType ??
-    (process.env.NODE_ENV === 'test'
-      ? 'test'
-      : typeof process !== 'undefined' && process.title?.includes('node')
-        ? 'cli'
-        : 'unknown');
-
-  const finalOptions: DatabaseOptions = {
-    ...dbOptions,
-    enableLocking: true,
     lockOptions: {
-      processType: detectedProcessType,
-      ...(options.lockOptions || {}),
+      processType: process.env.NODE_ENV === 'test' ? 'test' : 'cli',  // Simplified auto-detection
+      ...lockOptions,
     },
-  };
-
-  return createDatabase(finalOptions);
+  });
 }
 
 /**
