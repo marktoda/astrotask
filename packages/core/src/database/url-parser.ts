@@ -1,6 +1,8 @@
 /**
- * Database URL parsing with proper type discrimination
+ * Database URL parsing with standard URL API and essential cases
  */
+
+import { DatabaseUrlError } from './errors.js';
 
 export type DbUrl =
   | { kind: 'postgres'; url: URL }
@@ -10,109 +12,44 @@ export type DbUrl =
   | { kind: 'sqlite-file'; file: string }; // sqlite://./data/app.sqlite or ./data/app.sqlite
 
 /**
- * URL parsing patterns for each database type
+ * Protocol patterns for database types
  */
-const URL_PATTERNS = {
-  postgres: /^(postgresql|postgres|pg):/,
-  sqlite: /^sqlite:/,
-  memory: /^memory:/,
-  idb: /^idb:/,
-  sqliteFile: /\.(sqlite|sqlite3|db)$/,
+const PROTOCOL_MAP = {
+  'postgresql:': 'postgres',
+  'postgres:': 'postgres',
+  'pg:': 'postgres',
+  'sqlite:': 'sqlite',
+  'memory:': 'memory',
+  'idb:': 'idb',
 } as const;
 
 /**
- * Parse PostgreSQL URL
+ * File extension pattern for SQLite databases
  */
-function parsePostgresUrl(parsedUrl: URL): DbUrl {
-  return { kind: 'postgres', url: parsedUrl };
-}
-
-/**
- * Parse SQLite URL
- */
-function parseSqliteUrl(parsedUrl: URL): DbUrl {
-  const filePath = parsedUrl.pathname.startsWith('/')
-    ? parsedUrl.pathname.slice(1)
-    : parsedUrl.pathname;
-  if (!filePath) {
-    throw new Error('SQLite URL must specify a file path: sqlite://path/to/file.db');
-  }
-  return { kind: 'sqlite-file', file: filePath };
-}
-
-/**
- * Parse PGLite memory URL
- */
-function parseMemoryUrl(parsedUrl: URL): DbUrl {
-  // Label can be in hostname (memory://label) or pathname (memory:///label or memory://host/label)
-  const label =
-    parsedUrl.hostname ||
-    (parsedUrl.pathname ? parsedUrl.pathname.replace(/^\/+/, '') : '') ||
-    'default';
-  return { kind: 'pglite-mem', label };
-}
-
-/**
- * Parse PGLite IndexedDB URL
- */
-function parseIdbUrl(parsedUrl: URL): DbUrl {
-  // Label can be in hostname (idb://label) or pathname (idb:///label or idb://host/label)
-  const label =
-    parsedUrl.hostname ||
-    (parsedUrl.pathname ? parsedUrl.pathname.replace(/^\/+/, '') : '') ||
-    'default';
-  return { kind: 'pglite-idb', label };
-}
-
-/**
- * Handle URL protocol parsing
- */
-function parseUrlByProtocol(parsedUrl: URL): DbUrl {
-  const protocol = parsedUrl.protocol;
-
-  if (URL_PATTERNS.postgres.test(protocol)) {
-    return parsePostgresUrl(parsedUrl);
-  }
-
-  if (URL_PATTERNS.sqlite.test(protocol)) {
-    return parseSqliteUrl(parsedUrl);
-  }
-
-  if (URL_PATTERNS.memory.test(protocol)) {
-    return parseMemoryUrl(parsedUrl);
-  }
-
-  if (URL_PATTERNS.idb.test(protocol)) {
-    return parseIdbUrl(parsedUrl);
-  }
-
-  throw new Error(`Unsupported database URL protocol: ${protocol}`);
-}
+const SQLITE_FILE_PATTERN = /\.(sqlite|sqlite3|db)$/;
 
 /**
  * Parse a database connection string into a typed representation
- * Uses exhaustive pattern matching instead of heuristics
  */
 export function parseDbUrl(raw: string): DbUrl {
   if (!raw) {
-    throw new Error('Database URL cannot be empty');
+    throw new DatabaseUrlError('Database URL cannot be empty', raw);
   }
 
-  // Try to parse as URL first
+  // Try parsing as a proper URL first
   let parsedUrl: URL | null = null;
   try {
     parsedUrl = new URL(raw);
   } catch {
-    // Not a valid URL, will handle as file path below
+    // Not a valid URL, handle as file path below
   }
 
-  // Handle URL protocols
   if (parsedUrl) {
     return parseUrlByProtocol(parsedUrl);
   }
 
-  // Handle file paths
-  if (URL_PATTERNS.sqliteFile.test(raw)) {
+  // Handle file paths without protocol
+  if (SQLITE_FILE_PATTERN.test(raw)) {
     return { kind: 'sqlite-file', file: raw };
   }
 
@@ -121,7 +58,69 @@ export function parseDbUrl(raw: string): DbUrl {
 }
 
 /**
- * Check if a database URL represents a file-based database that typically needs locking
+ * Parse URL based on protocol
+ */
+function parseUrlByProtocol(url: URL): DbUrl {
+  const protocol = url.protocol;
+  const protocolType = PROTOCOL_MAP[protocol as keyof typeof PROTOCOL_MAP];
+
+  switch (protocolType) {
+    case 'postgres':
+      return { kind: 'postgres', url };
+
+    case 'sqlite':
+      return parseSqliteUrl(url);
+
+    case 'memory':
+      return parseMemoryUrl(url);
+
+    case 'idb':
+      return parseIdbUrl(url);
+
+    default:
+      throw new DatabaseUrlError(`Unsupported database URL protocol: ${protocol}`, url.toString());
+  }
+}
+
+/**
+ * Parse SQLite URL
+ */
+function parseSqliteUrl(url: URL): DbUrl {
+  const filePath = url.pathname.startsWith('/')
+    ? url.pathname.slice(1)
+    : url.pathname;
+  
+  if (!filePath) {
+    throw new DatabaseUrlError('SQLite URL must specify a file path: sqlite://path/to/file.db', url.toString());
+  }
+  
+  return { kind: 'sqlite-file', file: filePath };
+}
+
+/**
+ * Parse PGLite memory URL
+ */
+function parseMemoryUrl(url: URL): DbUrl {
+  // Extract label from hostname or pathname
+  const label = url.hostname || 
+               (url.pathname ? url.pathname.replace(/^\/+/, '') : '') || 
+               'default';
+  return { kind: 'pglite-mem', label };
+}
+
+/**
+ * Parse PGLite IndexedDB URL
+ */
+function parseIdbUrl(url: URL): DbUrl {
+  // Extract label from hostname or pathname
+  const label = url.hostname || 
+               (url.pathname ? url.pathname.replace(/^\/+/, '') : '') || 
+               'default';
+  return { kind: 'pglite-idb', label };
+}
+
+/**
+ * Check if a database URL represents a file-based database
  */
 export function isFileBasedUrl(parsed: DbUrl): boolean {
   return parsed.kind !== 'postgres';
@@ -138,5 +137,5 @@ export function isServerBased(parsed: DbUrl): boolean {
  * Type guard to ensure exhaustive handling of DbUrl variants
  */
 export function assertExhaustiveDbUrl(value: never): never {
-  throw new Error(`Unhandled DbUrl variant: ${JSON.stringify(value)}`);
+  throw new DatabaseUrlError(`Unhandled DbUrl variant: ${JSON.stringify(value)}`);
 }

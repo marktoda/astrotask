@@ -9,6 +9,7 @@ import {
   text as sqliteText,
   unique as sqliteUnique,
 } from 'drizzle-orm/sqlite-core';
+import { DatabaseAdapterError } from './errors.js';
 
 /*
   Unified Drizzle ORM schema definition for Astrotask.
@@ -325,7 +326,7 @@ export function createSchema(adapterType: AdapterType) {
     case 'sqlite':
       return createSqliteSchema();
     default:
-      throw new Error(`Unsupported adapter type: ${adapterType}`);
+      throw new DatabaseAdapterError(`Unsupported adapter type: ${adapterType}`, 'schema', adapterType);
   }
 }
 

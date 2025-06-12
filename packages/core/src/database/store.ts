@@ -8,7 +8,46 @@ import type {
 import type { CreateTask, Task, TaskStatus } from '../schemas/task.js';
 import { generateNextTaskId } from '../utils/taskId.js';
 import type { DrizzleOps } from './adapters/types.js';
+import {
+  DatabaseTransactionError,
+  DatabaseUnsupportedError,
+} from './errors.js';
 import type { postgresSchema, sqliteSchema } from './schema.js';
+
+/**
+ * Predefined query selections to reduce repetitive code
+ */
+
+// Standard task selection for all task queries
+const createTaskSelection = (schema: typeof postgresSchema | typeof sqliteSchema) => ({
+  id: schema.tasks.id,
+  parentId: schema.tasks.parentId,
+  title: schema.tasks.title,
+  description: schema.tasks.description,
+  status: schema.tasks.status,
+  priorityScore: schema.tasks.priorityScore,
+  prd: schema.tasks.prd,
+  contextDigest: schema.tasks.contextDigest,
+  createdAt: schema.tasks.createdAt,
+  updatedAt: schema.tasks.updatedAt,
+});
+
+// Standard context slice selection for all context slice queries
+const createContextSliceSelection = (schema: typeof postgresSchema | typeof sqliteSchema) => ({
+  id: schema.contextSlices.id,
+  title: schema.contextSlices.title,
+  description: schema.contextSlices.description,
+  contextType: schema.contextSlices.contextType,
+  taskId: schema.contextSlices.taskId,
+  contextDigest: schema.contextSlices.contextDigest,
+  createdAt: schema.contextSlices.createdAt,
+  updatedAt: schema.contextSlices.updatedAt,
+});
+
+// Standard task dependency selection for dependency queries
+const createTaskDependencySelection = (schema: typeof postgresSchema | typeof sqliteSchema) => ({
+  dependencyTaskId: schema.taskDependencies.dependencyTaskId,
+});
 
 /**
  * Interface for transaction operations
@@ -100,6 +139,11 @@ export class DatabaseStore<TRawClient = unknown, TDrizzle extends DrizzleOps = D
   public readonly isEncrypted: boolean;
   /** Schema definition for the database operations */
   private readonly schema: typeof postgresSchema | typeof sqliteSchema;
+  
+  // Predefined selections for this store instance
+  private readonly taskSelection: ReturnType<typeof createTaskSelection>;
+  private readonly contextSliceSelection: ReturnType<typeof createContextSliceSelection>;
+  private readonly taskDependencySelection: ReturnType<typeof createTaskDependencySelection>;
 
   constructor(
     rawClient: TRawClient,
@@ -111,6 +155,11 @@ export class DatabaseStore<TRawClient = unknown, TDrizzle extends DrizzleOps = D
     this.sql = sql;
     this.schema = schema;
     this.isEncrypted = isEncrypted;
+    
+    // Initialize predefined selections
+    this.taskSelection = createTaskSelection(schema);
+    this.contextSliceSelection = createContextSliceSelection(schema);
+    this.taskDependencySelection = createTaskDependencySelection(schema);
   }
 
   // Task operations
@@ -122,8 +171,6 @@ export class DatabaseStore<TRawClient = unknown, TDrizzle extends DrizzleOps = D
     } = {}
   ): Promise<Task[]> {
     const conditions = [];
-
-    // Apply status filtering if statuses are provided
     if (filters.statuses !== undefined) {
       if (filters.statuses.length === 1) {
         const status = filters.statuses[0];
@@ -133,12 +180,9 @@ export class DatabaseStore<TRawClient = unknown, TDrizzle extends DrizzleOps = D
       } else if (filters.statuses.length > 1) {
         conditions.push(inArray(this.schema.tasks.status, filters.statuses));
       }
-      // If statuses is an empty array, don't add any status filter (show all)
     } else {
-      // Default behavior when no statuses parameter is provided: show pending and in-progress
       conditions.push(inArray(this.schema.tasks.status, ['pending', 'in-progress']));
     }
-
     if (filters.parentId !== undefined) {
       if (filters.parentId === null) {
         conditions.push(isNull(this.schema.tasks.parentId));
@@ -146,32 +190,15 @@ export class DatabaseStore<TRawClient = unknown, TDrizzle extends DrizzleOps = D
         conditions.push(eq(this.schema.tasks.parentId, filters.parentId));
       }
     }
-
-    // Exclude PROJECT_ROOT from normal listings unless explicitly requested
     if (!filters.includeProjectRoot) {
       conditions.push(ne(this.schema.tasks.id, TASK_IDENTIFIERS.PROJECT_ROOT));
     }
-
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
-
-    const results = await this.sql
-      .select({
-        id: this.schema.tasks.id,
-        parentId: this.schema.tasks.parentId,
-        title: this.schema.tasks.title,
-        description: this.schema.tasks.description,
-        status: this.schema.tasks.status,
-        priorityScore: this.schema.tasks.priorityScore,
-        prd: this.schema.tasks.prd,
-        contextDigest: this.schema.tasks.contextDigest,
-        createdAt: this.schema.tasks.createdAt,
-        updatedAt: this.schema.tasks.updatedAt,
-      })
+    return await this.sql
+      .select(this.taskSelection)
       .from(this.schema.tasks)
       .where(whereClause)
       .orderBy(desc(this.schema.tasks.createdAt));
-
-    return this.transformTaskRows(results);
   }
 
   async addTask(data: CreateTask): Promise<Task> {
@@ -200,24 +227,11 @@ export class DatabaseStore<TRawClient = unknown, TDrizzle extends DrizzleOps = D
 
   async getTask(id: string): Promise<Task | null> {
     const tasks = await this.sql
-      .select({
-        id: this.schema.tasks.id,
-        parentId: this.schema.tasks.parentId,
-        title: this.schema.tasks.title,
-        description: this.schema.tasks.description,
-        status: this.schema.tasks.status,
-        priorityScore: this.schema.tasks.priorityScore,
-        prd: this.schema.tasks.prd,
-        contextDigest: this.schema.tasks.contextDigest,
-        createdAt: this.schema.tasks.createdAt,
-        updatedAt: this.schema.tasks.updatedAt,
-      })
+      .select(this.taskSelection)
       .from(this.schema.tasks)
       .where(eq(this.schema.tasks.id, id))
       .limit(1);
-
-    const transformedTasks = this.transformTaskRows(tasks);
-    return transformedTasks[0] || null;
+    return tasks[0] || null;
   }
 
   async updateTask(
@@ -263,7 +277,7 @@ export class DatabaseStore<TRawClient = unknown, TDrizzle extends DrizzleOps = D
   // Context slice operations
   async listContextSlices(taskId: string): Promise<ContextSlice[]> {
     return await this.sql
-      .select()
+      .select(this.contextSliceSelection)
       .from(this.schema.contextSlices)
       .where(eq(this.schema.contextSlices.taskId, taskId))
       .orderBy(desc(this.schema.contextSlices.createdAt));
@@ -299,7 +313,7 @@ export class DatabaseStore<TRawClient = unknown, TDrizzle extends DrizzleOps = D
 
   async getTaskDependencies(taskId: string): Promise<string[]> {
     const dependencies = await this.sql
-      .select({ dependencyTaskId: this.schema.taskDependencies.dependencyTaskId })
+      .select(this.taskDependencySelection)
       .from(this.schema.taskDependencies)
       .where(eq(this.schema.taskDependencies.dependentTaskId, taskId));
 
@@ -367,26 +381,12 @@ export class DatabaseStore<TRawClient = unknown, TDrizzle extends DrizzleOps = D
       }
     }
 
-    throw new Error('Unsupported raw client type for query operation');
-  }
-
-  /**
-   * Transform database rows to proper Task objects with Date conversion
-   * SQLite returns timestamps as numbers, but Task type expects Date objects
-   */
-  private transformTaskRows(results: Record<string, unknown>[]): Task[] {
-    return results.map((row) => ({
-      id: row.id as string,
-      parentId: row.parentId as string | null,
-      title: row.title as string,
-      description: row.description as string | null,
-      status: row.status as TaskStatus,
-      priorityScore: row.priorityScore as number,
-      prd: row.prd as string | null,
-      contextDigest: row.contextDigest as string | null,
-      createdAt: new Date(row.createdAt as string | number),
-      updatedAt: new Date(row.updatedAt as string | number),
-    })) as Task[];
+    throw new DatabaseUnsupportedError(
+      'Unsupported raw client type for query operation',
+      'unknown',
+      'raw query',
+      { clientType: typeof this.rawClient }
+    );
   }
 }
 
@@ -398,10 +398,20 @@ class DatabaseTransactionStore<TDrizzle extends DrizzleOps = DrizzleOps>
 {
   public readonly sql: TDrizzle;
   private readonly schema: typeof postgresSchema | typeof sqliteSchema;
+  
+  // Predefined selections for this transaction store instance
+  private readonly taskSelection: ReturnType<typeof createTaskSelection>;
+  private readonly contextSliceSelection: ReturnType<typeof createContextSliceSelection>;
+  private readonly taskDependencySelection: ReturnType<typeof createTaskDependencySelection>;
 
   constructor(transactionInstance: TDrizzle, schema: typeof postgresSchema | typeof sqliteSchema) {
     this.sql = transactionInstance;
     this.schema = schema;
+    
+    // Initialize predefined selections
+    this.taskSelection = createTaskSelection(schema);
+    this.contextSliceSelection = createContextSliceSelection(schema);
+    this.taskDependencySelection = createTaskDependencySelection(schema);
   }
 
   // Task operations within transaction
@@ -432,24 +442,11 @@ class DatabaseTransactionStore<TDrizzle extends DrizzleOps = DrizzleOps>
 
   async getTask(id: string): Promise<Task | null> {
     const tasks = await this.sql
-      .select({
-        id: this.schema.tasks.id,
-        parentId: this.schema.tasks.parentId,
-        title: this.schema.tasks.title,
-        description: this.schema.tasks.description,
-        status: this.schema.tasks.status,
-        priorityScore: this.schema.tasks.priorityScore,
-        prd: this.schema.tasks.prd,
-        contextDigest: this.schema.tasks.contextDigest,
-        createdAt: this.schema.tasks.createdAt,
-        updatedAt: this.schema.tasks.updatedAt,
-      })
+      .select(this.taskSelection)
       .from(this.schema.tasks)
       .where(eq(this.schema.tasks.id, id))
       .limit(1);
-
-    const transformedTasks = this.transformTaskRows(tasks);
-    return transformedTasks[0] || null;
+    return tasks[0] || null;
   }
 
   async updateTask(
@@ -483,8 +480,6 @@ class DatabaseTransactionStore<TDrizzle extends DrizzleOps = DrizzleOps>
     } = {}
   ): Promise<Task[]> {
     const conditions = [];
-
-    // Apply status filtering if statuses are provided
     if (filters.statuses !== undefined) {
       if (filters.statuses.length === 1) {
         const status = filters.statuses[0];
@@ -495,10 +490,8 @@ class DatabaseTransactionStore<TDrizzle extends DrizzleOps = DrizzleOps>
         conditions.push(inArray(this.schema.tasks.status, filters.statuses));
       }
     } else {
-      // Default behavior: show pending and in-progress
       conditions.push(inArray(this.schema.tasks.status, ['pending', 'in-progress']));
     }
-
     if (filters.parentId !== undefined) {
       if (filters.parentId === null) {
         conditions.push(isNull(this.schema.tasks.parentId));
@@ -506,32 +499,15 @@ class DatabaseTransactionStore<TDrizzle extends DrizzleOps = DrizzleOps>
         conditions.push(eq(this.schema.tasks.parentId, filters.parentId));
       }
     }
-
-    // Exclude PROJECT_ROOT from normal listings unless explicitly requested
     if (!filters.includeProjectRoot) {
       conditions.push(ne(this.schema.tasks.id, TASK_IDENTIFIERS.PROJECT_ROOT));
     }
-
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
-
-    const results = await this.sql
-      .select({
-        id: this.schema.tasks.id,
-        parentId: this.schema.tasks.parentId,
-        title: this.schema.tasks.title,
-        description: this.schema.tasks.description,
-        status: this.schema.tasks.status,
-        priorityScore: this.schema.tasks.priorityScore,
-        prd: this.schema.tasks.prd,
-        contextDigest: this.schema.tasks.contextDigest,
-        createdAt: this.schema.tasks.createdAt,
-        updatedAt: this.schema.tasks.updatedAt,
-      })
+    return await this.sql
+      .select(this.taskSelection)
       .from(this.schema.tasks)
       .where(whereClause)
       .orderBy(desc(this.schema.tasks.createdAt));
-
-    return this.transformTaskRows(results);
   }
 
   // Context slice operations within transaction
@@ -554,7 +530,7 @@ class DatabaseTransactionStore<TDrizzle extends DrizzleOps = DrizzleOps>
 
   async listContextSlices(taskId: string): Promise<ContextSlice[]> {
     return await this.sql
-      .select()
+      .select(this.contextSliceSelection)
       .from(this.schema.contextSlices)
       .where(eq(this.schema.contextSlices.taskId, taskId))
       .orderBy(desc(this.schema.contextSlices.createdAt));
@@ -573,7 +549,7 @@ class DatabaseTransactionStore<TDrizzle extends DrizzleOps = DrizzleOps>
 
   async getTaskDependencies(taskId: string): Promise<string[]> {
     const dependencies = await this.sql
-      .select({ dependencyTaskId: this.schema.taskDependencies.dependencyTaskId })
+      .select(this.taskDependencySelection)
       .from(this.schema.taskDependencies)
       .where(eq(this.schema.taskDependencies.dependentTaskId, taskId));
 
@@ -584,21 +560,6 @@ class DatabaseTransactionStore<TDrizzle extends DrizzleOps = DrizzleOps>
   rollback(): void {
     // Drizzle doesn't provide explicit rollback control within transaction functions
     // Rollback is achieved by throwing an error within the transaction
-    throw new Error('Transaction explicitly rolled back');
-  }
-
-  private transformTaskRows(results: Record<string, unknown>[]): Task[] {
-    return results.map((row) => ({
-      id: row.id as string,
-      parentId: row.parentId as string | null,
-      title: row.title as string,
-      description: row.description as string | null,
-      status: row.status as TaskStatus,
-      priorityScore: row.priorityScore as number,
-      prd: row.prd as string | null,
-      contextDigest: row.contextDigest as string | null,
-      createdAt: new Date(row.createdAt as string | number),
-      updatedAt: new Date(row.updatedAt as string | number),
-    }));
+    throw new DatabaseTransactionError('Transaction explicitly rolled back', 'transaction-store');
   }
 }

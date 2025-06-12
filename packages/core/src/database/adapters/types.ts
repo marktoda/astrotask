@@ -8,10 +8,14 @@ import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 
 /**
  * Database capabilities that vary between backends
+ * These are primarily informational and used for debugging/monitoring
  */
 export interface DbCapabilities {
+  /** Whether the backend supports concurrent writes (server-based vs file-based) */
   concurrentWrites: boolean;
+  /** Whether the backend supports PostgreSQL-style LISTEN/NOTIFY */
   listenNotify: boolean;
+  /** Available database extensions */
   extensions: Set<string>;
 }
 
@@ -77,7 +81,7 @@ export interface DatabaseBackend<TDrizzle extends DrizzleOps = DrizzleOps> {
   /** Raw client for escape hatch operations */
   readonly rawClient: unknown;
 
-  /** Backend capabilities */
+  /** Backend capabilities for informational purposes */
   readonly capabilities: DbCapabilities;
 
   /** Backend type for logging/debugging */
@@ -91,35 +95,6 @@ export interface DatabaseBackend<TDrizzle extends DrizzleOps = DrizzleOps> {
 
   /** Close the database connection */
   close(): Promise<void>;
-}
-
-/**
- * Helper functions for database backend characteristics
- */
-
-/**
- * Check if a backend is file-based (needs locking for migrations)
- */
-export function isFileBased(backend: DatabaseBackend): boolean {
-  return !backend.capabilities.concurrentWrites;
-}
-
-/**
- * Check if a backend supports server-style concurrent operations
- */
-export function isServerBased(backend: DatabaseBackend): boolean {
-  return backend.capabilities.concurrentWrites;
-}
-
-/**
- * Check if a backend needs external locking for safe concurrent access
- * Modern SQLite with WAL mode handles concurrency natively, so only very
- * specialized cases (like some migration scenarios) may need external locking
- */
-export function needsExternalLocking(): boolean {
-  // With WAL mode and proper timeouts, SQLite handles concurrency well
-  // Only legacy systems or special migration scenarios need external locking
-  return false; // Simplified: rely on native database concurrency features
 }
 
 /**

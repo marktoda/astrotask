@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { cfg } from '../utils/config.js';
 import { createModuleLogger } from '../utils/logger.js';
 import { AdapterHelpers, createAdapter } from './adapters/index.js';
+import { DatabaseAdapterError } from './errors.js';
 import { initializeDatabase } from './initialization.js';
 import type { LockOptions } from './lock.js';
 import { DatabaseLockError } from './lock.js';
@@ -125,7 +126,7 @@ function getSchemaForBackend(backendType: string) {
     case 'postgres':
       return postgresSchema;
     default:
-      throw new Error(`Unsupported backend type: ${backendType}`);
+      throw new DatabaseAdapterError(`Unsupported backend type: ${backendType}`, 'factory', backendType);
   }
 }
 

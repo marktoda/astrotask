@@ -15,11 +15,7 @@ export type {
   SqlRow,
 } from './types.js';
 
-export {
-  isFileBased,
-  isServerBased,
-  needsExternalLocking,
-} from './types.js';
+// Removed unused capability helper functions
 
 export { PostgresAdapter } from './postgres.js';
 export { PgLiteAdapter } from './pglite.js';
