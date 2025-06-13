@@ -244,7 +244,7 @@ export class TreeTransform {
   static map<T, U>(
     root: TreeNode<T>,
     transformer: (node: TreeNode<T>) => U
-  ): { data: U; children: any[] } {
+  ): { data: U; children: Array<{ data: U; children: unknown[] }> } {
     return {
       data: transformer(root),
       children: root.getChildren().map(child => TreeTransform.map(child, transformer)),

@@ -35,9 +35,6 @@ export const configSchema = z.object({
   OPENAI_API_KEY: z.string().default(''),
   LLM_MODEL: z.string().default(DEFAULT_MODEL_ID),
 
-  // Optional Electric SQL configuration (deprecated)
-  ELECTRIC_URL: z.string().optional(),
-
   // Development
   DEV_SERVER_HOST: z.string().default('localhost'),
   DEV_SERVER_PORT: z.coerce.number().int().min(1).max(65535).default(5173),

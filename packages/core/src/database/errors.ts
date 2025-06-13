@@ -20,7 +20,15 @@ export abstract class DatabaseError extends Error {
    * Create error with additional context
    */
   withContext(context: Record<string, unknown>): this {
-    return new (this.constructor as any)(
+    // Type-safe constructor call using proper typing
+    const Constructor = this.constructor as new (
+      message: string,
+      adapter: string,
+      operation?: string,
+      context?: Record<string, unknown>
+    ) => this;
+    
+    return new Constructor(
       this.message,
       this.adapter,
       this.operation,
@@ -129,12 +137,16 @@ export class DatabaseUnsupportedError extends DatabaseError {
 /**
  * Helper function to create adapter-specific error
  */
-export function createAdapterError(
-  ErrorClass: new (...args: any[]) => DatabaseError,
+export function createAdapterError<T extends DatabaseError>(
+  ErrorClass: new (
+    message: string,
+    adapter: string,
+    ...args: unknown[]
+  ) => T,
   message: string,
   adapter: string,
-  ...args: any[]
-): DatabaseError {
+  ...args: unknown[]
+): T {
   return new ErrorClass(message, adapter, ...args);
 }
 

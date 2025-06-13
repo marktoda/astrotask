@@ -161,38 +161,4 @@ export function createLLMService(config: Partial<LLMConfig> = {}): ILLMService {
   return new DefaultLLMService(config);
 }
 
-/**
- * Default LLM configuration using centralized config and model registry
- * @deprecated Use DefaultLLMService.getConfig() instead
- */
-export function getLLMConfig(overrides: Partial<LLMConfig> = {}): Required<LLMConfig> {
-  const service = new DefaultLLMService(overrides);
-  return service.getConfig();
-}
 
-/**
- * Create a configured OpenAI LLM instance
- * @deprecated Use DefaultLLMService.getChatModel() instead
- */
-export function createLLM(config: Partial<LLMConfig> = {}): ChatOpenAI {
-  const service = new DefaultLLMService(config);
-  return service.getChatModel();
-}
-
-/**
- * Validate LLM configuration
- * @deprecated Use DefaultLLMService.validateConfig() instead
- */
-export function validateLLMConfig(config: LLMConfig): string[] {
-  const service = new DefaultLLMService(config);
-  return service.validateConfig();
-}
-
-/**
- * Check if LLM is properly configured
- * @deprecated Use DefaultLLMService.isConfigured() instead
- */
-export function isLLMConfigured(): boolean {
-  const service = new DefaultLLMService();
-  return service.isConfigured();
-}

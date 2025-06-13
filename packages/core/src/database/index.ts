@@ -155,17 +155,7 @@ export async function createLockedDatabase(
   });
 }
 
-/**
- * Create a synced database (now just creates local database since sync is removed)
- * @deprecated Electric SQL sync has been removed. This now creates a local-only database.
- */
-export async function createSyncedDatabase(
-  dataDir?: string,
-  _electricUrl?: string
-): Promise<Store> {
-  logger.warn('Electric SQL sync has been removed. Creating local-only database instead.');
-  return createLocalDatabase(dataDir);
-}
+
 
 // Re-export types and utilities
 export type { Store, TransactionStore } from './store.js';

@@ -37,12 +37,6 @@ export {
   type DefaultRegistryResult,
 } from './services/default-registry.js';
 
-export {
-  createServices,
-  type ServiceContainer as LegacyServiceContainer,
-  type ServiceFactoryConfig,
-} from './services/ServiceFactory.js';
-
 // Configuration constants
 export { TEST_CONFIG } from './utils/config.js';
 
@@ -235,7 +229,6 @@ export {
 // Configuration and models
 export * from './utils/config.js';
 export * from './utils/models.js';
-export * from './utils/llm.js';
 
 // Acceptance criteria utilities
 export * from './utils/acceptanceCriteria.js';
