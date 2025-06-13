@@ -30,13 +30,6 @@ export {
 export { Registry, type Provider } from './services/registry.js';
 export { DependencyType } from './services/dependency-type.js';
 
-// Legacy service initialization (deprecated)
-export {
-  createDefaultRegistry,
-  type RegistryConfig,
-  type DefaultRegistryResult,
-} from './services/default-registry.js';
-
 // Configuration constants
 export { TEST_CONFIG } from './utils/config.js';
 

@@ -1,5 +1,5 @@
 import type { Task, TaskTree, TrackingTaskTree } from "@astrotask/core";
-import blessed from "blessed";
+import * as blessed from "blessed";
 import type { StoreApi } from "zustand";
 import type { DashboardStore } from "../../store/index.js";
 import {
@@ -11,6 +11,7 @@ import {
 	TaskLineFormatter,
 	type TaskLineInfo,
 } from "../../utils/task-line-formatter.js";
+import "../../types/blessed-extensions.js";
 
 interface TaskTreeItem {
 	taskId: string;
@@ -135,7 +136,7 @@ export class TaskTreeComponent {
 
 		// Expand/collapse handling
 		this.list.key(["right", "l"], () => {
-			const selectedIndex = (this.list as any).selected;
+			const selectedIndex = this.list.selected;
 			const item = this.currentItems[selectedIndex];
 			if (item && item.hasChildren) {
 				state().toggleTaskExpanded(item.taskId);
@@ -143,7 +144,7 @@ export class TaskTreeComponent {
 		});
 
 		this.list.key(["left", "h"], () => {
-			const selectedIndex = (this.list as any).selected;
+			const selectedIndex = this.list.selected;
 			const item = this.currentItems[selectedIndex];
 			if (item && state().expandedTaskIds.has(item.taskId)) {
 				state().toggleTaskExpanded(item.taskId);
@@ -152,7 +153,7 @@ export class TaskTreeComponent {
 
 		// Enter to expand/collapse or toggle status
 		this.list.key(["enter"], () => {
-			const selectedIndex = (this.list as any).selected;
+			const selectedIndex = this.list.selected;
 			const item = this.currentItems[selectedIndex];
 			if (item) {
 				// New behavior: Cycle through status: pending -> in-progress -> done -> pending
@@ -194,7 +195,7 @@ export class TaskTreeComponent {
 			if (now - this.lastKeyPress < this.keyDebounceMs) return;
 			this.lastKeyPress = now;
 
-			const selectedIndex = (this.list as any).selected;
+			const selectedIndex = this.list.selected;
 			const item = this.currentItems[selectedIndex];
 			if (item) {
 				// New behavior: Cycle through status: pending -> in-progress -> done -> pending
@@ -218,7 +219,7 @@ export class TaskTreeComponent {
 
 		// Shift+D to mark done
 		this.list.key(["S-d"], async () => {
-			const selectedIndex = (this.list as any).selected;
+			const selectedIndex = this.list.selected;
 			const item = this.currentItems[selectedIndex];
 			if (item) {
 				// Only allow marking done from pending or in-progress
@@ -243,7 +244,7 @@ export class TaskTreeComponent {
 
 		// b/B to block/unblock tasks
 		this.list.key(["b", "S-b"], async () => {
-			const selectedIndex = (this.list as any).selected;
+			const selectedIndex = this.list.selected;
 			const item = this.currentItems[selectedIndex];
 			if (item) {
 				if (item.task.status === "blocked") {
@@ -269,7 +270,7 @@ export class TaskTreeComponent {
 
 		// Add sibling task
 		this.list.key(["a"], async () => {
-			const selectedIndex = (this.list as any).selected;
+			const selectedIndex = this.list.selected;
 			const item = this.currentItems[selectedIndex];
 			if (item) {
 				const taskTree = state().getTaskTree(item.taskId);
@@ -280,7 +281,7 @@ export class TaskTreeComponent {
 
 		// Add child task
 		this.list.key(["S-a"], async () => {
-			const selectedIndex = (this.list as any).selected;
+			const selectedIndex = this.list.selected;
 			const item = this.currentItems[selectedIndex];
 			if (item) {
 				await state().addTaskWithEditor(item.taskId);
@@ -289,7 +290,7 @@ export class TaskTreeComponent {
 
 		// Delete task - using multiple key bindings for better compatibility
 		this.list.key(["delete", "C-d", "x"], () => {
-			const selectedIndex = (this.list as any).selected;
+			const selectedIndex = this.list.selected;
 			const item = this.currentItems[selectedIndex];
 
 			if (item) {
@@ -312,7 +313,7 @@ export class TaskTreeComponent {
 
 		// Rename task
 		this.list.key(["r"], () => {
-			const selectedIndex = (this.list as any).selected;
+			const selectedIndex = this.list.selected;
 			const item = this.currentItems[selectedIndex];
 			if (item) {
 				this.promptForRename(item.task, (newTitle) => {
@@ -323,7 +324,7 @@ export class TaskTreeComponent {
 
 		// Edit task with editor
 		this.list.key(["e"], async () => {
-			const selectedIndex = (this.list as any).selected;
+			const selectedIndex = this.list.selected;
 			const item = this.currentItems[selectedIndex];
 			if (item) {
 				await state().editTaskWithEditor(item.taskId);
@@ -347,7 +348,7 @@ export class TaskTreeComponent {
 
 		// Set task as tree root (focus on this task's subtree)
 		this.list.key(["f"], () => {
-			const selectedIndex = (this.list as any).selected;
+			const selectedIndex = this.list.selected;
 			const item = this.currentItems[selectedIndex];
 			if (item) {
 				// Set this task as the selected project to root the tree at this task
@@ -364,7 +365,7 @@ export class TaskTreeComponent {
 
 		// Mouse click handling - double click to set as root
 		this.list.on("click", () => {
-			const selectedIndex = (this.list as any).selected;
+			const selectedIndex = this.list.selected;
 			const item = this.currentItems[selectedIndex];
 			if (item) {
 				// On single click, just select the task
@@ -375,7 +376,7 @@ export class TaskTreeComponent {
 		// Selection change handler
 		this.list.on("select item", () => {
 			if (this.isRendering) return;
-			const selectedIndex = (this.list as any).selected;
+			const selectedIndex = this.list.selected;
 			const item = this.currentItems[selectedIndex];
 			if (item) {
 				this.store.getState().selectTask(item.taskId);
@@ -530,7 +531,7 @@ export class TaskTreeComponent {
 			this.currentItems = items;
 
 			// Remember current selection
-			const currentSelection = (this.list as any).selected || 0;
+			const currentSelection = this.list.selected || 0;
 			const currentSelectedTaskId = this.currentItems[currentSelection]?.taskId;
 
 			// Force complete redraw by temporarily hiding and showing the list
@@ -541,8 +542,8 @@ export class TaskTreeComponent {
 			this.list.setContent("");
 
 			// Clear the internal render cache if it exists
-			if ((this.list as any)._clines) {
-				(this.list as any)._clines = [];
+			if (this.list._clines) {
+				this.list._clines = [];
 			}
 
 			// Set items with enhanced color integration that preserves status glyph colors
@@ -591,7 +592,7 @@ export class TaskTreeComponent {
 
 			// Force the parent box to redraw as well
 			if (this.list.parent) {
-				(this.list.parent as any).render();
+				this.list.parent.render();
 			}
 		} finally {
 			this.isRendering = false;

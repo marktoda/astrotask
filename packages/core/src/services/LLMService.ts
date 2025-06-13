@@ -1,6 +1,6 @@
 import type { ChatOpenAI } from '@langchain/openai';
 import { ChatOpenAI as ChatOpenAIImpl } from '@langchain/openai';
-import { cfg } from '../utils/config.js';
+import type { AppConfig } from '../utils/config.js';
 import { type ModelConfig, getModelConfig } from '../utils/models.js';
 import { LLMNotConfiguredError } from '../errors/index.js';
 
@@ -59,9 +59,11 @@ export interface ILLMService {
 export class DefaultLLMService implements ILLMService {
   private model?: ChatOpenAI;
   private readonly overrides: Partial<LLMConfig>;
+  private readonly appConfig: AppConfig;
   private cachedConfig?: Required<LLMConfig>;
 
-  constructor(overrides: Partial<LLMConfig> = {}) {
+  constructor(appConfig: AppConfig, overrides: Partial<LLMConfig> = {}) {
+    this.appConfig = appConfig;
     this.overrides = overrides;
   }
 
@@ -120,10 +122,10 @@ export class DefaultLLMService implements ILLMService {
    * Build complete configuration from defaults, model config, and overrides
    */
   private buildConfig(): Required<LLMConfig> {
-    const modelConfig = getModelConfig(this.overrides.modelName ?? cfg.LLM_MODEL);
+    const modelConfig = getModelConfig(this.overrides.modelName ?? this.appConfig.LLM_MODEL);
 
     return {
-      apiKey: this.overrides.apiKey ?? cfg.OPENAI_API_KEY,
+      apiKey: this.overrides.apiKey ?? this.appConfig.OPENAI_API_KEY,
       modelName: this.overrides.modelName ?? modelConfig.id,
       temperature: this.overrides.temperature ?? modelConfig.temperature,
       maxTokens: this.overrides.maxTokens ?? modelConfig.maxTokens,
@@ -154,11 +156,12 @@ export class DefaultLLMService implements ILLMService {
 /**
  * Factory function to create an LLM service with configuration
  *
+ * @param appConfig - Application configuration
  * @param config - Optional configuration overrides
  * @returns Configured LLM service instance
  */
-export function createLLMService(config: Partial<LLMConfig> = {}): ILLMService {
-  return new DefaultLLMService(config);
+export function createLLMService(appConfig: AppConfig, config: Partial<LLMConfig> = {}): ILLMService {
+  return new DefaultLLMService(appConfig, config);
 }
 
 

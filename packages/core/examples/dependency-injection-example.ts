@@ -9,7 +9,8 @@ import {
   Registry,
   createLLMService,
   type AstrotaskConfig,
-  type LLMConfig 
+  type LLMConfig,
+  cfg
 } from '../src/index.js';
 
 // Example 1: Basic usage with default services
@@ -23,7 +24,7 @@ async function basicUsage() {
   const task = await astrotask.store.addTask({
     title: 'Example Task',
     status: 'pending',
-    priority: 'high',
+    priorityScore: 75,
   });
 
   console.log(`Created task: ${task.id} - ${task.title}`);
@@ -120,7 +121,7 @@ async function customLLMService() {
     title: 'Test Complexity Analysis',
     description: 'This task will use our custom LLM service',
     status: 'pending',
-    priority: 'medium',
+    priorityScore: 50,
   });
 
   try {
@@ -149,7 +150,7 @@ async function enhancedLLMConfiguration() {
         // Note: apiKey would typically come from environment
       };
       
-      const llmService = createLLMService(customConfig);
+      const llmService = createLLMService(cfg, customConfig);
       
       // Log the configuration
       console.log('LLM Service Configuration:', llmService.getConfig());
@@ -163,7 +164,7 @@ async function enhancedLLMConfiguration() {
   const task = await astrotask.store.addTask({
     title: 'Enhanced Configuration Test',
     status: 'pending',
-    priority: 'medium',
+    priorityScore: 50,
   });
 
   console.log(`Created task: ${task.id} - ${task.title}`);
@@ -251,7 +252,7 @@ async function registryMerging() {
   
   // Create a separate registry with testing overrides
   const testingRegistry = new Registry();
-  testingRegistry.register(DependencyType.LLM_SERVICE, createLLMService({
+  testingRegistry.register(DependencyType.LLM_SERVICE, createLLMService(cfg, {
     modelName: 'gpt-3.5-turbo',
     temperature: 0.5,
     maxTokens: 1024,
@@ -296,7 +297,7 @@ async function productionExample() {
           // In production, you might use Azure OpenAI or other providers
         };
         
-        registry.register(DependencyType.LLM_SERVICE, createLLMService(productionConfig));
+        registry.register(DependencyType.LLM_SERVICE, createLLMService(cfg, productionConfig));
         console.log('Using production LLM configuration');
       }
     },

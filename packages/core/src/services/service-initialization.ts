@@ -11,8 +11,9 @@
 import type { IDatabaseAdapter } from '../database/adapters/index.js';
 import { pgliteSchema, postgresSchema, sqliteSchema } from '../database/schema.js';
 import { DatabaseStore, type Store } from '../database/store.js';
+import type { AppConfig } from '../utils/config.js';
 import { cfg } from '../utils/config.js';
-import { createModuleLogger } from '../utils/logger.js';
+import { createModuleLogger, type LoggerFactory, createLoggerFactory } from '../utils/logger.js';
 import type { ComplexityAnalyzer } from './ComplexityAnalyzer.js';
 import { createComplexityAnalyzer } from './ComplexityAnalyzer.js';
 import type { DependencyService } from './DependencyService.js';
@@ -33,6 +34,12 @@ const logger = createModuleLogger('ServiceInitialization');
 export interface ServiceConfig {
   /** Database adapter instance */
   adapter: IDatabaseAdapter;
+  
+  /** Application configuration (defaults to global cfg) */
+  appConfig?: AppConfig;
+  
+  /** Optional custom logger factory */
+  loggerFactory?: LoggerFactory;
   
   /** Optional custom LLM service (defaults to DefaultLLMService) */
   llmService?: ILLMService;
@@ -95,6 +102,13 @@ export interface ServiceInitializationResult {
  * - Flexibility for testing and customization
  */
 export async function initializeServices(config: ServiceConfig): Promise<ServiceInitializationResult> {
+  // Use provided config or fall back to global cfg
+  const appConfig = config.appConfig ?? cfg;
+  
+  // Use provided logger factory or create one with appConfig
+  const loggerFactory = config.loggerFactory ?? createLoggerFactory(appConfig);
+  const logger = loggerFactory.createModuleLogger('ServiceInitialization');
+  
   logger.debug('Initializing Astrotask services');
   
   // Create registry
@@ -108,11 +122,11 @@ export async function initializeServices(config: ServiceConfig): Promise<Service
     config.adapter.rawClient,
     config.adapter.drizzle,
     schema,
-    cfg.STORE_IS_ENCRYPTED
+    appConfig.STORE_IS_ENCRYPTED
   );
   
   // Register services with dependency injection
-  configureRegistry(registry, store, config);
+  configureRegistry(registry, store, config, appConfig, loggerFactory);
   
   // Resolve all services
   const services = await resolveServices(registry, store);
@@ -125,10 +139,10 @@ export async function initializeServices(config: ServiceConfig): Promise<Service
 /**
  * Configure the dependency injection registry
  */
-function configureRegistry(registry: Registry, store: Store, config: ServiceConfig): void {
+function configureRegistry(registry: Registry, store: Store, config: ServiceConfig, appConfig: AppConfig, loggerFactory: LoggerFactory): void {
   // LLM Service (use provided or default)
   registry.register(DependencyType.LLM_SERVICE, 
-    config.llmService ?? (() => new DefaultLLMService())
+    config.llmService ?? (() => new DefaultLLMService(appConfig))
   );
   
   // Task Service
@@ -140,12 +154,13 @@ function configureRegistry(registry: Registry, store: Store, config: ServiceConf
   // Complexity Analyzer (depends on LLM)
   registry.register(DependencyType.COMPLEXITY_ANALYZER, async () => {
     const llmService = await registry.resolve<ILLMService>(DependencyType.LLM_SERVICE);
+    const logger = loggerFactory.createModuleLogger('ComplexityAnalyzer');
     return createComplexityAnalyzer(
       logger,
       {
-        threshold: config.complexityConfig?.threshold ?? cfg.COMPLEXITY_THRESHOLD,
-        research: config.complexityConfig?.research ?? cfg.COMPLEXITY_RESEARCH,
-        batchSize: config.complexityConfig?.batchSize ?? cfg.COMPLEXITY_BATCH_SIZE,
+        threshold: config.complexityConfig?.threshold ?? appConfig.COMPLEXITY_THRESHOLD,
+        research: config.complexityConfig?.research ?? appConfig.COMPLEXITY_RESEARCH,
+        batchSize: config.complexityConfig?.batchSize ?? appConfig.COMPLEXITY_BATCH_SIZE,
       },
       llmService
     );
@@ -158,21 +173,22 @@ function configureRegistry(registry: Registry, store: Store, config: ServiceConf
       registry.resolve<TaskService>(DependencyType.TASK_SERVICE)
     ]);
     
+    const logger = loggerFactory.createModuleLogger('TaskExpansionService');
     return createTaskExpansionService(
       logger,
       store,
       taskService,
       {
         useComplexityAnalysis:
-          config.expansionConfig?.useComplexityAnalysis ?? cfg.EXPANSION_USE_COMPLEXITY_ANALYSIS,
-        research: config.expansionConfig?.research ?? cfg.EXPANSION_RESEARCH,
+          config.expansionConfig?.useComplexityAnalysis ?? appConfig.EXPANSION_USE_COMPLEXITY_ANALYSIS,
+        research: config.expansionConfig?.research ?? appConfig.EXPANSION_RESEARCH,
         complexityThreshold:
-          config.expansionConfig?.complexityThreshold ?? cfg.EXPANSION_COMPLEXITY_THRESHOLD,
-        defaultSubtasks: config.expansionConfig?.defaultSubtasks ?? cfg.EXPANSION_DEFAULT_SUBTASKS,
-        maxSubtasks: config.expansionConfig?.maxSubtasks ?? cfg.EXPANSION_MAX_SUBTASKS,
-        forceReplace: config.expansionConfig?.forceReplace ?? cfg.EXPANSION_FORCE_REPLACE,
+          config.expansionConfig?.complexityThreshold ?? appConfig.EXPANSION_COMPLEXITY_THRESHOLD,
+        defaultSubtasks: config.expansionConfig?.defaultSubtasks ?? appConfig.EXPANSION_DEFAULT_SUBTASKS,
+        maxSubtasks: config.expansionConfig?.maxSubtasks ?? appConfig.EXPANSION_MAX_SUBTASKS,
+        forceReplace: config.expansionConfig?.forceReplace ?? appConfig.EXPANSION_FORCE_REPLACE,
         createContextSlices:
-          config.expansionConfig?.createContextSlices ?? cfg.EXPANSION_CREATE_CONTEXT_SLICES,
+          config.expansionConfig?.createContextSlices ?? appConfig.EXPANSION_CREATE_CONTEXT_SLICES,
       },
       llmService
     );

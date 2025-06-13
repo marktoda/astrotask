@@ -1,11 +1,16 @@
 #!/usr/bin/env node
 import { cfg, createDatabase } from "@astrotask/core";
-import blessed from "blessed";
+import * as blessed from "blessed";
 import { EditorService } from "./services/editor.js";
 import { EnhancedKeymapService } from "./services/enhanced-keymap.js";
 import { SyncService } from "./services/sync.js";
 import { createDashboardStore } from "./store/index.js";
 import { DashboardLayout } from "./ui/components/layout.js";
+import { createAstrotask } from "@astrotask/core";
+import { KeyMapRegistry } from "./services/keymap-registry.js";
+import { FirstRunDetector } from "./services/first-run-detector.js";
+import { OnboardingStateManager } from "./services/onboarding-state.js";
+import "./types/blessed-extensions.js";
 
 // Suppress terminfo warnings
 process.env["NODE_NO_WARNINGS"] = "1";
@@ -70,13 +75,12 @@ async function main() {
 			// Check if methods exist before calling them
 			try {
 				if (
-					screen.program &&
-					typeof (screen.program as any).keypad === "function"
+					typeof screen.program.keypad === "function"
 				) {
-					(screen.program as any).keypad(true);
+					screen.program.keypad(true);
 				}
-				if (typeof (screen as any).grabInput === "function") {
-					(screen as any).grabInput({ mouse: true });
+				if (typeof screen.grabInput === "function") {
+					screen.grabInput({ mouse: true });
 				}
 			} catch (programError: any) {
 				// Ignore program setup errors - not critical for basic functionality
@@ -191,9 +195,9 @@ async function main() {
 		let currentDashboard = await createDashboard();
 
 		// Handle screen restart after editor closes
-		process.on("blessed-screen-restart" as any, async () => {
-			// Clean up current screen without exiting
-			await currentDashboard.cleanup(false);
+		process.on("blessed-screen-restart", async () => {
+			// Clean up current screen
+			screen.destroy();
 
 			// Small delay to ensure terminal is ready
 			setTimeout(async () => {
