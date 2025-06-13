@@ -1,5 +1,8 @@
 /**
  * Service Factory - Handles initialization and composition of all Astrotask services
+ * 
+ * @deprecated Use `initializeServices` from './service-initialization.js' instead.
+ * This module is maintained for backward compatibility but will be removed in a future version.
  */
 
 import type { IDatabaseAdapter } from '../database/adapters/index.js';
@@ -46,6 +49,9 @@ export interface ServiceFactoryConfig {
     | undefined;
 }
 
+/**
+ * @deprecated Use `initializeServices` from './service-initialization.js' instead
+ */
 export function createServices(config: ServiceFactoryConfig): ServiceContainer {
   const { adapter, llmService } = config;
 

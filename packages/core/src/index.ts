@@ -17,24 +17,37 @@ export { TaskService } from './services/TaskService.js';
 export { DependencyService } from './services/DependencyService.js';
 export { DependencyGraph } from './entities/DependencyGraph.js';
 
+// Service initialization (unified approach)
+export {
+  initializeServices,
+  createServiceContainer,
+  type ServiceConfig,
+  type ServiceContainer,
+  type ServiceInitializationResult,
+} from './services/service-initialization.js';
+
 // Dependency Injection system
 export { Registry, type Provider } from './services/registry.js';
 export { DependencyType } from './services/dependency-type.js';
+
+// Legacy service initialization (deprecated)
 export {
   createDefaultRegistry,
   type RegistryConfig,
   type DefaultRegistryResult,
 } from './services/default-registry.js';
 
-// Service composition (legacy)
 export {
   createServices,
-  type ServiceContainer,
+  type ServiceContainer as LegacyServiceContainer,
   type ServiceFactoryConfig,
 } from './services/ServiceFactory.js';
 
 // Configuration constants
 export { TEST_CONFIG } from './utils/config.js';
+
+// Error handling
+export * from './errors/index.js';
 
 // Astrotask SDK - Main entry point
 export {
@@ -158,6 +171,25 @@ export {
   type TaskTreeCacheStats,
   type TaskTreeMetadata,
 } from './entities/TaskTreeCache.js';
+
+// Tree operations utilities
+export {
+  type TreeNode,
+  type TreeVisitor,
+  type TreePredicate,
+  TreeTraversal,
+  TreeSearch,
+  TreeAnalysis,
+  TreeTransform,
+  TreeValidation,
+  TreeBatch,
+} from './entities/tree-operations.js';
+
+export {
+  TaskTreeAdapter,
+  TrackingTaskTreeAdapter,
+  TreeAdapterUtils,
+} from './entities/tree-adapters.js';
 
 // Task generation exports
 export type {

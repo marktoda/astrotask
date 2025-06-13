@@ -2,6 +2,7 @@ import type { ChatOpenAI } from '@langchain/openai';
 import { ChatOpenAI as ChatOpenAIImpl } from '@langchain/openai';
 import { cfg } from '../utils/config.js';
 import { type ModelConfig, getModelConfig } from '../utils/models.js';
+import { LLMNotConfiguredError } from '../errors/index.js';
 
 /**
  * Configuration options for LLM instances
@@ -137,7 +138,7 @@ export class DefaultLLMService implements ILLMService {
     const config = this.getConfig();
 
     if (!config.apiKey) {
-      throw new Error('OpenAI API key is required. Set OPENAI_API_KEY environment variable.');
+      throw new LLMNotConfiguredError('createLLM');
     }
 
     return new ChatOpenAIImpl({

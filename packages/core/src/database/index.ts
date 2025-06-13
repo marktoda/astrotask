@@ -168,8 +168,9 @@ export async function createSyncedDatabase(
 }
 
 // Re-export types and utilities
-export type { Store } from './store.js';
+export type { Store, TransactionStore } from './store.js';
 export { DatabaseStore } from './store.js';
+export { BaseStore } from './store-base.js';
 export { LockingStore } from './lockingStore.js';
 export { DatabaseLock, DatabaseLockError, withDatabaseLock } from './lock.js';
 export type { LockOptions } from './lock.js';

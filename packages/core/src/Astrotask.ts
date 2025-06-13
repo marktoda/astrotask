@@ -15,14 +15,26 @@ import type { Store } from './database/store.js';
 import { parseDbUrl } from './database/url-parser.js';
 import type { ComplexityAnalyzer } from './services/ComplexityAnalyzer.js';
 import type { DependencyService } from './services/DependencyService.js';
-import type { ILLMService } from './services/LLMService.js';
 import type { TaskExpansionService } from './services/TaskExpansionService.js';
 import type { TaskService } from './services/TaskService.js';
-import { type RegistryConfig, createDefaultRegistry } from './services/default-registry.js';
+import { 
+  type ServiceConfig, 
+  type ServiceContainer,
+  initializeServices 
+} from './services/service-initialization.js';
 import { DependencyType } from './services/dependency-type.js';
 import { Registry } from './services/registry.js';
 import { TEST_CONFIG, cfg } from './utils/config.js';
 import { createModuleLogger } from './utils/logger.js';
+import {
+  SDKAlreadyInitializedError,
+  SDKDisposedError,
+  SDKInitializationError,
+  SDKNotInitializedError,
+  ServiceNotAvailableError,
+  AdapterNotAvailableError,
+  wrapError,
+} from './errors/index.js';
 
 const logger = createModuleLogger('Astrotask');
 
@@ -66,14 +78,7 @@ export interface AstrotaskConfig {
   };
 }
 
-export interface ServiceContainer {
-  store: Store;
-  llmService: ILLMService;
-  complexityAnalyzer: ComplexityAnalyzer;
-  taskService: TaskService;
-  dependencyService: DependencyService;
-  taskExpansionService: TaskExpansionService;
-}
+
 
 /**
  * Initialization result with details about setup
@@ -110,11 +115,11 @@ export class Astrotask {
    */
   async init(): Promise<InitializationResult> {
     if (this._initialized) {
-      throw new Error('Astrotask SDK is already initialized');
+      throw new SDKAlreadyInitializedError();
     }
 
     if (this._disposed) {
-      throw new Error('Astrotask SDK has been disposed and cannot be reinitialized');
+      throw new SDKDisposedError('initialization');
     }
 
     const startTime = Date.now();
@@ -133,7 +138,7 @@ export class Astrotask {
 
       // Step 3: Initialize database business logic
       if (!this._adapter) {
-        throw new Error('Adapter not set up properly');
+        throw new SDKInitializationError('Adapter not set up properly', 'database-init');
       }
       await initializeDatabase(this._adapter);
 
@@ -166,10 +171,12 @@ export class Astrotask {
       // Clean up on error
       await this._cleanup();
 
+      const wrappedError = wrapError(error, 'sdk', 'initialization', { duration });
+
       return {
         success: false,
         adapterType: this._adapter?.type ?? 'unknown',
-        error: error instanceof Error ? error : new Error(String(error)),
+        error: wrappedError,
       };
     }
   }
@@ -196,7 +203,7 @@ export class Astrotask {
   get adapter(): IDatabaseAdapter {
     this._ensureInitialized();
     if (!this._adapter) {
-      throw new Error('Adapter not initialized');
+      throw new ServiceNotAvailableError('Adapter', 'get-adapter');
     }
     return this._adapter;
   }
@@ -207,7 +214,7 @@ export class Astrotask {
   get store(): Store {
     this._ensureInitialized();
     if (!this._services) {
-      throw new Error('Services not initialized');
+      throw new ServiceNotAvailableError('Store', 'get-store');
     }
     return this._services.store;
   }
@@ -218,7 +225,7 @@ export class Astrotask {
   get tasks(): TaskService {
     this._ensureInitialized();
     if (!this._services) {
-      throw new Error('Services not initialized');
+      throw new ServiceNotAvailableError('TaskService', 'get-tasks');
     }
     return this._services.taskService;
   }
@@ -229,7 +236,7 @@ export class Astrotask {
   get dependencies(): DependencyService {
     this._ensureInitialized();
     if (!this._services) {
-      throw new Error('Services not initialized');
+      throw new ServiceNotAvailableError('DependencyService', 'get-dependencies');
     }
     return this._services.dependencyService;
   }
@@ -240,7 +247,7 @@ export class Astrotask {
   get complexity(): ComplexityAnalyzer {
     this._ensureInitialized();
     if (!this._services?.complexityAnalyzer) {
-      throw new Error('Complexity analyzer not initialized');
+      throw new ServiceNotAvailableError('ComplexityAnalyzer', 'get-complexity');
     }
     return this._services.complexityAnalyzer;
   }
@@ -251,7 +258,7 @@ export class Astrotask {
   get expansion(): TaskExpansionService {
     this._ensureInitialized();
     if (!this._services?.taskExpansionService) {
-      throw new Error('Task expansion service not initialized');
+      throw new ServiceNotAvailableError('TaskExpansionService', 'get-expansion');
     }
     return this._services.taskExpansionService;
   }
@@ -305,44 +312,60 @@ export class Astrotask {
     const parsed = this.config.databaseUrl ? parseDbUrl(this.config.databaseUrl) : undefined;
 
     if (!this._adapter) {
-      throw new Error('Adapter not set up for migrations');
+      throw new AdapterNotAvailableError('migrations');
     }
     return runner.runMigrations(this._adapter, parsed);
   }
 
   private async _setupServices(): Promise<void> {
     if (!this._adapter) {
-      throw new Error('Adapter not available for service setup');
+      throw new AdapterNotAvailableError('service-setup');
     }
 
-    // Create the default registry with configuration
-    const registryConfig: RegistryConfig = {
+    // Create service configuration
+    const serviceConfig: ServiceConfig = {
       adapter: this._adapter,
       complexityConfig: this.config.complexityConfig,
       expansionConfig: this.config.expansionConfig,
     };
 
-    const { registry, store } = createDefaultRegistry(registryConfig);
+    // Initialize services with the unified approach
+    const { registry, store, services } = await initializeServices(serviceConfig);
     this.registry = registry;
 
-    // Apply caller overrides *before* any service is resolved
-    this.config.overrides?.(this.registry);
-
-    // Resolve all services
-    this._services = {
-      store,
-      llmService: await this.registry.resolve<ILLMService>(DependencyType.LLM_SERVICE),
-      complexityAnalyzer: await this.registry.resolve<ComplexityAnalyzer>(
-        DependencyType.COMPLEXITY_ANALYZER
-      ),
-      taskService: await this.registry.resolve<TaskService>(DependencyType.TASK_SERVICE),
-      dependencyService: await this.registry.resolve<DependencyService>(
+    // Apply caller overrides if provided
+    if (this.config.overrides) {
+      this.config.overrides(this.registry);
+      // Re-resolve services after overrides
+      const taskService = await this.registry.resolve<TaskService>(DependencyType.TASK_SERVICE);
+      const dependencyService = await this.registry.resolve<DependencyService>(
         DependencyType.DEPENDENCY_SERVICE
-      ),
-      taskExpansionService: await this.registry.resolve<TaskExpansionService>(
+      );
+      const complexityAnalyzer = await this.registry.resolve<ComplexityAnalyzer>(
+        DependencyType.COMPLEXITY_ANALYZER
+      ).catch(() => undefined);
+      const taskExpansionService = await this.registry.resolve<TaskExpansionService>(
         DependencyType.TASK_EXPANSION_SERVICE
-      ),
-    };
+      ).catch(() => undefined);
+      
+      const container: ServiceContainer = {
+        store,
+        taskService,
+        dependencyService,
+      };
+      
+      if (complexityAnalyzer) {
+        container.complexityAnalyzer = complexityAnalyzer;
+      }
+      
+      if (taskExpansionService) {
+        container.taskExpansionService = taskExpansionService;
+      }
+      
+      this._services = container;
+    } else {
+      this._services = services;
+    }
   }
 
   private async _cleanup(): Promise<void> {
@@ -352,7 +375,8 @@ export class Astrotask {
         await this._adapter.close();
       }
     } catch (error) {
-      logger.warn({ error }, 'Error during cleanup');
+      const wrappedError = wrapError(error, 'sdk', 'cleanup');
+      logger.warn({ error: wrappedError }, 'Error during cleanup');
     }
 
     // Clear references
@@ -363,11 +387,11 @@ export class Astrotask {
 
   private _ensureInitialized(): void {
     if (!this._initialized) {
-      throw new Error('Astrotask SDK is not initialized. Call init() first.');
+      throw new SDKNotInitializedError();
     }
 
     if (this._disposed) {
-      throw new Error('Astrotask SDK has been disposed.');
+      throw new SDKDisposedError();
     }
   }
 }
@@ -382,7 +406,7 @@ export async function createAstrotask(config: AstrotaskConfig = {}): Promise<Ast
   const result = await astrotask.init();
 
   if (!result.success) {
-    throw result.error ?? new Error('Failed to initialize Astrotask SDK');
+    throw result.error ?? new SDKInitializationError('Failed to initialize Astrotask SDK');
   }
 
   return astrotask;

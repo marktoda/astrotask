@@ -38,6 +38,10 @@ export interface DefaultRegistryResult {
   store: Store;
 }
 
+/**
+ * @deprecated Use `initializeServices` from './service-initialization.js' instead.
+ * This function is maintained for backward compatibility.
+ */
 export function createDefaultRegistry(config: RegistryConfig): DefaultRegistryResult {
   const reg = new Registry();
   const logger = createModuleLogger('ServiceFactory');
