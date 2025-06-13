@@ -47,10 +47,14 @@ export async function createDatabase(options: DatabaseOptions = {}): Promise<Sto
   const dataDir = options.dataDir ?? cfg.DATABASE_URI;
   const verbose = options.verbose ?? cfg.DB_VERBOSE;
 
+  if (!dataDir) {
+    throw new Error('Database URI is required. Please set DATABASE_URI environment variable or provide dataDir option.');
+  }
+
   try {
     // Parse URL and create adapter in one step
     const parsed = parseDbUrl(dataDir);
-    const backend = createAdapter(parsed, { debug: verbose });
+    const backend = createAdapter(parsed, { debug: verbose ?? false });
 
     // Initialize backend
     await backend.init();
@@ -134,7 +138,11 @@ function getSchemaForBackend(backendType: string) {
  * Create a local-only database (simplified alias)
  */
 export async function createLocalDatabase(dataDir?: string): Promise<Store> {
-  return createDatabase({ dataDir: dataDir ?? cfg.DATABASE_URI });
+  const dbUri = dataDir ?? cfg.DATABASE_URI;
+  if (!dbUri) {
+    throw new Error('Database URI is required. Please set DATABASE_URI environment variable or provide dataDir option.');
+  }
+  return createDatabase({ dataDir: dbUri });
 }
 
 /**
@@ -145,8 +153,12 @@ export async function createLockedDatabase(
   dataDir?: string,
   lockOptions?: LockOptions
 ): Promise<Store> {
+  const dbUri = dataDir ?? cfg.DATABASE_URI;
+  if (!dbUri) {
+    throw new Error('Database URI is required. Please set DATABASE_URI environment variable or provide dataDir option.');
+  }
   return createDatabase({
-    dataDir: dataDir ?? cfg.DATABASE_URI,
+    dataDir: dbUri,
     enableLocking: true,
     lockOptions: {
       processType: process.env.NODE_ENV === 'test' ? 'test' : 'cli',  // Simplified auto-detection

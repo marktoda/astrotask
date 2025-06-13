@@ -97,7 +97,33 @@ export class LoggerFactory {
 }
 
 // Default factory instance using global config for backward compatibility
-const defaultFactory = new LoggerFactory(cfg);
+// We need to ensure all required fields have defaults
+const defaultConfig: AppConfig = {
+  NODE_ENV: cfg.NODE_ENV ?? 'development',
+  PORT: cfg.PORT ?? 3000,
+  LOG_LEVEL: cfg.LOG_LEVEL ?? 'info',
+  CLI_MODE: cfg.CLI_MODE ?? false,
+  DATABASE_URI: cfg.DATABASE_URI ?? '',
+  DB_VERBOSE: cfg.DB_VERBOSE ?? false,
+  DB_TIMEOUT: cfg.DB_TIMEOUT ?? 5000,
+  OPENAI_API_KEY: cfg.OPENAI_API_KEY ?? '',
+  LLM_MODEL: cfg.LLM_MODEL ?? 'gpt-4',
+  DEV_SERVER_HOST: cfg.DEV_SERVER_HOST ?? 'localhost',
+  DEV_SERVER_PORT: cfg.DEV_SERVER_PORT ?? 5173,
+  COMPLEXITY_THRESHOLD: cfg.COMPLEXITY_THRESHOLD ?? 7,
+  COMPLEXITY_RESEARCH: cfg.COMPLEXITY_RESEARCH ?? false,
+  COMPLEXITY_BATCH_SIZE: cfg.COMPLEXITY_BATCH_SIZE ?? 10,
+  EXPANSION_USE_COMPLEXITY_ANALYSIS: cfg.EXPANSION_USE_COMPLEXITY_ANALYSIS ?? true,
+  EXPANSION_RESEARCH: cfg.EXPANSION_RESEARCH ?? false,
+  EXPANSION_COMPLEXITY_THRESHOLD: cfg.EXPANSION_COMPLEXITY_THRESHOLD ?? 7,
+  EXPANSION_DEFAULT_SUBTASKS: cfg.EXPANSION_DEFAULT_SUBTASKS ?? 5,
+  EXPANSION_MAX_SUBTASKS: cfg.EXPANSION_MAX_SUBTASKS ?? 10,
+  EXPANSION_FORCE_REPLACE: cfg.EXPANSION_FORCE_REPLACE ?? false,
+  EXPANSION_CREATE_CONTEXT_SLICES: cfg.EXPANSION_CREATE_CONTEXT_SLICES ?? true,
+  STORE_IS_ENCRYPTED: cfg.STORE_IS_ENCRYPTED ?? false,
+};
+
+const defaultFactory = new LoggerFactory(defaultConfig);
 
 /**
  * Create a new logger factory with custom configuration

@@ -294,6 +294,9 @@ export class Astrotask {
     } else {
       // Create adapter from URL
       const databaseUrl = this.config.databaseUrl ?? cfg.DATABASE_URI;
+      if (!databaseUrl) {
+        throw new SDKInitializationError('Database URL is required. Please set DATABASE_URI environment variable or provide databaseUrl in config.', 'database-url');
+      }
       const parsed = parseDbUrl(databaseUrl);
 
       this._adapter = createAdapter(parsed, {

@@ -13,7 +13,7 @@ import { pgliteSchema, postgresSchema, sqliteSchema } from '../database/schema.j
 import { DatabaseStore, type Store } from '../database/store.js';
 import type { AppConfig } from '../utils/config.js';
 import { cfg } from '../utils/config.js';
-import { createModuleLogger, type LoggerFactory, createLoggerFactory } from '../utils/logger.js';
+import { type LoggerFactory, createLoggerFactory } from '../utils/logger.js';
 import type { ComplexityAnalyzer } from './ComplexityAnalyzer.js';
 import { createComplexityAnalyzer } from './ComplexityAnalyzer.js';
 import type { DependencyService } from './DependencyService.js';
@@ -25,8 +25,6 @@ import type { TaskService } from './TaskService.js';
 import { TaskService as TaskServiceImpl } from './TaskService.js';
 import { DependencyType } from './dependency-type.js';
 import { Registry } from './registry.js';
-
-const logger = createModuleLogger('ServiceInitialization');
 
 /**
  * Configuration for service initialization
@@ -102,8 +100,31 @@ export interface ServiceInitializationResult {
  * - Flexibility for testing and customization
  */
 export async function initializeServices(config: ServiceConfig): Promise<ServiceInitializationResult> {
-  // Use provided config or fall back to global cfg
-  const appConfig = config.appConfig ?? cfg;
+  // Use provided config or fall back to global cfg with defaults
+  const appConfig = config.appConfig ?? {
+    NODE_ENV: cfg.NODE_ENV ?? 'development',
+    PORT: cfg.PORT ?? 3000,
+    LOG_LEVEL: cfg.LOG_LEVEL ?? 'info',
+    CLI_MODE: cfg.CLI_MODE ?? false,
+    DATABASE_URI: cfg.DATABASE_URI ?? '',
+    DB_VERBOSE: cfg.DB_VERBOSE ?? false,
+    DB_TIMEOUT: cfg.DB_TIMEOUT ?? 5000,
+    OPENAI_API_KEY: cfg.OPENAI_API_KEY ?? '',
+    LLM_MODEL: cfg.LLM_MODEL ?? 'gpt-4',
+    DEV_SERVER_HOST: cfg.DEV_SERVER_HOST ?? 'localhost',
+    DEV_SERVER_PORT: cfg.DEV_SERVER_PORT ?? 5173,
+    COMPLEXITY_THRESHOLD: cfg.COMPLEXITY_THRESHOLD ?? 7,
+    COMPLEXITY_RESEARCH: cfg.COMPLEXITY_RESEARCH ?? false,
+    COMPLEXITY_BATCH_SIZE: cfg.COMPLEXITY_BATCH_SIZE ?? 10,
+    EXPANSION_USE_COMPLEXITY_ANALYSIS: cfg.EXPANSION_USE_COMPLEXITY_ANALYSIS ?? true,
+    EXPANSION_RESEARCH: cfg.EXPANSION_RESEARCH ?? false,
+    EXPANSION_COMPLEXITY_THRESHOLD: cfg.EXPANSION_COMPLEXITY_THRESHOLD ?? 7,
+    EXPANSION_DEFAULT_SUBTASKS: cfg.EXPANSION_DEFAULT_SUBTASKS ?? 5,
+    EXPANSION_MAX_SUBTASKS: cfg.EXPANSION_MAX_SUBTASKS ?? 10,
+    EXPANSION_FORCE_REPLACE: cfg.EXPANSION_FORCE_REPLACE ?? false,
+    EXPANSION_CREATE_CONTEXT_SLICES: cfg.EXPANSION_CREATE_CONTEXT_SLICES ?? true,
+    STORE_IS_ENCRYPTED: cfg.STORE_IS_ENCRYPTED ?? false,
+  };
   
   // Use provided logger factory or create one with appConfig
   const loggerFactory = config.loggerFactory ?? createLoggerFactory(appConfig);

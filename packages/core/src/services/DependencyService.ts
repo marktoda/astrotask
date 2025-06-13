@@ -27,6 +27,7 @@ import type {
   TaskWithDependencies,
 } from '../schemas/dependency.js';
 import type { Task } from '../schemas/task.js';
+import { validateDependency } from '../validation/dependency-validation.js';
 
 /**
  * Service for managing task dependencies and dependency graphs
@@ -173,7 +174,7 @@ export class DependencyService implements IDependencyReconciliationService {
 
   /**
    * Validate whether a dependency can be safely added.
-   * Checks for self-dependencies, duplicates, task existence, and cycles.
+   * Delegates to centralized validation logic.
    *
    * @param dependentId - ID of the dependent task
    * @param dependencyId - ID of the dependency task
@@ -183,53 +184,18 @@ export class DependencyService implements IDependencyReconciliationService {
     dependentId: string,
     dependencyId: string
   ): Promise<DependencyValidationResult> {
-    const errors: string[] = [];
-    const warnings: string[] = [];
-
-    // Check for self-dependency
-    if (dependentId === dependencyId) {
-      errors.push('A task cannot depend on itself');
-    }
-
-    // Check if both tasks exist
-    const [dependentTask, dependencyTask] = await Promise.all([
-      this.store.getTask(dependentId),
-      this.store.getTask(dependencyId),
-    ]);
-
-    if (!dependentTask) {
-      errors.push(`Dependent task ${dependentId} does not exist`);
-    }
-    if (!dependencyTask) {
-      errors.push(`Dependency task ${dependencyId} does not exist`);
-    }
-
-    // Check for duplicate dependency
-    if (dependentTask && dependencyTask) {
-      const existingDependencies = await this.getDependencies(dependentId);
-      if (existingDependencies.includes(dependencyId)) {
-        errors.push('Dependency already exists');
-      }
-    }
-
-    // Check for cycles using DependencyGraph (only if basic validation passes)
-    let cycles: string[][] = [];
-    if (errors.length === 0) {
-      const graph = await this.createDependencyGraph();
-      const cycleResult = graph.wouldCreateCycle(dependentId, dependencyId);
-      cycles = cycleResult.cycles;
-
-      if (cycleResult.hasCycles && cycles[0]) {
-        errors.push(`Adding this dependency would create a cycle: ${cycles[0].join(' -> ')}`);
-      }
-    }
-
-    return {
-      valid: errors.length === 0,
-      cycles,
-      errors,
-      warnings: warnings.length > 0 ? warnings : undefined,
-    };
+    // Get existing dependencies for duplicate check
+    const existingDependencies = await this.getDependencies(dependentId);
+    
+    // Create dependency graph for cycle detection
+    const graph = await this.createDependencyGraph();
+    
+    // Use centralized validation
+    return validateDependency(dependentId, dependencyId, {
+      store: this.store,
+      graph,
+      existingDependencies,
+    });
   }
 
   /**
