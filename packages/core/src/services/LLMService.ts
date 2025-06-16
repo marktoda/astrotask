@@ -1,8 +1,8 @@
 import type { ChatOpenAI } from '@langchain/openai';
 import { ChatOpenAI as ChatOpenAIImpl } from '@langchain/openai';
+import { LLMNotConfiguredError } from '../errors/index.js';
 import type { AppConfig } from '../utils/config.js';
 import { type ModelConfig, getModelConfig } from '../utils/models.js';
-import { LLMNotConfiguredError } from '../errors/index.js';
 
 /**
  * Configuration options for LLM instances
@@ -160,8 +160,9 @@ export class DefaultLLMService implements ILLMService {
  * @param config - Optional configuration overrides
  * @returns Configured LLM service instance
  */
-export function createLLMService(appConfig: AppConfig, config: Partial<LLMConfig> = {}): ILLMService {
+export function createLLMService(
+  appConfig: AppConfig,
+  config: Partial<LLMConfig> = {}
+): ILLMService {
   return new DefaultLLMService(appConfig, config);
 }
-
-

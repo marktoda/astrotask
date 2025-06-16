@@ -1,6 +1,6 @@
 /**
  * Service-specific error classes
- * 
+ *
  * Errors related to service operations and business logic
  */
 
@@ -29,12 +29,7 @@ export class TaskNotFoundError extends ServiceError {
     operation?: string,
     context?: Record<string, unknown>
   ) {
-    super(
-      `Task ${taskId} not found`,
-      'task',
-      operation,
-      { ...context, taskId }
-    );
+    super(`Task ${taskId} not found`, 'task', operation, { ...context, taskId });
   }
 }
 
@@ -48,12 +43,7 @@ export class TaskOperationError extends ServiceError {
     public readonly taskId?: string,
     context?: Record<string, unknown>
   ) {
-    super(
-      message,
-      'task',
-      operation,
-      { ...context, taskId }
-    );
+    super(message, 'task', operation, { ...context, taskId });
   }
 }
 
@@ -66,12 +56,7 @@ export class DependencyValidationError extends ServiceError {
     public readonly errors: string[],
     context?: Record<string, unknown>
   ) {
-    super(
-      message,
-      'dependency',
-      'validation',
-      { ...context, errors }
-    );
+    super(message, 'dependency', 'validation', { ...context, errors });
   }
 }
 
@@ -79,11 +64,7 @@ export class DependencyValidationError extends ServiceError {
  * Error thrown when a dependency operation fails
  */
 export class DependencyOperationError extends ServiceError {
-  constructor(
-    message: string,
-    operation: string,
-    context?: Record<string, unknown>
-  ) {
+  constructor(message: string, operation: string, context?: Record<string, unknown>) {
     super(message, 'dependency', operation, context);
   }
 }
@@ -92,10 +73,7 @@ export class DependencyOperationError extends ServiceError {
  * Error thrown when LLM service is not configured
  */
 export class LLMNotConfiguredError extends ServiceError {
-  constructor(
-    operation?: string,
-    context?: Record<string, unknown>
-  ) {
+  constructor(operation?: string, context?: Record<string, unknown>) {
     super(
       'OpenAI API key is required. Set OPENAI_API_KEY environment variable.',
       'llm',
@@ -109,11 +87,7 @@ export class LLMNotConfiguredError extends ServiceError {
  * Error thrown when LLM operation fails
  */
 export class LLMOperationError extends ServiceError {
-  constructor(
-    message: string,
-    operation: string,
-    context?: Record<string, unknown>
-  ) {
+  constructor(message: string, operation: string, context?: Record<string, unknown>) {
     super(message, 'llm', operation, context);
   }
 }
@@ -128,12 +102,7 @@ export class ComplexityAnalysisError extends ServiceError {
     public readonly taskId?: string,
     context?: Record<string, unknown>
   ) {
-    super(
-      message,
-      'complexity',
-      operation,
-      { ...context, taskId }
-    );
+    super(message, 'complexity', operation, { ...context, taskId });
   }
 }
 
@@ -147,12 +116,7 @@ export class TaskExpansionError extends ServiceError {
     public readonly taskId?: string,
     context?: Record<string, unknown>
   ) {
-    super(
-      message,
-      'expansion',
-      operation,
-      { ...context, taskId }
-    );
+    super(message, 'expansion', operation, { ...context, taskId });
   }
 }
 
@@ -165,12 +129,7 @@ export class RegistryError extends ServiceError {
     public readonly token: string,
     context?: Record<string, unknown>
   ) {
-    super(
-      message,
-      'registry',
-      'resolve',
-      { ...context, token }
-    );
+    super(message, 'registry', 'resolve', { ...context, token });
   }
 }
 
@@ -178,11 +137,7 @@ export class RegistryError extends ServiceError {
  * Error thrown when service initialization fails
  */
 export class ServiceInitializationError extends ServiceError {
-  constructor(
-    message: string,
-    service: string,
-    context?: Record<string, unknown>
-  ) {
+  constructor(message: string, service: string, context?: Record<string, unknown>) {
     super(message, service, 'initialization', context);
   }
 }
@@ -196,11 +151,6 @@ export class SchemaValidationError extends ServiceError {
     public readonly validationErrors: Array<{ field: string; message: string; code: string }>,
     context?: Record<string, unknown>
   ) {
-    super(
-      message,
-      'validation',
-      'schema',
-      { ...context, validationErrors }
-    );
+    super(message, 'validation', 'schema', { ...context, validationErrors });
   }
-} 
+}

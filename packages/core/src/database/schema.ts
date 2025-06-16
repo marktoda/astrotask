@@ -326,7 +326,11 @@ export function createSchema(adapterType: AdapterType) {
     case 'sqlite':
       return createSqliteSchema();
     default:
-      throw new DatabaseAdapterError(`Unsupported adapter type: ${adapterType}`, 'schema', adapterType);
+      throw new DatabaseAdapterError(
+        `Unsupported adapter type: ${adapterType}`,
+        'schema',
+        adapterType
+      );
   }
 }
 

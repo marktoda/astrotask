@@ -1,9 +1,9 @@
 /**
  * Tree Operations Example
- * 
+ *
  * This file demonstrates how TaskTree and TrackingTaskTree can be refactored
  * to use the common tree operations, reducing code duplication.
- * 
+ *
  * NOTE: This is an example file showing the refactoring approach.
  * Actual refactoring would be done in the TaskTree and TrackingTaskTree files.
  */
@@ -11,12 +11,12 @@
 import type { Task } from '../schemas/index.js';
 import type { TaskTree } from './TaskTree.js';
 import { TaskTreeAdapter } from './tree-adapters.js';
-import { 
-  TreeTraversal, 
-  TreeSearch, 
+import {
   TreeAnalysis,
   TreeBatch,
-  type TreePredicate 
+  type TreePredicate,
+  TreeSearch,
+  TreeTraversal,
 } from './tree-operations.js';
 
 /**
@@ -26,7 +26,7 @@ export class TaskTreeRefactored {
   /**
    * Original walkDepthFirst can be replaced with:
    */
-  static walkDepthFirst(taskTree: TaskTree, visitor: (node: TaskTree) => void | false): void {
+  static walkDepthFirst(taskTree: TaskTree, visitor: (node: TaskTree) => undefined | false): void {
     const adapter = TaskTreeAdapter.from(taskTree);
     TreeTraversal.walkDepthFirst(adapter, (node) => {
       const taskTreeNode = (node as TaskTreeAdapter).getTaskTree();
@@ -42,6 +42,7 @@ export class TaskTreeRefactored {
     TreeTraversal.walkBreadthFirst(adapter, (node) => {
       const taskTreeNode = (node as TaskTreeAdapter).getTaskTree();
       visitor(taskTreeNode);
+      return undefined;
     });
   }
 
@@ -60,7 +61,7 @@ export class TaskTreeRefactored {
   static filter(taskTree: TaskTree, predicate: (task: Task) => boolean): TaskTree[] {
     const adapter = TaskTreeAdapter.from(taskTree);
     const results = TreeSearch.filter(adapter, predicate);
-    return results.map(node => (node as TaskTreeAdapter).getTaskTree());
+    return results.map((node) => (node as TaskTreeAdapter).getTaskTree());
   }
 
   /**
@@ -94,7 +95,7 @@ export class TaskTreeRefactored {
   static getLeafTasks(taskTree: TaskTree): TaskTree[] {
     const adapter = TaskTreeAdapter.from(taskTree);
     const leaves = TreeAnalysis.getLeafNodes(adapter);
-    return leaves.map(node => (node as TaskTreeAdapter).getTaskTree());
+    return leaves.map((node) => (node as TaskTreeAdapter).getTaskTree());
   }
 
   /**
@@ -114,15 +115,15 @@ export class TaskTreeRefactored {
   ): Map<string, TaskTree[]> {
     const adapter = TaskTreeAdapter.from(taskTree);
     const results = TreeBatch.findMany(adapter, predicates);
-    
+
     const taskTreeResults = new Map<string, TaskTree[]>();
     for (const [key, nodes] of results) {
       taskTreeResults.set(
         key,
-        nodes.map(node => (node as TaskTreeAdapter).getTaskTree())
+        nodes.map((node) => (node as TaskTreeAdapter).getTaskTree())
       );
     }
-    
+
     return taskTreeResults;
   }
 }
@@ -137,33 +138,30 @@ export function demonstrateUsage(taskTree: TaskTree): void {
     ['pending', (task) => task.status === 'pending'],
     ['hasDescription', (task) => task.description !== null],
   ]);
-  
-  const results = TaskTreeRefactored.batchFind(taskTree, predicates);
-  
+
+  TaskTreeRefactored.batchFind(taskTree, predicates);
+
   // Get tree statistics
-  const depth = TaskTreeRefactored.getDepth(taskTree);
-  const height = TaskTreeRefactored.getHeight(taskTree);
-  const nodeCount = TaskTreeRefactored.countNodes(taskTree);
-  const leafTasks = TaskTreeRefactored.getLeafTasks(taskTree);
-  
-  console.log(`Tree stats: depth=${depth}, height=${height}, nodes=${nodeCount}, leaves=${leafTasks.length}`);
-  console.log(`Found ${results.get('highPriority')?.length ?? 0} high priority tasks`);
+  TaskTreeRefactored.getDepth(taskTree);
+  TaskTreeRefactored.getHeight(taskTree);
+  TaskTreeRefactored.countNodes(taskTree);
+  TaskTreeRefactored.getLeafTasks(taskTree);
 }
 
 /**
  * Migration guide for refactoring existing code
- * 
+ *
  * 1. Replace direct method calls with static utility calls:
  *    Before: taskTree.walkDepthFirst(visitor)
  *    After:  TaskTreeRefactored.walkDepthFirst(taskTree, visitor)
- * 
+ *
  * 2. Use adapters for new functionality:
  *    const adapter = TaskTreeAdapter.from(taskTree);
  *    const ancestors = TreeAnalysis.getAncestors(adapter);
- * 
+ *
  * 3. Batch operations for performance:
  *    Instead of multiple find() calls, use batchFind() for single traversal
- * 
+ *
  * 4. Consistent error handling and validation:
  *    Use TreeValidation utilities for consistent validation
- */ 
+ */

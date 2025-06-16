@@ -7,31 +7,24 @@ import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
 import { existsSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { createLocalDatabase } from '../src/database/index.js';
+import { createDatabase } from '../src/database/index.js';
 import type { Store } from '../src/database/store.js';
 
 describe('Transaction Support', () => {
   let store: Store;
-  const testDbDir = join(tmpdir(), 'astrotask-transaction-test');
-  const testDbPath = join(testDbDir, 'test.db');
 
   beforeEach(async () => {
-    // Clean up any existing test database directory
-    if (existsSync(testDbPath)) {
-      rmSync(testDbPath, { recursive: true, force: true });
-    }
-    
-    // Create test database
-    store = await createLocalDatabase(testDbPath);
+    // Create test database using PGLite in-memory which supports async transactions
+    store = await createDatabase({ 
+      dataDir: 'memory://transaction-test',
+      verbose: false 
+    });
   });
 
   afterEach(async () => {
-    // Close database and clean up
+    // Close database
     if (store) {
       await store.close();
-    }
-    if (existsSync(testDbPath)) {
-      rmSync(testDbPath, { recursive: true, force: true });
     }
   });
 
@@ -108,26 +101,27 @@ describe('Transaction Support', () => {
     const taskId = randomUUID();
 
     // Execute transaction with explicit rollback
-    const result = await store.transaction(async (tx) => {
-      // Create a task
-      await tx.addTaskWithId({
-        id: taskId,
-        title: 'Test Task',
-        description: 'This should be rolled back',
-        status: 'pending',
-        priorityScore: 50,
-      });
+    await expect(
+      store.transaction(async (tx) => {
+        // Create a task
+        await tx.addTaskWithId({
+          id: taskId,
+          title: 'Test Task',
+          description: 'This should be rolled back',
+          status: 'pending',
+          priorityScore: 50,
+        });
 
-      // Explicitly request rollback
-      tx.rollback();
+        // Explicitly request rollback
+        tx.rollback();
 
-      return 'completed';
-    });
+        return 'completed';
+      })
+    ).rejects.toThrow('Transaction explicitly rolled back');
 
     // Verify the task was not created due to explicit rollback
     const task = await store.getTask(taskId);
     expect(task).toBeNull();
-    expect(result).toBe('completed');
   });
 
   it('should support nested operations with context slices', async () => {

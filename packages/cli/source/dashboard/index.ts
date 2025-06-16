@@ -1,16 +1,11 @@
 #!/usr/bin/env node
 import { cfg, createDatabase } from "@astrotask/core";
-import * as blessed from "blessed";
+import blessed from "blessed";
 import { EditorService } from "./services/editor.js";
 import { EnhancedKeymapService } from "./services/enhanced-keymap.js";
 import { SyncService } from "./services/sync.js";
 import { createDashboardStore } from "./store/index.js";
 import { DashboardLayout } from "./ui/components/layout.js";
-import { createAstrotask } from "@astrotask/core";
-import { KeyMapRegistry } from "./services/keymap-registry.js";
-import { FirstRunDetector } from "./services/first-run-detector.js";
-import { OnboardingStateManager } from "./services/onboarding-state.js";
-import "./types/blessed-extensions.js";
 
 // Suppress terminfo warnings
 process.env["NODE_NO_WARNINGS"] = "1";
@@ -74,9 +69,7 @@ async function main() {
 			// Turn on application-cursor & raw input explicitly for better key handling
 			// Check if methods exist before calling them
 			try {
-				if (
-					typeof screen.program.keypad === "function"
-				) {
+				if (typeof screen.program.keypad === "function") {
 					screen.program.keypad(true);
 				}
 				if (typeof screen.grabInput === "function") {
@@ -141,7 +134,9 @@ async function main() {
 
 				try {
 					syncService.stop();
-					screen.destroy();
+					if (screen && typeof screen.destroy === "function") {
+						screen.destroy();
+					}
 					if (process.stdout.isTTY) {
 						process.stdout.write("\x1b[?25h"); // Show cursor
 					}
@@ -197,7 +192,12 @@ async function main() {
 		// Handle screen restart after editor closes
 		process.on("blessed-screen-restart", async () => {
 			// Clean up current screen
-			screen.destroy();
+			if (
+				currentDashboard.screen &&
+				typeof currentDashboard.screen.destroy === "function"
+			) {
+				currentDashboard.screen.destroy();
+			}
 
 			// Small delay to ensure terminal is ready
 			setTimeout(async () => {

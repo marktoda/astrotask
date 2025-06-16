@@ -2,6 +2,7 @@ import {
 	type TaskExpansionConfig,
 	type TaskExpansionResult,
 	TaskService,
+	cfg,
 	createLLMService,
 	createModuleLogger,
 	createTaskExpansionService,
@@ -79,7 +80,7 @@ export default function Expand({ options }: Props) {
 				const rootTaskId = options.root;
 
 				// Create LLM service
-				const llmService = createLLMService({
+				const llmService = createLLMService(cfg, {
 					modelName: "gpt-4o-mini",
 					temperature: 0.1,
 					maxTokens: 2048,

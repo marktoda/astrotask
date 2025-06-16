@@ -7,10 +7,7 @@ import type {
 import type { CreateTask, Task, TaskStatus } from '../schemas/task.js';
 import { generateNextTaskId } from '../utils/taskId.js';
 import type { DrizzleOps } from './adapters/types.js';
-import {
-  DatabaseTransactionError,
-  DatabaseUnsupportedError,
-} from './errors.js';
+import { DatabaseTransactionError, DatabaseUnsupportedError } from './errors.js';
 import type { postgresSchema, sqliteSchema } from './schema.js';
 import { BaseStore } from './store-base.js';
 
@@ -136,8 +133,6 @@ export class DatabaseStore<TRawClient = unknown, TDrizzle extends DrizzleOps = D
     return this.updateTask(id, { status });
   }
 
-
-
   // System operations
   async close(): Promise<void> {
     // The raw client needs to be closed differently based on its type
@@ -159,11 +154,27 @@ export class DatabaseStore<TRawClient = unknown, TDrizzle extends DrizzleOps = D
    * Execute operations within a database transaction
    */
   async transaction<T>(fn: (tx: TransactionStore<TDrizzle>) => Promise<T>): Promise<T> {
+    // SQLite transactions are synchronous, while PostgreSQL transactions can be async
+    // We need to handle both cases
+
+    // Check if this is a SQLite database by looking for the prepare method
+    const isSQLite =
+      this.rawClient &&
+      typeof this.rawClient === 'object' &&
+      'prepare' in this.rawClient &&
+      typeof (this.rawClient as { prepare?: unknown }).prepare === 'function';
+
+    if (isSQLite) {
+      // For SQLite, we need to use a different approach since it doesn't support async transactions
+      // We'll throw an error to indicate that async operations aren't supported in SQLite transactions
+      throw new Error(
+        'SQLite transactions must be synchronous. Consider using a different database adapter for async transaction support.'
+      );
+    }
+
+    // PostgreSQL and PGLite support async transactions
     return await this.sql.transaction(async (tx) => {
       const transactionStore = new DatabaseTransactionStore(tx as TDrizzle, this.schema);
-
-      // Drizzle automatically handles rollback on error
-      // The tx.rollback() method in TransactionStore throws an error to trigger rollback
       return await fn(transactionStore);
     });
   }
@@ -215,10 +226,6 @@ class DatabaseTransactionStore<TDrizzle extends DrizzleOps = DrizzleOps>
   extends BaseStore<TDrizzle>
   implements TransactionStore<TDrizzle>
 {
-  constructor(transactionInstance: TDrizzle, schema: typeof postgresSchema | typeof sqliteSchema) {
-    super(transactionInstance, schema);
-  }
-
   // Implementation of abstract method
   override async addTask(data: CreateTask): Promise<Task> {
     // Generate ID within transaction context to ensure uniqueness

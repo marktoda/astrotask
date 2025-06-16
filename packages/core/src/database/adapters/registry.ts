@@ -65,12 +65,14 @@ export const AdapterHelpers = {
  */
 const ADAPTER_REGISTRY: Record<DbUrl['kind'], AdapterFactory> = {
   postgres: (url, options) => {
-    if (url.kind !== 'postgres') throw new DatabaseAdapterError('Invalid URL for PostgreSQL adapter', 'postgres', url.kind);
+    if (url.kind !== 'postgres')
+      throw new DatabaseAdapterError('Invalid URL for PostgreSQL adapter', 'postgres', url.kind);
     return new PostgresAdapter(url.url, options.debug);
   },
 
   'pglite-file': (url, options) => {
-    if (url.kind !== 'pglite-file') throw new DatabaseAdapterError('Invalid URL for PGLite file adapter', 'pglite', url.kind);
+    if (url.kind !== 'pglite-file')
+      throw new DatabaseAdapterError('Invalid URL for PGLite file adapter', 'pglite', url.kind);
     AdapterHelpers.ensureDataDir(url.file);
     return new PgLiteAdapter({
       dataDir: url.file,
@@ -79,7 +81,8 @@ const ADAPTER_REGISTRY: Record<DbUrl['kind'], AdapterFactory> = {
   },
 
   'pglite-mem': (url, options) => {
-    if (url.kind !== 'pglite-mem') throw new DatabaseAdapterError('Invalid URL for PGLite memory adapter', 'pglite', url.kind);
+    if (url.kind !== 'pglite-mem')
+      throw new DatabaseAdapterError('Invalid URL for PGLite memory adapter', 'pglite', url.kind);
     return new PgLiteAdapter({
       dataDir: `memory://${url.label}`,
       debug: options.debug,
@@ -87,7 +90,12 @@ const ADAPTER_REGISTRY: Record<DbUrl['kind'], AdapterFactory> = {
   },
 
   'pglite-idb': (url, options) => {
-    if (url.kind !== 'pglite-idb') throw new DatabaseAdapterError('Invalid URL for PGLite IndexedDB adapter', 'pglite', url.kind);
+    if (url.kind !== 'pglite-idb')
+      throw new DatabaseAdapterError(
+        'Invalid URL for PGLite IndexedDB adapter',
+        'pglite',
+        url.kind
+      );
     return new PgLiteAdapter({
       dataDir: `idb://${url.label}`,
       debug: options.debug,
@@ -95,7 +103,8 @@ const ADAPTER_REGISTRY: Record<DbUrl['kind'], AdapterFactory> = {
   },
 
   'sqlite-file': (url, options) => {
-    if (url.kind !== 'sqlite-file') throw new DatabaseAdapterError('Invalid URL for SQLite adapter', 'sqlite', url.kind);
+    if (url.kind !== 'sqlite-file')
+      throw new DatabaseAdapterError('Invalid URL for SQLite adapter', 'sqlite', url.kind);
     AdapterHelpers.ensureDataDir(url.file);
     return new SqliteAdapter({
       dataDir: url.file,

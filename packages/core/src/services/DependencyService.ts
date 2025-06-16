@@ -186,10 +186,10 @@ export class DependencyService implements IDependencyReconciliationService {
   ): Promise<DependencyValidationResult> {
     // Get existing dependencies for duplicate check
     const existingDependencies = await this.getDependencies(dependentId);
-    
+
     // Create dependency graph for cycle detection
     const graph = await this.createDependencyGraph();
-    
+
     // Use centralized validation
     return validateDependency(dependentId, dependencyId, {
       store: this.store,

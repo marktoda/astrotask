@@ -63,7 +63,7 @@ export type AppConfig = z.infer<typeof configSchema>;
 // The resolved configuration object, fully validated & typed.
 // Top-level await makes sure that every importer sees a ready-to-use value.
 // Since our schema has defaults for required fields, loadConfig will populate them
-export const cfg = await loadConfig({
+const loadedConfig = await loadConfig({
   schema: configSchema,
   adapters: [
     // Order matters: later adapters win -> env overrides `.env` defaults.
@@ -71,6 +71,10 @@ export const cfg = await loadConfig({
     envAdapter(), // process.env
   ],
 });
+
+// Parse through the schema again to ensure TypeScript knows all properties are defined
+// This is safe because our schema has defaults for all fields
+export const cfg = configSchema.parse(loadedConfig);
 
 export const TEST_CONFIG = {
   DATABASE_URL: 'memory://test',

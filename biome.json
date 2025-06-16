@@ -33,7 +33,8 @@
 					"options": {
 						"maxAllowedComplexity": 25
 					}
-				}
+				},
+				"noStaticOnlyClass": "off"
 			},
 			"correctness": {
 				"noUnusedImports": "error",
@@ -41,7 +42,8 @@
 			},
 			"style": {
 				"useConst": "error",
-				"useTemplate": "error"
+				"useTemplate": "error",
+				"noNonNullAssertion": "off"
 			},
 			"suspicious": {
 				"noConsoleLog": "warn"

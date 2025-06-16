@@ -1,5 +1,5 @@
 import type { Task, TaskTree, TrackingTaskTree } from "@astrotask/core";
-import * as blessed from "blessed";
+import blessed from "blessed";
 import type { StoreApi } from "zustand";
 import type { DashboardStore } from "../../store/index.js";
 import {
@@ -11,7 +11,6 @@ import {
 	TaskLineFormatter,
 	type TaskLineInfo,
 } from "../../utils/task-line-formatter.js";
-import "../../types/blessed-extensions.js";
 
 interface TaskTreeItem {
 	taskId: string;

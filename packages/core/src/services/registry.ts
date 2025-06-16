@@ -1,5 +1,5 @@
-import type { DependencyType } from './dependency-type.js';
 import { RegistryError } from '../errors/index.js';
+import type { DependencyType } from './dependency-type.js';
 
 /** A function that builds the value (can be async) */
 export type Provider<T = unknown> = () => T | Promise<T>;

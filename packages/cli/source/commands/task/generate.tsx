@@ -3,6 +3,7 @@ import {
 	DependencyService,
 	type GenerationError,
 	TaskService,
+	cfg,
 	createLLMService,
 	createModuleLogger,
 	createPRDTaskGenerator,
@@ -122,7 +123,7 @@ export default function Generate({ options }: Props) {
 				const logger = createModuleLogger("CLI-TaskGeneration");
 
 				// Create LLM service
-				const llmService = createLLMService({
+				const llmService = createLLMService(cfg, {
 					modelName: "gpt-4o-mini",
 					temperature: 0.1,
 					maxTokens: 2048,

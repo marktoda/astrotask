@@ -86,14 +86,15 @@ function parseUrlByProtocol(url: URL): DbUrl {
  * Parse SQLite URL
  */
 function parseSqliteUrl(url: URL): DbUrl {
-  const filePath = url.pathname.startsWith('/')
-    ? url.pathname.slice(1)
-    : url.pathname;
-  
+  const filePath = url.pathname.startsWith('/') ? url.pathname.slice(1) : url.pathname;
+
   if (!filePath) {
-    throw new DatabaseUrlError('SQLite URL must specify a file path: sqlite://path/to/file.db', url.toString());
+    throw new DatabaseUrlError(
+      'SQLite URL must specify a file path: sqlite://path/to/file.db',
+      url.toString()
+    );
   }
-  
+
   return { kind: 'sqlite-file', file: filePath };
 }
 
@@ -102,9 +103,7 @@ function parseSqliteUrl(url: URL): DbUrl {
  */
 function parseMemoryUrl(url: URL): DbUrl {
   // Extract label from hostname or pathname
-  const label = url.hostname || 
-               (url.pathname ? url.pathname.replace(/^\/+/, '') : '') || 
-               'default';
+  const label = url.hostname || (url.pathname ? url.pathname.replace(/^\/+/, '') : '') || 'default';
   return { kind: 'pglite-mem', label };
 }
 
@@ -113,9 +112,7 @@ function parseMemoryUrl(url: URL): DbUrl {
  */
 function parseIdbUrl(url: URL): DbUrl {
   // Extract label from hostname or pathname
-  const label = url.hostname || 
-               (url.pathname ? url.pathname.replace(/^\/+/, '') : '') || 
-               'default';
+  const label = url.hostname || (url.pathname ? url.pathname.replace(/^\/+/, '') : '') || 'default';
   return { kind: 'pglite-idb', label };
 }
 

@@ -1,6 +1,6 @@
 /**
  * SDK-specific error classes
- * 
+ *
  * Errors related to Astrotask SDK initialization and lifecycle
  */
 
@@ -10,11 +10,7 @@ import { AstrotaskError } from './base.js';
  * Base class for SDK-related errors
  */
 export abstract class SDKError extends AstrotaskError {
-  constructor(
-    message: string,
-    operation?: string,
-    context?: Record<string, unknown>
-  ) {
+  constructor(message: string, operation?: string, context?: Record<string, unknown>) {
     super(message, 'sdk', operation, context);
   }
 }
@@ -37,10 +33,7 @@ export class SDKInitializationError extends SDKError {
  */
 export class SDKNotInitializedError extends SDKError {
   constructor(operation?: string) {
-    super(
-      'Astrotask SDK is not initialized. Call init() first.',
-      operation
-    );
+    super('Astrotask SDK is not initialized. Call init() first.', operation);
   }
 }
 
@@ -75,11 +68,7 @@ export class ServiceNotAvailableError extends SDKError {
     public readonly serviceName: string,
     operation?: string
   ) {
-    super(
-      `${serviceName} not initialized`,
-      operation,
-      { serviceName }
-    );
+    super(`${serviceName} not initialized`, operation, { serviceName });
   }
 }
 
@@ -87,14 +76,7 @@ export class ServiceNotAvailableError extends SDKError {
  * Error thrown when adapter is not available
  */
 export class AdapterNotAvailableError extends SDKError {
-  constructor(
-    operation: string,
-    context?: Record<string, unknown>
-  ) {
-    super(
-      `Adapter not available for ${operation}`,
-      operation,
-      context
-    );
+  constructor(operation: string, context?: Record<string, unknown>) {
+    super(`Adapter not available for ${operation}`, operation, context);
   }
-} 
+}

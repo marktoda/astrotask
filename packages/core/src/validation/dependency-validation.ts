@@ -1,6 +1,6 @@
 /**
  * Dependency Validation Module
- * 
+ *
  * Consolidates dependency-specific validation logic including:
  * - Self-dependency checks
  * - Duplicate dependency checks
@@ -9,8 +9,8 @@
  */
 
 import type { Store } from '../database/store.js';
-import type { DependencyValidationResult } from '../schemas/dependency.js';
 import type { IDependencyGraph } from '../entities/DependencyGraph.js';
+import type { DependencyValidationResult } from '../schemas/dependency.js';
 
 /**
  * Validate whether a dependency can be safely added.
@@ -88,17 +88,13 @@ export async function validateDependencies(
   }
 ): Promise<Map<string, DependencyValidationResult>> {
   const results = new Map<string, DependencyValidationResult>();
-  
+
   for (const dep of dependencies) {
     const key = `${dep.dependentId}->${dep.dependencyId}`;
-    const result = await validateDependency(
-      dep.dependentId,
-      dep.dependencyId,
-      context
-    );
+    const result = await validateDependency(dep.dependentId, dep.dependencyId, context);
     results.set(key, result);
   }
-  
+
   return results;
 }
 
@@ -132,7 +128,7 @@ export async function validateTaskCanStart(
   }
 ): Promise<{ canStart: boolean; blockedBy: string[]; reason?: string }> {
   const blockingTasks = await context.getBlockingTasks();
-  
+
   if (blockingTasks.length > 0) {
     return {
       canStart: false,
@@ -140,9 +136,9 @@ export async function validateTaskCanStart(
       reason: `Task is blocked by ${blockingTasks.length} incomplete dependencies`,
     };
   }
-  
+
   return {
     canStart: true,
     blockedBy: [],
   };
-} 
+}

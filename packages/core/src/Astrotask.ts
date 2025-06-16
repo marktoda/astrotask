@@ -13,28 +13,28 @@ import { initializeDatabase } from './database/initialization.js';
 import { type MigrationResult, createMigrationRunner } from './database/migrate.js';
 import type { Store } from './database/store.js';
 import { parseDbUrl } from './database/url-parser.js';
-import type { ComplexityAnalyzer } from './services/ComplexityAnalyzer.js';
-import type { DependencyService } from './services/DependencyService.js';
-import type { TaskExpansionService } from './services/TaskExpansionService.js';
-import type { TaskService } from './services/TaskService.js';
-import { 
-  type ServiceConfig, 
-  type ServiceContainer,
-  initializeServices 
-} from './services/service-initialization.js';
-import { DependencyType } from './services/dependency-type.js';
-import { Registry } from './services/registry.js';
-import { TEST_CONFIG, cfg } from './utils/config.js';
-import { createModuleLogger } from './utils/logger.js';
 import {
+  AdapterNotAvailableError,
   SDKAlreadyInitializedError,
   SDKDisposedError,
   SDKInitializationError,
   SDKNotInitializedError,
   ServiceNotAvailableError,
-  AdapterNotAvailableError,
   wrapError,
 } from './errors/index.js';
+import type { ComplexityAnalyzer } from './services/ComplexityAnalyzer.js';
+import type { DependencyService } from './services/DependencyService.js';
+import type { TaskExpansionService } from './services/TaskExpansionService.js';
+import type { TaskService } from './services/TaskService.js';
+import { DependencyType } from './services/dependency-type.js';
+import { Registry } from './services/registry.js';
+import {
+  type ServiceConfig,
+  type ServiceContainer,
+  initializeServices,
+} from './services/service-initialization.js';
+import { TEST_CONFIG, cfg } from './utils/config.js';
+import { createModuleLogger } from './utils/logger.js';
 
 const logger = createModuleLogger('Astrotask');
 
@@ -77,8 +77,6 @@ export interface AstrotaskConfig {
     createContextSlices?: boolean;
   };
 }
-
-
 
 /**
  * Initialization result with details about setup
@@ -295,7 +293,10 @@ export class Astrotask {
       // Create adapter from URL
       const databaseUrl = this.config.databaseUrl ?? cfg.DATABASE_URI;
       if (!databaseUrl) {
-        throw new SDKInitializationError('Database URL is required. Please set DATABASE_URI environment variable or provide databaseUrl in config.', 'database-url');
+        throw new SDKInitializationError(
+          'Database URL is required. Please set DATABASE_URI environment variable or provide databaseUrl in config.',
+          'database-url'
+        );
       }
       const parsed = parseDbUrl(databaseUrl);
 
@@ -344,27 +345,27 @@ export class Astrotask {
       const dependencyService = await this.registry.resolve<DependencyService>(
         DependencyType.DEPENDENCY_SERVICE
       );
-      const complexityAnalyzer = await this.registry.resolve<ComplexityAnalyzer>(
-        DependencyType.COMPLEXITY_ANALYZER
-      ).catch(() => undefined);
-      const taskExpansionService = await this.registry.resolve<TaskExpansionService>(
-        DependencyType.TASK_EXPANSION_SERVICE
-      ).catch(() => undefined);
-      
+      const complexityAnalyzer = await this.registry
+        .resolve<ComplexityAnalyzer>(DependencyType.COMPLEXITY_ANALYZER)
+        .catch(() => undefined);
+      const taskExpansionService = await this.registry
+        .resolve<TaskExpansionService>(DependencyType.TASK_EXPANSION_SERVICE)
+        .catch(() => undefined);
+
       const container: ServiceContainer = {
         store,
         taskService,
         dependencyService,
       };
-      
+
       if (complexityAnalyzer) {
         container.complexityAnalyzer = complexityAnalyzer;
       }
-      
+
       if (taskExpansionService) {
         container.taskExpansionService = taskExpansionService;
       }
-      
+
       this._services = container;
     } else {
       this._services = services;

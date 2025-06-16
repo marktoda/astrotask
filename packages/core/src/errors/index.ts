@@ -1,6 +1,6 @@
 /**
  * Centralized error handling for Astrotask
- * 
+ *
  * This module exports all error classes and utilities for consistent
  * error handling across the application.
  */
@@ -51,4 +51,4 @@ export {
   DatabaseAdapterError,
   DatabaseUnsupportedError,
   wrapDatabaseError,
-} from '../database/errors.js'; 
+} from '../database/errors.js';

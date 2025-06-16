@@ -1,6 +1,6 @@
 /**
  * Tree Validation Module
- * 
+ *
  * Re-exports tree validation functionality from entities/TaskTreeValidation
  * to provide a centralized validation API.
  */
@@ -15,4 +15,4 @@ export {
   type ValidationError,
   type ValidationWarning,
   type ValidationOptions,
-} from '../entities/TaskTreeValidation.js'; 
+} from '../entities/TaskTreeValidation.js';

@@ -48,7 +48,9 @@ export async function createDatabase(options: DatabaseOptions = {}): Promise<Sto
   const verbose = options.verbose ?? cfg.DB_VERBOSE;
 
   if (!dataDir) {
-    throw new Error('Database URI is required. Please set DATABASE_URI environment variable or provide dataDir option.');
+    throw new Error(
+      'Database URI is required. Please set DATABASE_URI environment variable or provide dataDir option.'
+    );
   }
 
   try {
@@ -130,7 +132,11 @@ function getSchemaForBackend(backendType: string) {
     case 'postgres':
       return postgresSchema;
     default:
-      throw new DatabaseAdapterError(`Unsupported backend type: ${backendType}`, 'factory', backendType);
+      throw new DatabaseAdapterError(
+        `Unsupported backend type: ${backendType}`,
+        'factory',
+        backendType
+      );
   }
 }
 
@@ -140,7 +146,9 @@ function getSchemaForBackend(backendType: string) {
 export async function createLocalDatabase(dataDir?: string): Promise<Store> {
   const dbUri = dataDir ?? cfg.DATABASE_URI;
   if (!dbUri) {
-    throw new Error('Database URI is required. Please set DATABASE_URI environment variable or provide dataDir option.');
+    throw new Error(
+      'Database URI is required. Please set DATABASE_URI environment variable or provide dataDir option.'
+    );
   }
   return createDatabase({ dataDir: dbUri });
 }
@@ -155,19 +163,19 @@ export async function createLockedDatabase(
 ): Promise<Store> {
   const dbUri = dataDir ?? cfg.DATABASE_URI;
   if (!dbUri) {
-    throw new Error('Database URI is required. Please set DATABASE_URI environment variable or provide dataDir option.');
+    throw new Error(
+      'Database URI is required. Please set DATABASE_URI environment variable or provide dataDir option.'
+    );
   }
   return createDatabase({
     dataDir: dbUri,
     enableLocking: true,
     lockOptions: {
-      processType: process.env.NODE_ENV === 'test' ? 'test' : 'cli',  // Simplified auto-detection
+      processType: process.env.NODE_ENV === 'test' ? 'test' : 'cli', // Simplified auto-detection
       ...lockOptions,
     },
   });
 }
-
-
 
 // Re-export types and utilities
 export type { Store, TransactionStore } from './store.js';

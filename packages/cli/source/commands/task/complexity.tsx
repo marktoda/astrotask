@@ -1,4 +1,5 @@
 import {
+	cfg,
 	createComplexityAnalyzer,
 	createComplexityContextService,
 	createLLMService,
@@ -61,7 +62,7 @@ export default function Complexity({ options }: Props) {
 				const logger = createModuleLogger("complexity-cli");
 
 				// Create LLM service
-				const llmService = createLLMService({
+				const llmService = createLLMService(cfg, {
 					modelName: "gpt-4o-mini",
 					temperature: 0.1,
 					maxTokens: 2048,

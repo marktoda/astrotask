@@ -25,7 +25,7 @@ export interface DbCapabilities {
  * Concrete dialect types (PostgresJsDatabase, PgliteDatabase, BetterSQLite3Database)
  * will be compatible with this structure while still providing their richer types
  * when a generic parameter is concrete.
- * 
+ *
  * Note: We use 'any' here because Drizzle's query builders have complex type signatures
  * that vary between dialects. This is a necessary compromise for cross-dialect compatibility.
  */
@@ -51,13 +51,12 @@ export type DrizzleSchema = Record<string, unknown>;
  * Type aliases for the actual Drizzle database types used by each adapter
  * These use proper schema generics for better type safety
  */
-export type PostgresDrizzle<TSchema extends DrizzleSchema = DrizzleSchema> = 
+export type PostgresDrizzle<TSchema extends DrizzleSchema = DrizzleSchema> =
   PostgresJsDatabase<TSchema>;
 
-export type PgliteDrizzle<TSchema extends DrizzleSchema = DrizzleSchema> = 
-  PgliteDatabase<TSchema>;
+export type PgliteDrizzle<TSchema extends DrizzleSchema = DrizzleSchema> = PgliteDatabase<TSchema>;
 
-export type SqliteDrizzle<TSchema extends DrizzleSchema = DrizzleSchema> = 
+export type SqliteDrizzle<TSchema extends DrizzleSchema = DrizzleSchema> =
   BetterSQLite3Database<TSchema>;
 
 /**

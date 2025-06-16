@@ -27,13 +27,11 @@ export abstract class DatabaseError extends Error {
       operation?: string,
       context?: Record<string, unknown>
     ) => this;
-    
-    return new Constructor(
-      this.message,
-      this.adapter,
-      this.operation,
-      { ...this.context, ...context }
-    );
+
+    return new Constructor(this.message, this.adapter, this.operation, {
+      ...this.context,
+      ...context,
+    });
   }
 }
 
@@ -84,11 +82,7 @@ export class DatabaseQueryError extends DatabaseError {
  * Transaction-related errors
  */
 export class DatabaseTransactionError extends DatabaseError {
-  constructor(
-    message: string,
-    adapter: string,
-    context?: Record<string, unknown>
-  ) {
+  constructor(message: string, adapter: string, context?: Record<string, unknown>) {
     super(message, adapter, 'transaction', context);
   }
 }
@@ -138,11 +132,7 @@ export class DatabaseUnsupportedError extends DatabaseError {
  * Helper function to create adapter-specific error
  */
 export function createAdapterError<T extends DatabaseError>(
-  ErrorClass: new (
-    message: string,
-    adapter: string,
-    ...args: unknown[]
-  ) => T,
+  ErrorClass: new (message: string, adapter: string, ...args: unknown[]) => T,
   message: string,
   adapter: string,
   ...args: unknown[]
@@ -170,4 +160,4 @@ export function wrapDatabaseError(
 
   const message = error instanceof Error ? error.message : String(error);
   return new GenericDatabaseError(message, adapter, operation, context);
-} 
+}

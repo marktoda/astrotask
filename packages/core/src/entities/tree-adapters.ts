@@ -1,6 +1,6 @@
 /**
  * Tree Adapters Module
- * 
+ *
  * Provides adapters to make TaskTree and TrackingTaskTree compatible with
  * the generic TreeNode interface, allowing them to use common tree operations.
  */
@@ -26,7 +26,7 @@ export class TaskTreeAdapter implements TreeNode<Task> {
   }
 
   getChildren(): readonly TaskTreeAdapter[] {
-    return this.taskTree.getChildren().map(child => new TaskTreeAdapter(child));
+    return this.taskTree.getChildren().map((child) => new TaskTreeAdapter(child));
   }
 
   getData(): Task {
@@ -64,7 +64,7 @@ export class TrackingTaskTreeAdapter implements TreeNode<Task> {
   }
 
   getChildren(): readonly TrackingTaskTreeAdapter[] {
-    return this.trackingTree.getChildren().map(child => new TrackingTaskTreeAdapter(child));
+    return this.trackingTree.getChildren().map((child) => new TrackingTaskTreeAdapter(child));
   }
 
   getData(): Task {
@@ -94,14 +94,14 @@ export class TreeAdapterUtils {
    * Convert adapter results back to original tree type
    */
   static unwrapTaskTrees(adapters: TaskTreeAdapter[]): TaskTree[] {
-    return adapters.map(adapter => adapter.getTaskTree());
+    return adapters.map((adapter) => adapter.getTaskTree());
   }
 
   /**
    * Convert adapter results back to original tracking tree type
    */
   static unwrapTrackingTrees(adapters: TrackingTaskTreeAdapter[]): TrackingTaskTree[] {
-    return adapters.map(adapter => adapter.getTrackingTree());
+    return adapters.map((adapter) => adapter.getTrackingTree());
   }
 
   /**
@@ -111,7 +111,7 @@ export class TreeAdapterUtils {
     trees: T[]
   ): Map<string, TreeNode<Task>> {
     const map = new Map<string, TreeNode<Task>>();
-    
+
     for (const tree of trees) {
       if ('getOperations' in tree) {
         // TrackingTaskTree
@@ -121,7 +121,7 @@ export class TreeAdapterUtils {
         map.set(tree.id, new TaskTreeAdapter(tree as TaskTree));
       }
     }
-    
+
     return map;
   }
-} 
+}

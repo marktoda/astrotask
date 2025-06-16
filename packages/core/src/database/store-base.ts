@@ -11,17 +11,17 @@ import type { postgresSchema, sqliteSchema } from './schema.js';
 
 /**
  * Base class for database store operations
- * 
+ *
  * This class consolidates common CRUD operations that were previously duplicated
  * between DatabaseStore and DatabaseTransactionStore. It follows the DRY principle
  * by extracting shared functionality into a single base class.
- * 
+ *
  * Key benefits:
  * - Eliminates ~200 lines of duplicate code
  * - Ensures consistent behavior between regular and transaction stores
  * - Makes it easier to add new operations that work in both contexts
  * - Simplifies maintenance by having a single source of truth
- * 
+ *
  * The only abstract method is `addTask` because it has different implementations:
  * - DatabaseStore: Generates sequential IDs using the ID generator
  * - DatabaseTransactionStore: Uses UUIDs for simplicity in transactions
@@ -29,7 +29,7 @@ import type { postgresSchema, sqliteSchema } from './schema.js';
 export abstract class BaseStore<TDrizzle extends DrizzleOps = DrizzleOps> {
   public readonly sql: TDrizzle;
   protected readonly schema: typeof postgresSchema | typeof sqliteSchema;
-  
+
   // Predefined selections for query optimization
   protected readonly taskSelection: Record<string, unknown>;
   protected readonly contextSliceSelection: Record<string, unknown>;
@@ -38,7 +38,7 @@ export abstract class BaseStore<TDrizzle extends DrizzleOps = DrizzleOps> {
   constructor(sql: TDrizzle, schema: typeof postgresSchema | typeof sqliteSchema) {
     this.sql = sql;
     this.schema = schema;
-    
+
     // Initialize predefined selections
     this.taskSelection = this.createTaskSelection(schema);
     this.contextSliceSelection = this.createContextSliceSelection(schema);
@@ -90,7 +90,7 @@ export abstract class BaseStore<TDrizzle extends DrizzleOps = DrizzleOps> {
   ): Promise<Task[]> {
     const conditions = this.buildTaskFilterConditions(filters);
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
-    
+
     return await this.sql
       .select(this.taskSelection)
       .from(this.schema.tasks)
@@ -201,7 +201,7 @@ export abstract class BaseStore<TDrizzle extends DrizzleOps = DrizzleOps> {
     includeProjectRoot?: boolean;
   }) {
     const conditions = [];
-    
+
     // Status filtering
     if (filters.statuses !== undefined) {
       if (filters.statuses.length === 1) {
@@ -216,7 +216,7 @@ export abstract class BaseStore<TDrizzle extends DrizzleOps = DrizzleOps> {
       // Default to pending and in-progress if no status filter provided
       conditions.push(inArray(this.schema.tasks.status, ['pending', 'in-progress']));
     }
-    
+
     // Parent ID filtering
     if (filters.parentId !== undefined) {
       if (filters.parentId === null) {
@@ -225,15 +225,15 @@ export abstract class BaseStore<TDrizzle extends DrizzleOps = DrizzleOps> {
         conditions.push(eq(this.schema.tasks.parentId, filters.parentId));
       }
     }
-    
+
     // Project root filtering
     if (!filters.includeProjectRoot) {
       conditions.push(ne(this.schema.tasks.id, TASK_IDENTIFIERS.PROJECT_ROOT));
     }
-    
+
     return conditions;
   }
 
   // Abstract method that must be implemented by subclasses
   abstract addTask(data: CreateTask): Promise<Task>;
-} 
+}

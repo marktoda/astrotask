@@ -1,6 +1,6 @@
 /**
  * Base error classes for Astrotask
- * 
+ *
  * This module provides the foundation for consistent error handling across
  * all Astrotask modules, following the pattern established by database errors.
  */
@@ -14,17 +14,17 @@ export abstract class AstrotaskError extends Error {
    * Module where the error originated
    */
   public readonly module: string;
-  
+
   /**
    * Operation being performed when error occurred
    */
   public readonly operation?: string | undefined;
-  
+
   /**
    * Additional context information
    */
   public readonly context?: Record<string, unknown> | undefined;
-  
+
   /**
    * Timestamp when error occurred
    */
@@ -42,7 +42,7 @@ export abstract class AstrotaskError extends Error {
     this.operation = operation;
     this.context = context;
     this.timestamp = new Date();
-    
+
     // Ensure proper prototype chain for instanceof checks
     Object.setPrototypeOf(this, new.target.prototype);
   }
@@ -57,13 +57,11 @@ export abstract class AstrotaskError extends Error {
       operation?: string,
       context?: Record<string, unknown>
     ) => this;
-    
-    return new ErrorClass(
-      this.message,
-      this.module,
-      this.operation,
-      { ...this.context, ...additionalContext }
-    );
+
+    return new ErrorClass(this.message, this.module, this.operation, {
+      ...this.context,
+      ...additionalContext,
+    });
   }
 
   /**
@@ -95,32 +93,18 @@ export function wrapError(
   if (error instanceof AstrotaskError) {
     return context ? error.withContext(context) : error;
   }
-  
+
   // Convert to GenericError with proper context
   const message = error instanceof Error ? error.message : String(error);
   const cause = error instanceof Error ? error : undefined;
-  
-  return new GenericError(
-    message,
-    module,
-    operation,
-    { ...context, cause }
-  );
+
+  return new GenericError(message, module, operation, { ...context, cause });
 }
 
 /**
  * Generic error for wrapping unknown errors
  */
-class GenericError extends AstrotaskError {
-  constructor(
-    message: string,
-    module: string,
-    operation?: string,
-    context?: Record<string, unknown>
-  ) {
-    super(message, module, operation, context);
-  }
-}
+class GenericError extends AstrotaskError {}
 
 /**
  * Type guard to check if an error is an AstrotaskError
@@ -148,15 +132,15 @@ export function extractErrorDetails(error: unknown): {
       stack: error.stack,
     };
   }
-  
+
   if (error instanceof Error) {
     return {
       message: error.message,
       stack: error.stack,
     };
   }
-  
+
   return {
     message: String(error),
   };
-} 
+}

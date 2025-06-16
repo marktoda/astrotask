@@ -1,7 +1,7 @@
 import pino from 'pino';
 import type { LoggerOptions } from 'pino';
-import type { AppConfig } from './config.js';
 import { cfg } from '../utils/config.js';
+import type { AppConfig } from './config.js';
 
 /**
  * Logger configuration and setup for Astrolabe
@@ -127,7 +127,7 @@ const defaultFactory = new LoggerFactory(defaultConfig);
 
 /**
  * Create a new logger factory with custom configuration
- * 
+ *
  * @param appConfig - Application configuration
  * @returns LoggerFactory instance
  */
