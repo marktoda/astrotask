@@ -7,7 +7,9 @@ describe('Configuration System', () => {
     expect(cfg.NODE_ENV).toBe('test'); // vitest sets NODE_ENV to 'test' in test environment
     expect(cfg.PORT).toBe(3000); // default from schema
     expect(cfg.LOG_LEVEL).toBe('info'); // default from schema
-    expect(cfg.DATABASE_URI).toBe('./data/astrotask.db'); // unified database path
+    // DATABASE_URI now dynamically determined - just check it's a string
+    expect(typeof cfg.DATABASE_URI).toBe('string');
+    expect(cfg.DATABASE_URI).toBeTruthy();
   });
 
   it('should have proper types', () => {
@@ -38,7 +40,11 @@ describe('Configuration System', () => {
   });
 
   it('should validate database configuration', () => {
-    expect(cfg.DATABASE_URI).toBe('./data/astrotask.db');
+    // DATABASE_URI is now dynamically determined based on git root or fallbacks
+    expect(typeof cfg.DATABASE_URI).toBe('string');
+    expect(cfg.DATABASE_URI).toBeTruthy();
+    // Should end with astrotask.db
+    expect(cfg.DATABASE_URI).toMatch(/astrotask\.db$/);
     expect(typeof cfg.DB_VERBOSE).toBe('boolean');
     expect(cfg.DB_VERBOSE).toBe(false); // default
   });

@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { loadConfig } from 'zod-config';
 import { dotEnvAdapter } from 'zod-config/dotenv-adapter';
 import { envAdapter } from 'zod-config/env-adapter';
+import { getDefaultDatabaseUri } from './find-project-root.js';
 import { DEFAULT_MODEL_ID } from './models.js';
 
 /**
@@ -23,9 +24,10 @@ export const configSchema = z.object({
   CLI_MODE: z.coerce.boolean().default(false),
 
   // Database configuration
-  // Can be either a file path for PGlite (e.g., './data/astrotask.db')
+  // Can be either a file path for SQLite/PGlite (e.g., './data/astrotask.db')
   // or a PostgreSQL connection string (e.g., 'postgresql://user:pass@host:port/db')
-  DATABASE_URI: z.string().default('./data/astrotask.db'),
+  // If not set, will intelligently determine based on git root or existing databases
+  DATABASE_URI: z.string().optional(),
 
   // Database performance and behavior settings
   DB_VERBOSE: z.coerce.boolean().default(false),
@@ -74,7 +76,13 @@ const loadedConfig = await loadConfig({
 
 // Parse through the schema again to ensure TypeScript knows all properties are defined
 // This is safe because our schema has defaults for all fields
-export const cfg = configSchema.parse(loadedConfig);
+const parsedConfig = configSchema.parse(loadedConfig);
+
+// Apply dynamic default for DATABASE_URI if not set
+export const cfg = {
+  ...parsedConfig,
+  DATABASE_URI: parsedConfig.DATABASE_URI || getDefaultDatabaseUri(),
+} as AppConfig & { DATABASE_URI: string };
 
 export const TEST_CONFIG = {
   DATABASE_URL: 'memory://test',

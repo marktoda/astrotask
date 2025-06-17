@@ -274,7 +274,10 @@ describe('Database Configuration', () => {
 
   describe('Database Configuration Constants', () => {
     it('should have correct default configuration', () => {
-      expect(cfg.DATABASE_URI).toBe('./data/astrotask.db');
+      // DATABASE_URI is now dynamically determined based on git root
+      expect(typeof cfg.DATABASE_URI).toBe('string');
+      expect(cfg.DATABASE_URI).toBeTruthy();
+      expect(cfg.DATABASE_URI).toMatch(/astrotask\.db$/);
       expect(cfg.DB_VERBOSE).toBe(false);
       expect(cfg.DB_TIMEOUT).toBe(5000);
     });

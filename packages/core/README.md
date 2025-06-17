@@ -239,21 +239,28 @@ logger.debug('Detailed debug info', { details: complexObject });
 
 ## Configuration
 
-Configure the core library through environment variables or configuration objects:
+Astrotask Core uses environment variables for configuration. Create a `.env` file in your project root:
 
-```typescript
-// Environment variables
-process.env.LOG_LEVEL = 'debug';
-process.env.NODE_ENV = 'development';
-process.env.DATABASE_URI = './tasks.db';
+```bash
+# Database location (optional - will auto-detect if not set)
+DATABASE_URI=./data/astrotask.db
 
-// Or programmatic configuration
-import { cfg } from '@astrotask/core';
+# Enable debug logging
+DB_VERBOSE=true
 
-console.log(cfg.LOG_LEVEL);  // Current log level
-console.log(cfg.NODE_ENV);   // Current environment
-console.log(cfg.DATABASE_URI); // Database location
+# Other configuration options...
+LOG_LEVEL=debug
 ```
+
+### Database URI Auto-Detection
+
+If `DATABASE_URI` is not explicitly set, Astrotask will intelligently determine the database location:
+
+1. **Git Root Priority**: If your project is in a git repository, the database will be placed at `{git_root}/data/astrotask.db`
+2. **Existing Database**: If a database already exists in a parent directory, it will be reused
+3. **Fallback**: If no git root or existing database is found, defaults to `./data/astrotask.db` in the current directory
+
+This ensures that all parts of your project use the same database, regardless of which subdirectory you run commands from.
 
 ## Error Handling
 

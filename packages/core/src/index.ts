@@ -321,3 +321,10 @@ export {
   parseTaskId,
   TaskIdGenerationError,
 } from './utils/taskId.js';
+
+// Re-export project root utilities
+export {
+  findGitRoot,
+  findExistingDatabase,
+  getDefaultDatabaseUri,
+} from './utils/find-project-root.js';

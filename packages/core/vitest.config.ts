@@ -14,7 +14,14 @@ export default defineConfig({
     // Environment
     environment: 'node',
     testTimeout: 30000,
-    globals: true
+    globals: true,
+    // Run tests sequentially to avoid database conflicts
+    pool: 'forks',
+    poolOptions: {
+      forks: {
+        singleFork: true
+      }
+    }
   },
   resolve: {
     alias: {
