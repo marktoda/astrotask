@@ -55,7 +55,11 @@ export default function App({ Component, commandProps }: AppProps) {
 						? `SQLite database at ${cfg.DATABASE_URI}`
 						: `${astrotask.databaseType} database`;
 
-				console.log(`Initialized Astrotask SDK with ${connectionInfo}`);
+				// Only show initialization message if not running dashboard
+				const isDashboard = process.argv.some(arg => arg.includes('dashboard'));
+				if (!isDashboard) {
+					console.log(`Initialized Astrotask SDK with ${connectionInfo}`);
+				}
 				setContext({ astrotask });
 			})
 			.catch((err) => {
@@ -86,7 +90,15 @@ export default function App({ Component, commandProps }: AppProps) {
 		};
 	}, []);
 
-	if (!context) return <Text>Initialising Astrotask SDK…</Text>;
+	if (!context) {
+		// Only show initializing message if not running dashboard
+		const isDashboard = process.argv.some(arg => arg.includes('dashboard'));
+		if (isDashboard) {
+			// Return empty element for dashboard to avoid any output
+			return null;
+		}
+		return <Text>Initialising Astrotask SDK…</Text>;
+	}
 
 	return (
 		<DatabaseContext.Provider value={context}>

@@ -352,9 +352,8 @@ export class GhostTextRenderer {
 		// Re-render screen
 		this.screen.render();
 
-		if (process.env["DEBUG_ONBOARDING"]) {
-			console.error(`DEBUG: Hidden ghost text for ${tooltip.binding.key}`);
-		}
+		// Remove debug log
+		// console.error(`DEBUG: Hidden ghost text for ${tooltip.binding.key}`);
 	}
 
 	/**

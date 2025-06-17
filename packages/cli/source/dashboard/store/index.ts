@@ -195,7 +195,7 @@ export function createDashboardStore(
 		lastFlushTime: 0,
 		autoFlushEnabled: false,
 		isFlushingChanges: false,
-		showCompletedTasks: true,
+		showCompletedTasks: false,
 		statusFilterCounts: { total: 0, visible: 0, hidden: 0 },
 
 		// Helper to trigger re-renders after mutations
@@ -209,7 +209,12 @@ export function createDashboardStore(
 				set({ statusMessage: "Loading tasks..." });
 
 				// Load the base TaskTree from the database
-				const baseTree = await taskService.getTaskTree();
+				// Pass empty statuses array to load ALL tasks including completed ones
+				const baseTree = await taskService.getTaskTree(
+					undefined,
+					undefined,
+					{ statuses: [] }
+				);
 
 				if (!baseTree) {
 					set({

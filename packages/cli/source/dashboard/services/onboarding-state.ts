@@ -330,10 +330,6 @@ export class OnboardingStateManager {
 			// Write state to file with pretty formatting
 			const json = JSON.stringify(this.state, null, 2);
 			await fs.writeFile(this.configPath, json, "utf-8");
-
-			if (process.env["DEBUG_ONBOARDING"]) {
-				console.error(`DEBUG: Onboarding state saved to ${this.configPath}`);
-			}
 		} catch (error) {
 			console.error("Failed to save onboarding state:", error);
 		}
@@ -356,10 +352,6 @@ export class OnboardingStateManager {
 					...loaded.preferences,
 				},
 			};
-
-			if (process.env["DEBUG_ONBOARDING"]) {
-				console.error(`DEBUG: Onboarding state loaded from ${this.configPath}`);
-			}
 		} catch (error) {
 			if ((error as any).code === "ENOENT") {
 				// File doesn't exist, use defaults

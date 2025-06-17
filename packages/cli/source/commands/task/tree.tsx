@@ -114,7 +114,28 @@ export default function Tree({ options }: Props) {
 					if (syntheticTree) {
 						// Extract the root tasks from synthetic root children
 						const rootTasks = [...syntheticTree.getChildren()];
-						setTree(rootTasks);
+						
+						// Sort root tasks to put completed ones at the bottom
+						const sortedRootTasks = rootTasks.sort((a, b) => {
+							const aIsDone = a.task.status === "done" || a.task.status === "archived";
+							const bIsDone = b.task.status === "done" || b.task.status === "archived";
+
+							// If one is done and the other isn't, put done task last
+							if (aIsDone && !bIsDone) return 1;
+							if (!aIsDone && bIsDone) return -1;
+
+							// If both have same "doneness", sort by priority score (higher scores first)
+							const aScore = a.task.priorityScore ?? 50;
+							const bScore = b.task.priorityScore ?? 50;
+							if (aScore !== bScore) {
+								return bScore - aScore; // Higher scores first
+							}
+
+							// If same priority score, sort by creation date (older tasks first)
+							return a.task.createdAt.getTime() - b.task.createdAt.getTime();
+						});
+						
+						setTree(sortedRootTasks);
 					} else {
 						setTree([]);
 					}
@@ -236,6 +257,27 @@ function TreeNodeComponent({
 }: TreeNodeComponentProps) {
 	const shouldShowChildren = maxDepth === undefined || depth < maxDepth;
 	const children = node.getChildren();
+	
+	// Sort children to put completed tasks at the bottom
+	const sortedChildren = [...children].sort((a, b) => {
+		const aIsDone = a.task.status === "done" || a.task.status === "archived";
+		const bIsDone = b.task.status === "done" || b.task.status === "archived";
+
+		// If one is done and the other isn't, put done task last
+		if (aIsDone && !bIsDone) return 1;
+		if (!aIsDone && bIsDone) return -1;
+
+		// If both have same "doneness", sort by priority score (higher scores first)
+		const aScore = a.task.priorityScore ?? 50;
+		const bScore = b.task.priorityScore ?? 50;
+		if (aScore !== bScore) {
+			return bScore - aScore; // Higher scores first
+		}
+
+		// If same priority score, sort by creation date (older tasks first)
+		return a.task.createdAt.getTime() - b.task.createdAt.getTime();
+	});
+	
 	const hasChildren = children.length > 0;
 	const task = node.task;
 
@@ -298,11 +340,11 @@ function TreeNodeComponent({
 			{/* Children */}
 			{shouldShowChildren && hasChildren && (
 				<>
-					{children.map((child, index) => (
+					{sortedChildren.map((child, index) => (
 						<TreeNodeComponent
 							key={child.task.id}
 							node={child}
-							isLast={index === children.length - 1}
+							isLast={index === sortedChildren.length - 1}
 							depth={depth + 1}
 							maxDepth={maxDepth}
 							showStatus={showStatus}
@@ -316,7 +358,7 @@ function TreeNodeComponent({
 			{/* Show truncation indicator if max depth reached */}
 			{maxDepth !== undefined && depth >= maxDepth && hasChildren && (
 				<Text color="gray">
-					{childPrefix}⋯ ({children.length} more subtasks)
+					{childPrefix}⋯ ({sortedChildren.length} more subtasks)
 				</Text>
 			)}
 		</Box>

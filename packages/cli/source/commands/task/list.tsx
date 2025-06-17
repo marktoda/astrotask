@@ -94,6 +94,32 @@ export default function List({ options }: Props) {
 		(t) => t.parentId && t.parentId !== TASK_IDENTIFIERS.PROJECT_ROOT,
 	);
 
+	// Sort function to put completed tasks at the bottom
+	const sortTasksByStatus = (tasks: Task[]) => {
+		return tasks.sort((a, b) => {
+			const aIsDone = a.status === "done" || a.status === "archived";
+			const bIsDone = b.status === "done" || b.status === "archived";
+
+			// If one is done and the other isn't, put done task last
+			if (aIsDone && !bIsDone) return 1;
+			if (!aIsDone && bIsDone) return -1;
+
+			// If both have same "doneness", sort by priority score (higher scores first)
+			const aScore = a.priorityScore ?? 50;
+			const bScore = b.priorityScore ?? 50;
+			if (aScore !== bScore) {
+				return bScore - aScore; // Higher scores first
+			}
+
+			// If same priority score, sort by creation date (older tasks first)
+			return a.createdAt.getTime() - b.createdAt.getTime();
+		});
+	};
+
+	// Sort both root tasks and subtasks
+	const sortedRootTasks = sortTasksByStatus(rootTasks);
+	const sortedSubtasks = sortTasksByStatus(subtasks);
+
 	const filterSummary = options.status
 		? ` (filtered by status: ${options.status})`
 		: options.showAll
@@ -111,13 +137,13 @@ export default function List({ options }: Props) {
 					archived tasks
 				</Text>
 			)}
-			{rootTasks.length > 0 && (
+			{sortedRootTasks.length > 0 && (
 				<>
 					<Text> </Text>
 					<Text bold color="cyan">
-						Root Tasks ({rootTasks.length})
+						Root Tasks ({sortedRootTasks.length})
 					</Text>
-					{rootTasks.map((task) => (
+					{sortedRootTasks.map((task) => (
 						<Box key={task.id} flexDirection="column" marginBottom={1}>
 							<Text>
 								<Text color="cyan">{task.id}</Text> -{" "}
@@ -135,13 +161,13 @@ export default function List({ options }: Props) {
 					))}
 				</>
 			)}
-			{subtasks.length > 0 && (
+			{sortedSubtasks.length > 0 && (
 				<>
 					<Text> </Text>
 					<Text bold color="green">
-						Subtasks ({subtasks.length})
+						Subtasks ({sortedSubtasks.length})
 					</Text>
-					{subtasks.map((task) => (
+					{sortedSubtasks.map((task) => (
 						<Box key={task.id} flexDirection="column" marginBottom={1}>
 							<Text>
 								<Text color="cyan">{task.id}</Text> -{" "}
