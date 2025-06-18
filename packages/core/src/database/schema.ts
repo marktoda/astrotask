@@ -18,8 +18,8 @@ import { DatabaseAdapterError } from './errors.js';
   - PGLite (embedded PostgreSQL)
   - SQLite (with better-sqlite3)
   
-  The schema uses adapter-specific column builders to handle the differences
-  between database types, primarily timestamp handling:
+  The schema uses a factory pattern with adapter-specific column builders
+  to handle differences between database types, primarily timestamp handling:
   - PostgreSQL/PGLite: timestamp with timezone + NOW()
   - SQLite: integer with timestamp mode + $defaultFn(() => new Date())
   
@@ -33,90 +33,38 @@ import { DatabaseAdapterError } from './errors.js';
 export type AdapterType = 'postgres' | 'pglite' | 'sqlite';
 
 /**
- * Create PostgreSQL/PGLite schema
+ * Shared task status enum and constraint definitions
  */
-function createPostgresSchema() {
-  // ---------------------------------------------------------------------------
-  // tasks table
-  // ---------------------------------------------------------------------------
-  const tasks = pgTable(
-    'tasks',
-    {
-      id: text('id').primaryKey(),
-      parentId: text('parent_id'),
-      title: text('title').notNull(),
-      description: text('description'),
-      status: text('status', {
-        enum: ['pending', 'in-progress', 'blocked', 'done', 'cancelled', 'archived'],
-      })
-        .notNull()
-        .default('pending'),
-      priorityScore: real('priority_score').notNull().default(50.0),
+const TASK_STATUS_ENUM = [
+  'pending',
+  'in-progress',
+  'blocked',
+  'done',
+  'cancelled',
+  'archived',
+] as const;
 
-      prd: text('prd'),
-      contextDigest: text('context_digest'),
+/**
+ * Common constraint SQL templates
+ */
+const CONSTRAINTS = {
+  statusCheck: (statusColumn: unknown) =>
+    sql`${statusColumn} IN ('pending', 'in-progress', 'blocked', 'done', 'cancelled', 'archived')`,
+  priorityScoreCheck: (priorityColumn: unknown) =>
+    sql`${priorityColumn} >= 0 AND ${priorityColumn} <= 100`,
+  noSelfDependency: (dependentCol: unknown, dependencyCol: unknown) =>
+    sql`${dependentCol} != ${dependencyCol}`,
+};
 
-      createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-      updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-    },
-    (table) => [
-      foreignKey({
-        columns: [table.parentId],
-        foreignColumns: [table.id],
-      }),
-      check(
-        'status_check',
-        sql`${table.status} IN ('pending', 'in-progress', 'blocked', 'done', 'cancelled', 'archived')`
-      ),
-      check(
-        'priority_score_check',
-        sql`${table.priorityScore} >= 0 AND ${table.priorityScore} <= 100`
-      ),
-    ]
-  );
-
-  // ---------------------------------------------------------------------------
-  // task_dependencies table
-  // ---------------------------------------------------------------------------
-  const taskDependencies = pgTable(
-    'task_dependencies',
-    {
-      id: text('id').primaryKey(),
-      dependentTaskId: text('dependent_task_id')
-        .notNull()
-        .references(() => tasks.id, { onDelete: 'cascade' }),
-      dependencyTaskId: text('dependency_task_id')
-        .notNull()
-        .references(() => tasks.id, { onDelete: 'cascade' }),
-      createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-    },
-    (table) => [
-      // Ensure no duplicate dependencies
-      unique('unique_dependency').on(table.dependentTaskId, table.dependencyTaskId),
-      // Prevent self-dependencies
-      check('no_self_dependency', sql`${table.dependentTaskId} != ${table.dependencyTaskId}`),
-    ]
-  );
-
-  // ---------------------------------------------------------------------------
-  // context_slices table
-  // ---------------------------------------------------------------------------
-  const contextSlices = pgTable('context_slices', {
-    id: text('id').primaryKey(),
-    title: text('title').notNull(),
-    description: text('description'),
-    contextType: text('context_type').notNull().default('general'),
-
-    taskId: text('task_id').references(() => tasks.id),
-    contextDigest: text('context_digest'),
-
-    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-  });
-
-  // ---------------------------------------------------------------------------
-  // Relationships (Drizzle helpers)
-  // ---------------------------------------------------------------------------
+/**
+ * Common relationship definitions factory
+ */
+function createRelations(tables: {
+  tasks: unknown;
+  taskDependencies: unknown;
+  contextSlices: unknown;
+}) {
+  const { tasks, taskDependencies, contextSlices } = tables;
 
   const taskRelations = relations(tasks, ({ one, many }) => ({
     parent: one(tasks, {
@@ -125,11 +73,9 @@ function createPostgresSchema() {
     }),
     children: many(tasks),
     contextSlices: many(contextSlices),
-    // Dependencies where this task is the dependent (tasks this task depends on)
     dependencies: many(taskDependencies, {
       relationName: 'taskDependencies',
     }),
-    // Dependencies where this task is the dependency (tasks that depend on this task)
     dependents: many(taskDependencies, {
       relationName: 'taskDependents',
     }),
@@ -155,13 +101,7 @@ function createPostgresSchema() {
     }),
   }));
 
-  // ---------------------------------------------------------------------------
-  // Export grouped schema to allow `drizzle(db, { schema })`
-  // ---------------------------------------------------------------------------
   return {
-    tasks,
-    taskDependencies,
-    contextSlices,
     taskRelations,
     taskDependencyRelations,
     contextSliceRelations,
@@ -169,12 +109,79 @@ function createPostgresSchema() {
 }
 
 /**
+ * Create PostgreSQL/PGLite schema
+ */
+function createPostgresSchema() {
+  const tasks = pgTable(
+    'tasks',
+    {
+      id: text('id').primaryKey(),
+      parentId: text('parent_id'),
+      title: text('title').notNull(),
+      description: text('description'),
+      status: text('status', { enum: TASK_STATUS_ENUM }).notNull().default('pending'),
+      priorityScore: real('priority_score').notNull().default(50.0),
+      prd: text('prd'),
+      contextDigest: text('context_digest'),
+      createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+      updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+    },
+    (table) => [
+      foreignKey({
+        columns: [table.parentId],
+        foreignColumns: [table.id],
+      }),
+      check('status_check', CONSTRAINTS.statusCheck(table.status)),
+      check('priority_score_check', CONSTRAINTS.priorityScoreCheck(table.priorityScore)),
+    ]
+  );
+
+  const taskDependencies = pgTable(
+    'task_dependencies',
+    {
+      id: text('id').primaryKey(),
+      dependentTaskId: text('dependent_task_id')
+        .notNull()
+        .references(() => tasks.id, { onDelete: 'cascade' }),
+      dependencyTaskId: text('dependency_task_id')
+        .notNull()
+        .references(() => tasks.id, { onDelete: 'cascade' }),
+      createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    },
+    (table) => [
+      unique('unique_dependency').on(table.dependentTaskId, table.dependencyTaskId),
+      check(
+        'no_self_dependency',
+        CONSTRAINTS.noSelfDependency(table.dependentTaskId, table.dependencyTaskId)
+      ),
+    ]
+  );
+
+  const contextSlices = pgTable('context_slices', {
+    id: text('id').primaryKey(),
+    title: text('title').notNull(),
+    description: text('description'),
+    contextType: text('context_type').notNull().default('general'),
+    taskId: text('task_id').references(() => tasks.id),
+    contextDigest: text('context_digest'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  });
+
+  const relations = createRelations({ tasks, taskDependencies, contextSlices });
+
+  return {
+    tasks,
+    taskDependencies,
+    contextSlices,
+    ...relations,
+  };
+}
+
+/**
  * Create SQLite schema
  */
 function createSqliteSchema() {
-  // ---------------------------------------------------------------------------
-  // tasks table
-  // ---------------------------------------------------------------------------
   const tasks = sqliteTable(
     'tasks',
     {
@@ -182,17 +189,10 @@ function createSqliteSchema() {
       parentId: sqliteText('parent_id'),
       title: sqliteText('title').notNull(),
       description: sqliteText('description'),
-      status: sqliteText('status', {
-        enum: ['pending', 'in-progress', 'blocked', 'done', 'cancelled', 'archived'],
-      })
-        .notNull()
-        .default('pending'),
+      status: sqliteText('status', { enum: TASK_STATUS_ENUM }).notNull().default('pending'),
       priorityScore: sqliteReal('priority_score').notNull().default(50.0),
-
       prd: sqliteText('prd'),
       contextDigest: sqliteText('context_digest'),
-
-      // SQLite doesn't have built-in timestamp types, use INTEGER for Unix timestamps
       createdAt: integer('created_at', { mode: 'timestamp' })
         .notNull()
         .$defaultFn(() => new Date()),
@@ -205,20 +205,11 @@ function createSqliteSchema() {
         columns: [table.parentId],
         foreignColumns: [table.id],
       }),
-      sqliteCheck(
-        'status_check',
-        sql`${table.status} IN ('pending', 'in-progress', 'blocked', 'done', 'cancelled', 'archived')`
-      ),
-      sqliteCheck(
-        'priority_score_check',
-        sql`${table.priorityScore} >= 0 AND ${table.priorityScore} <= 100`
-      ),
+      sqliteCheck('status_check', CONSTRAINTS.statusCheck(table.status)),
+      sqliteCheck('priority_score_check', CONSTRAINTS.priorityScoreCheck(table.priorityScore)),
     ]
   );
 
-  // ---------------------------------------------------------------------------
-  // task_dependencies table
-  // ---------------------------------------------------------------------------
   const taskDependencies = sqliteTable(
     'task_dependencies',
     {
@@ -234,25 +225,21 @@ function createSqliteSchema() {
         .$defaultFn(() => new Date()),
     },
     (table) => [
-      // Ensure no duplicate dependencies
       sqliteUnique('unique_dependency').on(table.dependentTaskId, table.dependencyTaskId),
-      // Prevent self-dependencies
-      sqliteCheck('no_self_dependency', sql`${table.dependentTaskId} != ${table.dependencyTaskId}`),
+      sqliteCheck(
+        'no_self_dependency',
+        CONSTRAINTS.noSelfDependency(table.dependentTaskId, table.dependencyTaskId)
+      ),
     ]
   );
 
-  // ---------------------------------------------------------------------------
-  // context_slices table
-  // ---------------------------------------------------------------------------
   const contextSlices = sqliteTable('context_slices', {
     id: sqliteText('id').primaryKey(),
     title: sqliteText('title').notNull(),
     description: sqliteText('description'),
     contextType: sqliteText('context_type').notNull().default('general'),
-
     taskId: sqliteText('task_id').references(() => tasks.id),
     contextDigest: sqliteText('context_digest'),
-
     createdAt: integer('created_at', { mode: 'timestamp' })
       .notNull()
       .$defaultFn(() => new Date()),
@@ -261,57 +248,13 @@ function createSqliteSchema() {
       .$defaultFn(() => new Date()),
   });
 
-  // ---------------------------------------------------------------------------
-  // Relationships (Drizzle helpers)
-  // ---------------------------------------------------------------------------
+  const relations = createRelations({ tasks, taskDependencies, contextSlices });
 
-  const taskRelations = relations(tasks, ({ one, many }) => ({
-    parent: one(tasks, {
-      fields: [tasks.parentId],
-      references: [tasks.id],
-    }),
-    children: many(tasks),
-    contextSlices: many(contextSlices),
-    // Dependencies where this task is the dependent (tasks this task depends on)
-    dependencies: many(taskDependencies, {
-      relationName: 'taskDependencies',
-    }),
-    // Dependencies where this task is the dependency (tasks that depend on this task)
-    dependents: many(taskDependencies, {
-      relationName: 'taskDependents',
-    }),
-  }));
-
-  const taskDependencyRelations = relations(taskDependencies, ({ one }) => ({
-    dependentTask: one(tasks, {
-      fields: [taskDependencies.dependentTaskId],
-      references: [tasks.id],
-      relationName: 'taskDependencies',
-    }),
-    dependencyTask: one(tasks, {
-      fields: [taskDependencies.dependencyTaskId],
-      references: [tasks.id],
-      relationName: 'taskDependents',
-    }),
-  }));
-
-  const contextSliceRelations = relations(contextSlices, ({ one }) => ({
-    task: one(tasks, {
-      fields: [contextSlices.taskId],
-      references: [tasks.id],
-    }),
-  }));
-
-  // ---------------------------------------------------------------------------
-  // Export grouped schema to allow `drizzle(db, { schema })`
-  // ---------------------------------------------------------------------------
   return {
     tasks,
     taskDependencies,
     contextSlices,
-    taskRelations,
-    taskDependencyRelations,
-    contextSliceRelations,
+    ...relations,
   };
 }
 

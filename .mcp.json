@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "astrotask": {
+      "type": "stdio",
+      "command": "node /home/dev/workspace/packages/mcp/dist/index.js",
+      "args": [],
+      "env": {}
+    }
+  }
+}
