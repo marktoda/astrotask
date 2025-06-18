@@ -60,8 +60,11 @@ const CONSTRAINTS = {
  * Common relationship definitions factory
  */
 function createRelations(tables: {
+  // biome-ignore lint/suspicious/noExplicitAny: Drizzle table types are complex
   tasks: any;
+  // biome-ignore lint/suspicious/noExplicitAny: Drizzle table types are complex
   taskDependencies: any;
+  // biome-ignore lint/suspicious/noExplicitAny: Drizzle table types are complex
   contextSlices: any;
 }) {
   const { tasks, taskDependencies, contextSlices } = tables;

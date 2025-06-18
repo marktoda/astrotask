@@ -18,6 +18,8 @@ import {
   validateStatusTransition,
 } from '../utils/statusTransitions.js';
 import { DependencyService } from './DependencyService.js';
+import { validateTaskExists } from './service-utils.js';
+import { collectDescendants, collectAncestors, findRootTaskId } from './tree-utils.js';
 
 /**
  * TaskService - Business logic layer for hierarchical task operations
@@ -172,35 +174,14 @@ export class TaskService implements ITaskReconciliationService {
    * Return all ancestor tasks up to the root (closest first, root last)
    */
   async getTaskAncestors(taskId: string): Promise<Task[]> {
-    const ancestors: Task[] = [];
-    let current = await this.store.getTask(taskId);
-
-    while (current?.parentId) {
-      const parent = await this.store.getTask(current.parentId);
-      if (!parent) break;
-      ancestors.unshift(parent); // root first ordering
-      current = parent;
-    }
-
-    return ancestors;
+    return collectAncestors(this.store, taskId);
   }
 
   /**
    * Return every descendant (children, grandchildren, etc.) of a task
    */
   async getTaskDescendants(taskId: string): Promise<Task[]> {
-    const descendants: Task[] = [];
-
-    const collectDescendants = async (parentId: string): Promise<void> => {
-      const children = await this.store.listTasks({ parentId, statuses: [] });
-      for (const child of children) {
-        descendants.push(child);
-        await collectDescendants(child.id);
-      }
-    };
-
-    await collectDescendants(taskId);
-    return descendants;
+    return collectDescendants(this.store, taskId);
   }
 
   /**
@@ -353,8 +334,7 @@ export class TaskService implements ITaskReconciliationService {
    * Find the root task for a given task ID
    */
   private async findRootTask(taskId: string): Promise<string | null> {
-    const ancestors = await this.getTaskAncestors(taskId);
-    return ancestors.length > 0 && ancestors[0] ? ancestors[0].id : taskId;
+    return findRootTaskId(this.store, taskId);
   }
 
   /**
@@ -508,10 +488,7 @@ export class TaskService implements ITaskReconciliationService {
     }
 
     const taskId = operation.taskId;
-    const originalTask = await this.store.getTask(taskId);
-    if (!originalTask) {
-      throw new TaskNotFoundError(taskId, 'handleTaskUpdate');
-    }
+    const originalTask = await validateTaskExists(this.store, taskId, 'handleTaskUpdate');
 
     const updatedTask = await this.store.updateTask(taskId, operation.updates as Partial<Task>);
     if (!updatedTask) {

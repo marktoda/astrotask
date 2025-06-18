@@ -29,6 +29,7 @@ import type {
 } from '../schemas/dependency.js';
 import type { Task } from '../schemas/task.js';
 import { validateDependency } from '../validation/dependency-validation.js';
+import { getTasksFiltered } from './service-utils.js';
 
 /**
  * Service for managing task dependencies and dependency graphs
@@ -223,20 +224,17 @@ export class DependencyService implements IDependencyReconciliationService {
     const graph = await this.createDependencyGraph();
     const blockedTaskIds = graph.getBlockedTasks();
 
-    const blockedTasks: TaskWithDependencies[] = [];
-    for (const taskId of blockedTaskIds) {
-      const task = await this.store.getTask(taskId);
-      if (task) {
-        const dependencyGraph = graph.getTaskDependencyGraph(taskId);
-        blockedTasks.push({
-          ...task,
-          dependencies: dependencyGraph.dependencies,
-          dependents: dependencyGraph.dependents,
-          isBlocked: dependencyGraph.isBlocked,
-          blockedBy: dependencyGraph.blockedBy,
-        });
-      }
-    }
+    const tasks = await getTasksFiltered(this.store, blockedTaskIds);
+    const blockedTasks = tasks.map((task) => {
+      const dependencyGraph = graph.getTaskDependencyGraph(task.id);
+      return {
+        ...task,
+        dependencies: dependencyGraph.dependencies,
+        dependents: dependencyGraph.dependents,
+        isBlocked: dependencyGraph.isBlocked,
+        blockedBy: dependencyGraph.blockedBy,
+      } as TaskWithDependencies;
+    });
 
     return blockedTasks;
   }
@@ -261,15 +259,7 @@ export class DependencyService implements IDependencyReconciliationService {
     const graph = await this.createDependencyGraph();
     const executableTaskIds = graph.getExecutableTasks();
 
-    const executableTasks: Task[] = [];
-    for (const taskId of executableTaskIds) {
-      const task = await this.store.getTask(taskId);
-      if (task) {
-        executableTasks.push(task);
-      }
-    }
-
-    return executableTasks;
+    return getTasksFiltered(this.store, executableTaskIds);
   }
 
   /**
