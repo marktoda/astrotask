@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(*)",
+      "Bash(pnpm type-check:*)",
+      "Bash(pnpm build:*)",
+      "Bash(node:*)",
+      "Bash(pnpm verify:*)",
+      "Bash(pnpm rebuild:*)"
+    ],
+    "deny": []
+  }
+}

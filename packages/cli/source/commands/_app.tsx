@@ -56,7 +56,9 @@ export default function App({ Component, commandProps }: AppProps) {
 						: `${astrotask.databaseType} database`;
 
 				// Only show initialization message if not running dashboard
-				const isDashboard = process.argv.some(arg => arg.includes('dashboard'));
+				const isDashboard = process.argv.some((arg) =>
+					arg.includes("dashboard"),
+				);
 				if (!isDashboard) {
 					console.log(`Initialized Astrotask SDK with ${connectionInfo}`);
 				}
@@ -92,7 +94,7 @@ export default function App({ Component, commandProps }: AppProps) {
 
 	if (!context) {
 		// Only show initializing message if not running dashboard
-		const isDashboard = process.argv.some(arg => arg.includes('dashboard'));
+		const isDashboard = process.argv.some((arg) => arg.includes("dashboard"));
 		if (isDashboard) {
 			// Return empty element for dashboard to avoid any output
 			return null;

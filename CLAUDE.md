@@ -1,72 +1,99 @@
-# Claude Agent Guide – Astrolabe
+# CLAUDE.md
 
-> **Audience:** This document is for Anthropic Claude (or any external LLM) wired up to the Astrolabe repository.  It explains how to become a helpful, context-aware pair-programmer without violating project guards.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-[AGENTS.md](mdc:AGENTS.md) is your north-star for architecture, tech-stack & conventions.  **Read it first.**
+## Project Overview
 
----
+Astrotask is a local-first, MCP-compatible task management platform for humans and AI agents. It's built as a TypeScript monorepo using pnpm workspaces with strict type safety and offline-first principles.
 
-## 1 · Principles
+## Architecture
 
-1. **Local-First First.** Assume the developer may be offline.  Prefer solutions that work with the local SQLite replica and don't rely on always-on cloud infrastructure.
-2. **Type Safety or Bust.**  All runtime data **must** flow through Zod schemas and compile under `pnpm type-check`.
-3. **One MCP Call → Full Context.**  When you need project information, call `getTaskContext` or the MCP tools listed in the rules instead of spelunking arbitrary files.
-4. **Eager Logging.**  Append findings to the relevant Task Master subtask with `update_subtask` as you go (see dev_workflow rule).
-5. **No `any`, No `console.log`.** Biome rules will shout; avoid fighting them.
+- **@astrotask/core** - Core library with task management, database abstraction, and services
+- **@astrotask/cli** - Command-line interface (`astro` command) 
+- **@astrotask/mcp** - Model Context Protocol server for AI agent integration
+- **Local SQLite database** - Primary data store with WAL mode for concurrent access
+- **Zod schemas** - Runtime validation for all data models
+- **Biome** - Code formatting and linting
 
----
+## Common Development Commands
 
-## 2 · Quick-Start Prompt Template
+```bash
+# Install dependencies
+pnpm install
 
-```text
-You are Claude, an AI engineer working on Astrolabe.
-Goal: <state the small, specific goal in one sentence>
-Relevant task ID: <id or none>
+# Build all packages
+pnpm build
 
-Constraints:
-- Adhere to conventions in AGENTS.md (TypeScript strict, Zod, Biome).
-- If code change: provide explicit diff or patch chunks only.
-- After thinking, either:
-  • propose a patch (use correct file path & minimal diff), or
-  • call an MCP tool (see taskmaster.mdc), or
-  • ask a **single** clarifying question.
+# Run all tests
+pnpm test
 
-Respond in markdown.
+# Type checking
+pnpm type-check
+
+# Lint and format (auto-fix)
+pnpm lint:fix
+pnpm format:fix
+
+# Full verification (run before commits)
+pnpm verify
+
+# CLI development
+pnpm cli <command>
+
+# Dashboard (TUI interface)
+pnpm dashboard
+
+# Run single test file
+cd packages/core && pnpm test basic.test.ts
 ```
 
----
+## Code Quality Standards
 
-## 3 · Common Workflows
+This project enforces strict code quality with Biome:
 
-| Need… | Prefer | Example |
-| --- | --- | --- |
-| Project status | `next_task` MCP tool | "show me the next task" |
-| Append research | `update_subtask` | id=`3.2`, prompt=`Found better CRDT lib…` |
-| Add code | Diff via `edit_file` | target=`packages/core/src/database/store.ts` |
-| Generate subtasks | `expand_task` | id=`7`, num=`5`, research=`true` |
+- **No `any` types** - Use explicit TypeScript types
+- **No `console.log`** - Use proper logging utilities
+- **Zod schemas** - All runtime data must flow through Zod validation
+- **2 spaces, single quotes, semicolons** - Follow Biome configuration
+- **100 character line width**
 
-For full list, see [dev_workflow.mdc](mdc:.cursor/rules/dev_workflow.mdc).
+Always run `pnpm verify` before committing. This runs build, lint, format, type-check, and tests.
 
----
+## Key Conventions
 
-## 4 · Prompt Anti-Patterns
+1. **Local-First**: Prefer SQLite operations over cloud dependencies
+2. **Type Safety**: All data models use Zod schemas with TypeScript inference
+3. **Monorepo Structure**: Use `pnpm -r` commands to run across all packages
+4. **ES Modules**: Native ESM with Node16 module resolution
+5. **Strict TypeScript**: Enhanced strictness with `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`
 
-❌ *"Write a full file from scratch"*  → Too much boilerplate & risk of drift.  **Prefer surgical diffs.**
+## Database
 
-❌ *"Do X and Y and Z in one go"* → Split into discrete steps; log progress between them.
+- Primary database: SQLite at `./data/astrotask.db`
+- Database adapters support SQLite, PostgreSQL, and PGlite
+- All database operations go through the store layer with proper error handling
+- Migrations are managed via Drizzle ORM
 
-❌ *Long speculative essays* → Keep to actionable reasoning and next action.
+## Testing
 
----
+- Vitest for unit testing
+- Test utilities in `packages/core/test/testUtils.ts`
+- Database tests use temporary SQLite instances
+- Run `pnpm test:clean` to cleanup test data
 
-## 5 · Useful Links
+## Important File Locations
 
-- AGENTS overview: [AGENTS.md](mdc:AGENTS.md)
-- Task Workflow rule: [dev_workflow.mdc](mdc:.cursor/rules/dev_workflow.mdc)
-- Taskmaster reference: [taskmaster.mdc](mdc:.cursor/rules/taskmaster.mdc)
-- Self-improvement guide: [self_improve.mdc](mdc:.cursor/rules/self_improve.mdc)
-- Cursor rule format: [cursor_rules.mdc](mdc:.cursor/rules/cursor_rules.mdc)
+- Main exports: `packages/core/src/index.ts`
+- Database schema: `packages/core/src/database/schema.ts`
+- Task service: `packages/core/src/services/TaskService.ts`
+- CLI commands: `packages/cli/source/commands/`
+- MCP handlers: `packages/mcp/src/handlers/`
 
----
+## Development Workflow
 
-**Happy hacking, Claude!**  Stay concise, stay safe, and always reference the stars (a.k.a. the rules). 🌌
+1. Make changes following TypeScript/Biome conventions
+2. Run `pnpm type-check` to verify types
+3. Run `pnpm lint:fix && pnpm format:fix` to fix code style
+4. Run `pnpm test` to verify functionality
+5. Run `pnpm verify` before committing
+6. Never commit if verification fails

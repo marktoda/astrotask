@@ -1,4 +1,4 @@
-import { type Astrotask } from "@astrotask/core";
+import { type Astrotask, type Store } from "@astrotask/core";
 import React from "react";
 
 export interface DatabaseContextValue {
@@ -16,7 +16,7 @@ export function useAstrotask() {
 	return ctx.astrotask;
 }
 
-export function useDatabase() {
+export function useDatabase(): Store {
 	const ctx = React.useContext(DatabaseContext);
 	if (!ctx)
 		throw new Error("useDatabase must be used inside <DatabaseProvider>");

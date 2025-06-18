@@ -114,11 +114,13 @@ export default function Tree({ options }: Props) {
 					if (syntheticTree) {
 						// Extract the root tasks from synthetic root children
 						const rootTasks = [...syntheticTree.getChildren()];
-						
+
 						// Sort root tasks to put completed ones at the bottom
 						const sortedRootTasks = rootTasks.sort((a, b) => {
-							const aIsDone = a.task.status === "done" || a.task.status === "archived";
-							const bIsDone = b.task.status === "done" || b.task.status === "archived";
+							const aIsDone =
+								a.task.status === "done" || a.task.status === "archived";
+							const bIsDone =
+								b.task.status === "done" || b.task.status === "archived";
 
 							// If one is done and the other isn't, put done task last
 							if (aIsDone && !bIsDone) return 1;
@@ -134,7 +136,7 @@ export default function Tree({ options }: Props) {
 							// If same priority score, sort by creation date (older tasks first)
 							return a.task.createdAt.getTime() - b.task.createdAt.getTime();
 						});
-						
+
 						setTree(sortedRootTasks);
 					} else {
 						setTree([]);
@@ -257,7 +259,7 @@ function TreeNodeComponent({
 }: TreeNodeComponentProps) {
 	const shouldShowChildren = maxDepth === undefined || depth < maxDepth;
 	const children = node.getChildren();
-	
+
 	// Sort children to put completed tasks at the bottom
 	const sortedChildren = [...children].sort((a, b) => {
 		const aIsDone = a.task.status === "done" || a.task.status === "archived";
@@ -277,7 +279,7 @@ function TreeNodeComponent({
 		// If same priority score, sort by creation date (older tasks first)
 		return a.task.createdAt.getTime() - b.task.createdAt.getTime();
 	});
-	
+
 	const hasChildren = children.length > 0;
 	const task = node.task;
 

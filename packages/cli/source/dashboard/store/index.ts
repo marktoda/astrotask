@@ -1,13 +1,12 @@
 import type { ContextSlice, Task, TaskTree } from "@astrotask/core";
 import {
+	DependencyService,
 	TASK_IDENTIFIERS,
+	TaskService,
 	TrackingDependencyGraph,
 	TrackingTaskTree,
 	createDatabase,
 } from "@astrotask/core";
-import { DependencyService } from "@astrotask/core/dist/services/DependencyService.js";
-// Import TaskService and DependencyService first to avoid PostgreSQL import hang
-import { TaskService } from "@astrotask/core/dist/services/TaskService.js";
 import type blessed from "blessed";
 import { create } from "zustand";
 import { EditorService, type PendingTaskData } from "../services/editor.js";
@@ -210,11 +209,9 @@ export function createDashboardStore(
 
 				// Load the base TaskTree from the database
 				// Pass empty statuses array to load ALL tasks including completed ones
-				const baseTree = await taskService.getTaskTree(
-					undefined,
-					undefined,
-					{ statuses: [] }
-				);
+				const baseTree = await taskService.getTaskTree(undefined, undefined, {
+					statuses: [],
+				});
 
 				if (!baseTree) {
 					set({

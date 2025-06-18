@@ -4,6 +4,36 @@
   "description": "A local-first, MCP-compatible task-navigation platform for humans + AI agents",
   "main": "dist/index.js",
   "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./advanced": {
+      "import": "./dist/advanced.js",
+      "types": "./dist/advanced.d.ts"
+    },
+    "./validation": {
+      "import": "./dist/validation.js",
+      "types": "./dist/validation.d.ts"
+    },
+    "./tree": {
+      "import": "./dist/tree.js",
+      "types": "./dist/tree.d.ts"
+    },
+    "./llm": {
+      "import": "./dist/llm.js",
+      "types": "./dist/llm.d.ts"
+    },
+    "./utils": {
+      "import": "./dist/utils.js",
+      "types": "./dist/utils.d.ts"
+    },
+    "./errors": {
+      "import": "./dist/errors.js",
+      "types": "./dist/errors.d.ts"
+    }
+  },
   "directories": {
     "doc": "docs"
   },
@@ -39,7 +69,7 @@
   "author": "",
   "license": "MIT",
   "engines": {
-    "node": ">=22.0.0"
+    "node": ">=20.0.0"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
