@@ -18,6 +18,8 @@ import { z } from 'zod';
 
 import type { Task } from '../schemas/task.js';
 import type { ILLMService } from './LLMService.js';
+// Import error classes (will be used when replacing Error instances)
+// import { ComplexityAnalysisError, TaskNotFoundError } from '../errors/service.js';
 
 /**
  * Schema for individual task complexity analysis

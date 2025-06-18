@@ -9,6 +9,7 @@ import {
 } from '../entities/TaskTreeValidation.js';
 import type { ReconciliationPlan } from '../entities/TrackingTaskTree.js';
 import type { ITaskReconciliationService } from '../entities/TrackingTypes.js';
+import { TaskNotFoundError, TaskOperationError } from '../errors/service.js';
 import type { TaskDependencyGraph, TaskWithDependencies } from '../schemas/dependency.js';
 import type { CreateTask, Task, TaskStatus } from '../schemas/task.js';
 import { createModuleLogger } from '../utils/logger.js';
@@ -413,7 +414,7 @@ export class TaskService implements ITaskReconciliationService {
       // No changes to apply, just return current tree
       const currentTree = await this.getTaskTree(plan.treeId);
       if (!currentTree) {
-        throw new Error('Task tree not found');
+        throw new TaskNotFoundError(plan.treeId, 'applyReconciliationPlan');
       }
       return currentTree;
     }
@@ -458,7 +459,11 @@ export class TaskService implements ITaskReconciliationService {
       // Return the updated tree with all changes applied
       const updatedTree = await this.getTaskTree(plan.treeId);
       if (!updatedTree) {
-        throw new Error(`Tree not found after applying operations: ${plan.treeId}`);
+        throw new TaskOperationError(
+          'Tree not found after applying operations',
+          'executeReconciliationOperations',
+          plan.treeId
+        );
       }
 
       return { tree: updatedTree, idMappings };
@@ -479,8 +484,10 @@ export class TaskService implements ITaskReconciliationService {
         }
       }
 
-      throw new Error(
-        `Failed to apply reconciliation plan: ${error instanceof Error ? error.message : String(error)}`
+      throw new TaskOperationError(
+        `Failed to apply reconciliation plan: ${error instanceof Error ? error.message : String(error)}`,
+        'executeReconciliationOperations',
+        plan.treeId
       );
     } finally {
       // Clear cache again to ensure no stale data persists after the operation
@@ -497,18 +504,18 @@ export class TaskService implements ITaskReconciliationService {
     rollbackActions: (() => Promise<void>)[]
   ): Promise<void> {
     if (!operation.taskId) {
-      throw new Error('task_update operation missing taskId');
+      throw new TaskOperationError('task_update operation missing taskId', 'handleTaskUpdate');
     }
 
     const taskId = operation.taskId;
     const originalTask = await this.store.getTask(taskId);
     if (!originalTask) {
-      throw new Error(`Task ${taskId} not found for update`);
+      throw new TaskNotFoundError(taskId, 'handleTaskUpdate');
     }
 
     const updatedTask = await this.store.updateTask(taskId, operation.updates as Partial<Task>);
     if (!updatedTask) {
-      throw new Error(`Failed to update task ${taskId}`);
+      throw new TaskOperationError('Failed to update task', 'handleTaskUpdate', taskId);
     }
     updatedTaskIds.add(taskId);
 
@@ -535,10 +542,10 @@ export class TaskService implements ITaskReconciliationService {
     idMapping: Map<string, string>
   ): Promise<void> {
     if (!operation.parentId) {
-      throw new Error('child_add operation missing parentId');
+      throw new TaskOperationError('child_add operation missing parentId', 'handleChildAdd');
     }
     if (!operation.childData) {
-      throw new Error('child_add operation missing childData');
+      throw new TaskOperationError('child_add operation missing childData', 'handleChildAdd');
     }
 
     const childData = operation.childData as TaskTreeData;
@@ -588,7 +595,7 @@ export class TaskService implements ITaskReconciliationService {
     rollbackActions: (() => Promise<void>)[]
   ): Promise<void> {
     if (!operation.childId) {
-      throw new Error('child_remove operation missing childId');
+      throw new TaskOperationError('child_remove operation missing childId', 'handleChildRemove');
     }
 
     // Delete the child and all its descendants

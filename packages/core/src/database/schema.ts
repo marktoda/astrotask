@@ -60,9 +60,9 @@ const CONSTRAINTS = {
  * Common relationship definitions factory
  */
 function createRelations(tables: {
-  tasks: unknown;
-  taskDependencies: unknown;
-  contextSlices: unknown;
+  tasks: any;
+  taskDependencies: any;
+  contextSlices: any;
 }) {
   const { tasks, taskDependencies, contextSlices } = tables;
 

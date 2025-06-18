@@ -19,6 +19,7 @@ import type {
   DependencyReconciliationPlan,
 } from '../entities/TrackingDependencyGraph.js';
 import type { IDependencyReconciliationService } from '../entities/TrackingTypes.js';
+import { DependencyOperationError, DependencyValidationError } from '../errors/service.js';
 import type {
   CreateTaskDependency,
   DependencyValidationResult,
@@ -54,7 +55,10 @@ export class DependencyService implements IDependencyReconciliationService {
     // Validate the dependency before adding
     const validation = await this.validateDependency(dependentId, dependencyId);
     if (!validation.valid) {
-      throw new Error(`Cannot add dependency: ${validation.errors.join(', ')}`);
+      throw new DependencyValidationError('Cannot add dependency', validation.errors, {
+        dependentId,
+        dependencyId,
+      });
     }
 
     const dependency: CreateTaskDependency = {
@@ -324,8 +328,9 @@ export class DependencyService implements IDependencyReconciliationService {
 
       default:
         // TypeScript should ensure this never happens, but just in case
-        throw new Error(
-          `Unknown dependency operation type: ${(operation as { type: string }).type}`
+        throw new DependencyOperationError(
+          `Unknown dependency operation type: ${(operation as { type: string }).type}`,
+          'applyDependencyOperation'
         );
     }
   }
@@ -347,10 +352,12 @@ export class DependencyService implements IDependencyReconciliationService {
         // Dependency already exists, skip
         return;
       }
-      throw new Error(
+      throw new DependencyOperationError(
         `Failed to add dependency ${operation.dependentTaskId} -> ${operation.dependencyTaskId}: ${
           error instanceof Error ? error.message : String(error)
-        }`
+        }`,
+        'applyAddDependencyOperation',
+        { dependentTaskId: operation.dependentTaskId, dependencyTaskId: operation.dependencyTaskId }
       );
     }
   }
@@ -367,10 +374,12 @@ export class DependencyService implements IDependencyReconciliationService {
     try {
       await this.removeDependency(operation.dependentTaskId, operation.dependencyTaskId);
     } catch (error) {
-      throw new Error(
+      throw new DependencyOperationError(
         `Failed to remove dependency ${operation.dependentTaskId} -> ${operation.dependencyTaskId}: ${
           error instanceof Error ? error.message : String(error)
-        }`
+        }`,
+        'applyRemoveDependencyOperation',
+        { dependentTaskId: operation.dependentTaskId, dependencyTaskId: operation.dependencyTaskId }
       );
     }
   }
