@@ -1,6 +1,6 @@
 /**
  * Common service utilities and helper functions
- * 
+ *
  * This module provides reusable utilities for service operations including
  * task validation, retrieval patterns, and error handling.
  */
@@ -11,7 +11,7 @@ import type { Task } from '../schemas/task.js';
 
 /**
  * Validates that a task exists and returns it
- * 
+ *
  * @param store - Database store instance
  * @param taskId - ID of the task to validate
  * @param operation - Name of the operation being performed (for error context)
@@ -32,8 +32,8 @@ export async function validateTaskExists(
 
 /**
  * Validates that multiple tasks exist and returns them
- * 
- * @param store - Database store instance  
+ *
+ * @param store - Database store instance
  * @param taskIds - Array of task IDs to validate
  * @param operation - Name of the operation being performed (for error context)
  * @returns Promise resolving to array of validated tasks
@@ -58,7 +58,7 @@ export async function validateTasksExist(
 
 /**
  * Gets tasks and filters out null results
- * 
+ *
  * @param store - Database store instance
  * @param taskIds - Array of task IDs to retrieve
  * @param filter - Optional filter function to apply to valid tasks
@@ -71,17 +71,17 @@ export async function getTasksFiltered<T extends Task = Task>(
 ): Promise<T[]> {
   const tasks = await Promise.all(taskIds.map((id) => store.getTask(id)));
   const validTasks = tasks.filter((task): task is Task => task !== null);
-  
+
   if (filter) {
     return validTasks.filter(filter);
   }
-  
+
   return validTasks as T[];
 }
 
 /**
  * Batch task existence validation with partial failure handling
- * 
+ *
  * @param store - Database store instance
  * @param taskIds - Array of task IDs to validate
  * @returns Promise resolving to object with valid tasks and missing IDs
@@ -116,7 +116,7 @@ export async function validateTasksBatch(
 
 /**
  * Creates a logger instance with consistent module naming
- * 
+ *
  * @param serviceName - Name of the service for logger context
  * @returns Logger instance configured for the service
  */
@@ -128,7 +128,7 @@ export function createServiceLogger(serviceName: string) {
 
 /**
  * Standard error handler for service operations
- * 
+ *
  * @param error - The error that occurred
  * @param serviceName - Name of the service where error occurred
  * @param operation - Name of the operation that failed

@@ -19,7 +19,7 @@ import {
 } from '../utils/statusTransitions.js';
 import { DependencyService } from './DependencyService.js';
 import { validateTaskExists } from './service-utils.js';
-import { collectDescendants, collectAncestors, findRootTaskId } from './tree-utils.js';
+import { collectAncestors, collectDescendants, findRootTaskId } from './tree-utils.js';
 
 /**
  * TaskService - Business logic layer for hierarchical task operations

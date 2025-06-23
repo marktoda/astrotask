@@ -1,6 +1,6 @@
 /**
  * Tree operation utilities
- * 
+ *
  * This module provides common tree traversal and manipulation utilities
  * that can be used across different services and entities.
  */
@@ -10,7 +10,7 @@ import type { Task, TaskStatus } from '../schemas/task.js';
 
 /**
  * Recursively collect all descendant tasks from a given parent
- * 
+ *
  * @param store - Database store instance
  * @param parentId - ID of the parent task
  * @param statuses - Optional array of statuses to filter by
@@ -24,11 +24,11 @@ export async function collectDescendants(
   const descendants: Task[] = [];
 
   const collectRecursive = async (currentParentId: string): Promise<void> => {
-    const children = await store.listTasks({ 
-      parentId: currentParentId, 
-      statuses: statuses || [] 
+    const children = await store.listTasks({
+      parentId: currentParentId,
+      statuses: statuses || [],
     });
-    
+
     for (const child of children) {
       descendants.push(child);
       await collectRecursive(child.id);
@@ -41,15 +41,12 @@ export async function collectDescendants(
 
 /**
  * Collect all ancestor tasks up to the root
- * 
+ *
  * @param store - Database store instance
  * @param taskId - ID of the task to get ancestors for
  * @returns Promise resolving to array of ancestor tasks (root first)
  */
-export async function collectAncestors(
-  store: Store,
-  taskId: string
-): Promise<Task[]> {
+export async function collectAncestors(store: Store, taskId: string): Promise<Task[]> {
   const ancestors: Task[] = [];
   let current = await store.getTask(taskId);
 
@@ -65,37 +62,31 @@ export async function collectAncestors(
 
 /**
  * Calculate the depth of a task in its hierarchy
- * 
+ *
  * @param store - Database store instance
  * @param taskId - ID of the task to calculate depth for
  * @returns Promise resolving to the depth (0 for root tasks)
  */
-export async function calculateTaskDepth(
-  store: Store,
-  taskId: string
-): Promise<number> {
+export async function calculateTaskDepth(store: Store, taskId: string): Promise<number> {
   const ancestors = await collectAncestors(store, taskId);
   return ancestors.length;
 }
 
 /**
  * Find the root task of a hierarchy
- * 
+ *
  * @param store - Database store instance
  * @param taskId - ID of the task to find root for
  * @returns Promise resolving to the root task ID, or the original task ID if already root
  */
-export async function findRootTaskId(
-  store: Store,
-  taskId: string
-): Promise<string> {
+export async function findRootTaskId(store: Store, taskId: string): Promise<string> {
   const ancestors = await collectAncestors(store, taskId);
   return ancestors.length > 0 && ancestors[0] ? ancestors[0].id : taskId;
 }
 
 /**
  * Generic tree walker that applies a function to each node
- * 
+ *
  * @param store - Database store instance
  * @param rootId - ID of the root task to start walking from
  * @param visitor - Function to call for each task
@@ -124,11 +115,11 @@ export async function walkTaskTree(
 
     // Recurse into children if not at max depth
     if (maxDepth === undefined || depth < maxDepth) {
-      const children = await store.listTasks({ 
-        parentId: taskId, 
-        statuses: statuses || [] 
+      const children = await store.listTasks({
+        parentId: taskId,
+        statuses: statuses || [],
       });
-      
+
       for (const child of children) {
         await walk(child.id, depth + 1);
       }
@@ -145,7 +136,7 @@ export async function walkTaskTree(
 
 /**
  * Find all leaf tasks (tasks with no children) in a tree
- * 
+ *
  * @param store - Database store instance
  * @param rootId - ID of the root task to search from
  * @param options - Options for filtering
@@ -161,23 +152,28 @@ export async function findLeafTasks(
 ): Promise<Task[]> {
   const leafTasks: Task[] = [];
 
-  await walkTaskTree(store, rootId, async (task) => {
-    const children = await store.listTasks({ 
-      parentId: task.id, 
-      statuses: options?.statuses || [] 
-    });
-    
-    if (children.length === 0) {
-      leafTasks.push(task);
-    }
-  }, options);
+  await walkTaskTree(
+    store,
+    rootId,
+    async (task) => {
+      const children = await store.listTasks({
+        parentId: task.id,
+        statuses: options?.statuses || [],
+      });
+
+      if (children.length === 0) {
+        leafTasks.push(task);
+      }
+    },
+    options
+  );
 
   return leafTasks;
 }
 
 /**
  * Count total tasks in a tree hierarchy
- * 
+ *
  * @param store - Database store instance
  * @param rootId - ID of the root task
  * @param options - Options for filtering
@@ -193,9 +189,14 @@ export async function countTasksInTree(
 ): Promise<number> {
   let count = 0;
 
-  await walkTaskTree(store, rootId, () => {
-    count++;
-  }, options);
+  await walkTaskTree(
+    store,
+    rootId,
+    () => {
+      count++;
+    },
+    options
+  );
 
   return count;
 }
