@@ -23,6 +23,8 @@ export {
   createTestAstrotask,
   type AstrotaskConfig,
   type InitializationResult,
+  type AvailableTasksFilter,
+  type NextTaskFilter,
 } from './Astrotask.js';
 
 // Core services

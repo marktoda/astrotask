@@ -1,12 +1,13 @@
+import type { NextTaskFilter, TrackingTaskTree } from "@astrotask/core";
 import { priorityScore, taskStatus } from "@astrotask/core";
 import { Box, Text } from "ink";
 import { useEffect, useState } from "react";
 import zod from "zod";
-import { useTaskService } from "../../context/DatabaseContext.js";
+import { useAstrotask } from "../../context/DatabaseContext.js";
 import { formatPriority } from "../../utils/priority.js";
 
 export const description =
-	"Show the next available task to work on, based on status and completed dependencies";
+	"Show the next available task to work on using intelligent Tree API - considers dependencies, priority, and workflow";
 
 export const options = zod.object({
 	status: taskStatus.optional().describe("Filter by task status"),
@@ -15,32 +16,39 @@ export const options = zod.object({
 		.describe(
 			"Filter by minimum priority score (0-100). Tasks with scores >= this value will be included",
 		),
-	root: zod
+	parent: zod
 		.string()
 		.optional()
 		.describe(
-			"Root task ID - limit search to direct children of this task. Use this to focus on a specific project or feature area.",
+			"Parent task ID - limit search to subtasks of this task. Use this to focus on a specific project or feature area.",
 		),
+	includeInProgress: zod
+		.boolean()
+		.default(false)
+		.describe("Include tasks that are already in progress"),
 });
 
 type Props = {
 	options: zod.infer<typeof options>;
 };
 
-// Simplified result type that avoids storing full task objects
+// Enhanced result type with tree context
 interface NextTaskDisplay {
-	taskId: string | null;
-	title: string;
-	status: string;
-	priorityScore: number;
-	description: string | null;
+	task: TrackingTaskTree | null;
 	message: string;
 	availableCount: number;
-	hasContext: boolean;
+	blockedCount: number;
+	context: {
+		hasSubtasks: boolean;
+		availableSubtasks: number;
+		isBlocked: boolean;
+		blockingTasks: string[];
+		canStartWork: boolean;
+	} | null;
 }
 
 export default function Next({ options }: Props) {
-	const taskService = useTaskService();
+	const astrotask = useAstrotask();
 	const [display, setDisplay] = useState<NextTaskDisplay | null>(null);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
@@ -48,54 +56,49 @@ export default function Next({ options }: Props) {
 	useEffect(() => {
 		async function getNextTask() {
 			try {
-				// Get available tasks (no incomplete dependencies)
-				const availableTasks = await taskService.getAvailableTasks({
+				// NEW TREE API: Much simpler and more powerful
+				const filter: NextTaskFilter = {
 					status: options.status,
 					priorityScore: options.priorityScore,
-				});
+					parentId: options.parent,
+					includeInProgress: options.includeInProgress,
+				};
 
-				// Apply parent filter if specified (similar to MCP parentTaskId filtering)
-				let filteredTasks = availableTasks;
-				if (options.root) {
-					filteredTasks = availableTasks.filter(
-						(task) => task.parentId === options.root,
-					);
+				// Get the next available task using the new tree-centric API
+				const nextTask = await astrotask.getNextTask(filter);
+
+				// Get all available tasks for context
+				const allAvailable = await astrotask.getAvailableTasks(filter);
+				const availableCount = allAvailable.length;
+				const blockedCount = allAvailable.filter((t) => t.isBlocked()).length;
+
+				let message: string;
+				let context: NextTaskDisplay["context"] = null;
+
+				if (nextTask) {
+					message = `Next recommended task: ${nextTask.title}`;
+					context = {
+						hasSubtasks: nextTask.getChildren().length > 0,
+						availableSubtasks: nextTask.getAvailableChildren().length,
+						isBlocked: nextTask.isBlocked(),
+						blockingTasks: nextTask.getBlockingTasks(),
+						canStartWork: nextTask.canStart(),
+					};
+				} else {
+					message =
+						availableCount > 0
+							? "No unblocked tasks available (all available tasks are blocked by dependencies)"
+							: options.parent
+								? `No tasks available under parent ${options.parent}`
+								: "No tasks available with current filters";
 				}
 
-				// Find the highest priority pending task (using priority scores)
-				const nextTask =
-					filteredTasks
-						.filter((task) => task.status === "pending")
-						.sort((a, b) => {
-							// Sort by priority score (higher score = higher priority), then by ID
-							const aScore = a.priorityScore ?? 50; // Default to 50 if not set
-							const bScore = b.priorityScore ?? 50; // Default to 50 if not set
-
-							if (aScore !== bScore) {
-								return bScore - aScore; // Higher scores first
-							}
-
-							return a.id.localeCompare(b.id);
-						})[0] || null;
-
-				const message = nextTask
-					? `Next task to work on: ${nextTask.title}`
-					: filteredTasks.length > 0
-						? "No pending tasks available (all tasks are in progress or completed)"
-						: options.root
-							? `No tasks available under root ${options.root}`
-							: "No tasks available";
-
-				// Create simplified display object without storing full task objects
 				setDisplay({
-					taskId: nextTask?.id || null,
-					title: nextTask?.title || "",
-					status: nextTask?.status || "",
-					priorityScore: nextTask?.priorityScore || 50,
-					description: nextTask?.description || null,
+					task: nextTask,
 					message,
-					availableCount: filteredTasks.length,
-					hasContext: !!nextTask,
+					availableCount,
+					blockedCount,
+					context,
 				});
 			} catch (err) {
 				setError(
@@ -106,7 +109,7 @@ export default function Next({ options }: Props) {
 			}
 		}
 		getNextTask();
-	}, [options, taskService]);
+	}, [options, astrotask]);
 
 	// Exit the process after operation is complete (like expand command)
 	useEffect(() => {
@@ -136,7 +139,7 @@ export default function Next({ options }: Props) {
 	};
 
 	// If no next task available
-	if (!display.taskId) {
+	if (!display.task) {
 		return (
 			<Box flexDirection="column">
 				<Text bold color="yellow">
@@ -144,43 +147,42 @@ export default function Next({ options }: Props) {
 				</Text>
 				<Text>{display.message}</Text>
 
-				{display.availableCount > 0 && (
-					<Box flexDirection="column" marginTop={1}>
-						<Text>
-							There are {display.availableCount} available tasks, but none are
-							pending.
+				<Box flexDirection="column" marginTop={1}>
+					<Text>
+						📊 Task Overview: {display.availableCount} available,{" "}
+						{display.blockedCount} blocked
+					</Text>
+
+					{display.blockedCount > 0 && (
+						<Text color="red">
+							🚫 {display.blockedCount} task(s) are blocked by incomplete
+							dependencies
 						</Text>
-					</Box>
-				)}
+					)}
+				</Box>
 
 				<Box marginTop={1}>
 					<Text color="green">
-						💡 Use <Text color="cyan">astrotask task list</Text> to see all
-						tasks
-						{options.root ? (
+						💡 Try: <Text color="cyan">astrotask task available</Text> to see
+						all available tasks
+						{options.parent && (
 							<>
 								{" "}
 								or{" "}
-								<Text color="cyan">
-									astrotask task list --parent {options.root}
-								</Text>{" "}
-								to see tasks under this root
+								<Text color="cyan">astrotask task tree {options.parent}</Text>{" "}
+								to see the full task hierarchy
 							</>
-						) : (
-							""
-						)}{" "}
-						or{" "}
-						<Text color="cyan">
-							astrotask task update &lt;task-id&gt; --status in-progress
-						</Text>{" "}
-						to begin working on a specific task
+						)}
 					</Text>
 				</Box>
 			</Box>
 		);
 	}
 
-	// Display the next task
+	const task = display.task.task;
+	const context = display.context!;
+
+	// Display the next task with enhanced context
 	return (
 		<Box
 			flexDirection="column"
@@ -189,37 +191,95 @@ export default function Next({ options }: Props) {
 			padding={1}
 		>
 			<Text bold color="green">
-				Next Task{options.root ? ` (under root ${options.root})` : ""}
+				🎯 Next Recommended Task
+				{options.parent ? ` (under ${options.parent})` : ""}
 			</Text>
 
 			<Box flexDirection="column" marginTop={1}>
 				<Text>
 					<Text color="cyan" bold>
-						{display.taskId}
+						{task.id}
 					</Text>{" "}
-					- <Text bold>{display.title}</Text>
+					- <Text bold>{task.title}</Text>
 				</Text>
 				<Text>
-					Status:{" "}
-					<Text color={getStatusColor(display.status)}>{display.status}</Text> |
-					Priority:{" "}
-					<Text color="magenta">{formatPriority(display.priorityScore)}</Text>
+					Status: <Text color={getStatusColor(task.status)}>{task.status}</Text>{" "}
+					| Priority:{" "}
+					<Text color="magenta">
+						{formatPriority(task.priorityScore ?? 50)}
+					</Text>
 				</Text>
 
-				{display.description && (
+				{task.description && (
 					<Box marginTop={1}>
-						<Text color="gray">{display.description}</Text>
+						<Text color="gray">📝 {task.description}</Text>
 					</Box>
 				)}
 			</Box>
 
+			{/* Enhanced context information */}
+			<Box flexDirection="column" marginTop={1}>
+				<Text bold color="blue">
+					Task Context:
+				</Text>
+
+				{context.hasSubtasks && (
+					<Text>
+						🌳 Has {display.task.getChildren().length} subtask(s)
+						{context.availableSubtasks > 0 && (
+							<Text color="green">
+								{" "}
+								({context.availableSubtasks} available)
+							</Text>
+						)}
+					</Text>
+				)}
+
+				{context.isBlocked ? (
+					<Text color="red">
+						🚫 Currently blocked by: {context.blockingTasks.join(", ")}
+					</Text>
+				) : (
+					<Text color="green">
+						✅ Ready to start - no blocking dependencies
+					</Text>
+				)}
+
+				<Text>
+					📊 Workflow: {display.availableCount} available tasks in scope
+				</Text>
+			</Box>
+
+			{/* Smart action suggestions */}
+			<Box flexDirection="column" marginTop={1}>
+				<Text bold color="cyan">
+					Recommended Actions:
+				</Text>
+
+				{context.canStartWork && (
+					<Text color="green">
+						▶️ <Text color="cyan">astrotask task start-work {task.id}</Text> -
+						Start working on this task
+					</Text>
+				)}
+
+				{context.availableSubtasks > 0 && (
+					<Text color="yellow">
+						🔍 <Text color="cyan">astrotask task tree {task.id}</Text> - View
+						available subtasks
+					</Text>
+				)}
+
+				<Text color="blue">
+					📋 <Text color="cyan">astrotask task context {task.id}</Text> - See
+					full task context and dependencies
+				</Text>
+			</Box>
+
 			<Box marginTop={1}>
-				<Text color="green">
-					💡 Use{" "}
-					<Text color="cyan">
-						astrotask task update {display.taskId} --status in-progress
-					</Text>{" "}
-					to start working on this task
+				<Text color="gray" italic>
+					💡 Enhanced with Tree API: Smart task selection with dependency
+					awareness
 				</Text>
 			</Box>
 		</Box>

@@ -27,5 +27,19 @@ export function useTaskService() {
 	const ctx = React.useContext(DatabaseContext);
 	if (!ctx)
 		throw new Error("useTaskService must be used inside <DatabaseProvider>");
-	return ctx.astrotask.tasks;
+	return ctx.astrotask.taskService;
+}
+
+// NEW: Enhanced hooks for tree-centric API
+export function useTasks(parentId?: string) {
+	const astrotask = useAstrotask();
+	return React.useMemo(() => astrotask.tasks(parentId), [astrotask, parentId]);
+}
+
+export function useDependencies(graphId?: string) {
+	const astrotask = useAstrotask();
+	return React.useMemo(
+		() => astrotask.dependencies(graphId),
+		[astrotask, graphId],
+	);
 }

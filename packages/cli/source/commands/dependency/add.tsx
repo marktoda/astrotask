@@ -1,7 +1,7 @@
 import { Text } from "ink";
 import { useEffect, useState } from "react";
 import zod from "zod";
-import { useTaskService } from "../../context/DatabaseContext.js";
+import { useAstrotask } from "../../context/DatabaseContext.js";
 
 export const description = "Add a dependency between tasks";
 
@@ -15,14 +15,15 @@ type Props = {
 };
 
 export default function AddDependency({ options }: Props) {
-	const taskService = useTaskService();
+	const astrotask = useAstrotask();
 	const [result, setResult] = useState<string | null>(null);
 	const [error, setError] = useState<string | null>(null);
 
 	useEffect(() => {
 		async function addDependency() {
 			try {
-				await taskService.addTaskDependency(
+				// Use store directly for simple dependency addition
+				await astrotask.store.addTaskDependency(
 					options.dependent,
 					options.dependency,
 				);
@@ -36,7 +37,7 @@ export default function AddDependency({ options }: Props) {
 			}
 		}
 		addDependency();
-	}, [options, taskService]);
+	}, [options, astrotask]);
 
 	if (error) return <Text color="red">Error: {error}</Text>;
 	if (result) return <Text color="green">{result}</Text>;

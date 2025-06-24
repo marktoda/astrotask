@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import type { Task, TaskStatus } from '../schemas/task.js';
+import type { IDependencyGraph } from './DependencyGraph.js';
 import { type ITaskTree, TaskTree, type TaskTreeData } from './TaskTree.js';
+import type { TrackingDependencyGraph } from './TrackingDependencyGraph.js';
 import { ReconciliationError } from './TrackingErrors.js';
 import type { ITaskReconciliationService, TaskFlushResult } from './TrackingTypes.js';
 
@@ -50,6 +52,14 @@ export interface FlushResult {
 }
 
 /**
+ * Enhanced flush result with dependency coordination
+ */
+export interface EnhancedFlushResult extends TaskFlushResult {
+  dependencyGraph?: IDependencyGraph | undefined;
+  availableSubtasks?: TrackingTaskTree[] | undefined;
+}
+
+/**
  * Mutable TrackingTaskTree that records operations in place for later reconciliation.
  *
  * Key features:
@@ -68,6 +78,9 @@ export class TrackingTaskTree implements ITaskTree {
   private _children: TrackingTaskTree[] = [];
   private readonly _parent: TrackingTaskTree | null = null;
   private _task: Task;
+
+  // Dependency management
+  private _dependencyGraph?: TrackingDependencyGraph;
 
   constructor(
     data: TaskTreeData,
@@ -291,6 +304,325 @@ export class TrackingTaskTree implements ITaskTree {
     return this;
   }
 
+  // Dependency Integration Methods
+
+  /**
+   * Set the dependency graph for this tree to enable dependency operations
+   */
+  withDependencyGraph(dependencyGraph: TrackingDependencyGraph): this {
+    this._dependencyGraph = dependencyGraph;
+    return this;
+  }
+
+  /**
+   * Add a dependency relationship: this task depends on the specified task
+   */
+  dependsOn(taskId: string): this {
+    if (this._dependencyGraph) {
+      this._dependencyGraph.withDependency(this.id, taskId);
+    }
+    return this;
+  }
+
+  /**
+   * Add multiple dependency relationships: this task depends on all specified tasks
+   */
+  blockedBy(taskIds: string[]): this {
+    if (this._dependencyGraph) {
+      for (const taskId of taskIds) {
+        this._dependencyGraph.withDependency(this.id, taskId);
+      }
+    }
+    return this;
+  }
+
+  /**
+   * Remove a dependency relationship: this task no longer depends on the specified task
+   */
+  unblockBy(taskId: string): this {
+    if (this._dependencyGraph) {
+      this._dependencyGraph.withoutDependency(this.id, taskId);
+    }
+    return this;
+  }
+
+  /**
+   * Remove multiple dependency relationships
+   */
+  unblockedBy(taskIds: string[]): this {
+    if (this._dependencyGraph) {
+      for (const taskId of taskIds) {
+        this._dependencyGraph.withoutDependency(this.id, taskId);
+      }
+    }
+    return this;
+  }
+
+  // Query Methods for Availability and Blocking Status
+
+  /**
+   * Check if this task is blocked by incomplete dependencies
+   */
+  isBlocked(): boolean {
+    if (!this._dependencyGraph) return false;
+
+    const dependencies = this._dependencyGraph.getDependencies(this.id);
+    if (dependencies.length === 0) return false;
+
+    // Check if any dependencies are incomplete
+    for (const depId of dependencies) {
+      const depGraph = this._dependencyGraph.getTaskDependencyGraph(depId);
+      // If we can't find the dependency or it's not done, we're blocked
+      if (!depGraph || this.getTaskStatus(depId) !== 'done') {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  /**
+   * Get task IDs that are currently blocking this task
+   */
+  getBlockingTasks(): string[] {
+    if (!this._dependencyGraph) return [];
+
+    const dependencies = this._dependencyGraph.getDependencies(this.id);
+    const blocking: string[] = [];
+
+    for (const depId of dependencies) {
+      if (this.getTaskStatus(depId) !== 'done') {
+        blocking.push(depId);
+      }
+    }
+
+    return blocking;
+  }
+
+  /**
+   * Get blocking tasks as TrackingTaskTree nodes
+   */
+  getBlockingTaskNodes(): TrackingTaskTree[] {
+    const blockingIds = this.getBlockingTasks();
+    const root = this.getRoot();
+    const blockingNodes: TrackingTaskTree[] = [];
+
+    for (const taskId of blockingIds) {
+      const node = root.find((task) => task.id === taskId);
+      if (node) {
+        blockingNodes.push(node);
+      }
+    }
+
+    return blockingNodes;
+  }
+
+  /**
+   * Get all subtasks that are currently available (not blocked by dependencies)
+   */
+  getAvailableSubtasks(): TrackingTaskTree[] {
+    const availableTasks: TrackingTaskTree[] = [];
+
+    this.walkDepthFirst((node) => {
+      // Skip if this is a completed task
+      if (node.status === 'done' || node.status === 'cancelled' || node.status === 'archived') {
+        return;
+      }
+
+      // Check if this task is available (not blocked)
+      if (!node.isBlocked()) {
+        availableTasks.push(node);
+      }
+    });
+
+    return availableTasks;
+  }
+
+  /**
+   * Get immediate children that are available for work
+   */
+  getAvailableChildren(): TrackingTaskTree[] {
+    return this._children.filter((child) => {
+      return (
+        !child.isBlocked() &&
+        child.status !== 'done' &&
+        child.status !== 'cancelled' &&
+        child.status !== 'archived'
+      );
+    });
+  }
+
+  /**
+   * Check if this task can be started (no blocking dependencies and proper status)
+   */
+  canStart(): boolean {
+    return !this.isBlocked() && (this.status === 'pending' || this.status === 'in-progress');
+  }
+
+  /**
+   * Get the next available task in this subtree (depth-first search)
+   */
+  getNextAvailableTask(): TrackingTaskTree | null {
+    // If this task itself is available, return it
+    if (this.canStart()) {
+      return this;
+    }
+
+    // Otherwise, look for available children
+    const availableChildren = this.getAvailableChildren();
+    if (availableChildren.length > 0) {
+      // Return the highest priority available child
+      return availableChildren.reduce((highest, current) => {
+        const highestPriority = highest.task.priorityScore ?? 50;
+        const currentPriority = current.task.priorityScore ?? 50;
+        return currentPriority > highestPriority ? current : highest;
+      });
+    }
+
+    return null;
+  }
+
+  /**
+   * Helper method to get task status by ID (looks in the tree or dependency graph)
+   */
+  private getTaskStatus(taskId: string): TaskStatus {
+    // First try to find the task in our tree
+    const root = this.getRoot();
+    const taskNode = root.find((task) => task.id === taskId);
+    if (taskNode) {
+      return taskNode.status;
+    }
+
+    // If not found in tree, assume it's pending (conservative approach)
+    // In a real implementation, we might query the dependency graph's task data
+    return 'pending';
+  }
+
+  // Convenience Methods for Status Transitions
+
+  /**
+   * Mark this task as done, optionally cascading to all descendants
+   */
+  markDone(cascade = false): this {
+    this.withTask({ status: 'done' });
+
+    if (cascade) {
+      this.walkDepthFirst((node) => {
+        if (node !== this && node.status !== 'done') {
+          node.withTask({ status: 'done' });
+        }
+      });
+    }
+
+    return this;
+  }
+
+  /**
+   * Mark this task as in progress
+   */
+  markInProgress(): this {
+    return this.withTask({ status: 'in-progress' });
+  }
+
+  /**
+   * Mark this task as pending
+   */
+  markPending(): this {
+    return this.withTask({ status: 'pending' });
+  }
+
+  /**
+   * Mark this task as cancelled, optionally cascading to all descendants
+   */
+  markCancelled(cascade = false): this {
+    this.withTask({ status: 'cancelled' });
+
+    if (cascade) {
+      this.walkDepthFirst((node) => {
+        if (node !== this && node.status !== 'cancelled' && node.status !== 'done') {
+          node.withTask({ status: 'cancelled' });
+        }
+      });
+    }
+
+    return this;
+  }
+
+  /**
+   * Mark this task as archived, optionally cascading to all descendants
+   */
+  markArchived(cascade = false): this {
+    this.withTask({ status: 'archived' });
+
+    if (cascade) {
+      this.walkDepthFirst((node) => {
+        if (node !== this && node.status !== 'archived') {
+          node.withTask({ status: 'archived' });
+        }
+      });
+    }
+
+    return this;
+  }
+
+  /**
+   * Update the priority score of this task
+   */
+  withPriority(priorityScore: number): this {
+    return this.withTask({ priorityScore });
+  }
+
+  /**
+   * Update the title of this task
+   */
+  withTitle(title: string): this {
+    return this.withTask({ title });
+  }
+
+  /**
+   * Update the description of this task
+   */
+  withDescription(description: string): this {
+    return this.withTask({ description });
+  }
+
+  /**
+   * Start working on this task (mark as in-progress) if not blocked
+   * Returns true if the task was successfully started, false if blocked
+   */
+  startWork(): boolean {
+    if (this.isBlocked()) {
+      return false;
+    }
+
+    if (this.status === 'pending') {
+      this.markInProgress();
+      return true;
+    }
+
+    // Already in progress or done
+    return this.status === 'in-progress';
+  }
+
+  /**
+   * Complete this task and automatically start available child tasks
+   * Returns the list of child tasks that were automatically started
+   */
+  completeAndStartNext(): TrackingTaskTree[] {
+    this.markDone();
+
+    const startedTasks: TrackingTaskTree[] = [];
+    const availableChildren = this.getAvailableChildren();
+
+    for (const child of availableChildren) {
+      if (child.startWork()) {
+        startedTasks.push(child);
+      }
+    }
+
+    return startedTasks;
+  }
+
   /**
    * Check if any node in the tree has pending changes
    */
@@ -309,6 +641,71 @@ export class TrackingTaskTree implements ITaskTree {
     }
 
     return hasChanges;
+  }
+
+  /**
+   * Enhanced flush that coordinates task tree and dependency graph operations
+   * This method provides atomic updates across both task hierarchy and dependencies
+   */
+  async flushWithDependencies(
+    taskService: ITaskReconciliationService,
+    dependencyService?: import('./TrackingTypes.js').IDependencyReconciliationService
+  ): Promise<EnhancedFlushResult> {
+    const taskOperations = this.collectAllOperations();
+    const dependencyOperations = this._dependencyGraph?.pendingOperations || [];
+
+    // If no operations to apply, return current state
+    if (taskOperations.length === 0 && dependencyOperations.length === 0) {
+      const currentTree = await taskService
+        .executeReconciliationOperations({
+          treeId: this.id,
+          baseVersion: this._baseVersion,
+          operations: [],
+        })
+        .then((result) => result.tree);
+
+      return {
+        updatedTree: currentTree,
+        clearedTrackingTree: this,
+        idMappings: new Map<string, string>(),
+        dependencyGraph: this._dependencyGraph?.stopTracking(),
+        availableSubtasks: this.getAvailableSubtasks(),
+      };
+    }
+
+    try {
+      // Phase 1: Apply task operations first to get ID mappings
+      const taskResult = await this.flush(taskService);
+      const { idMappings } = taskResult;
+
+      // Phase 2: Apply dependency operations with resolved IDs
+      let dependencyGraph: IDependencyGraph | undefined;
+      if (this._dependencyGraph && dependencyService && dependencyOperations.length > 0) {
+        // Apply ID mappings to dependency operations
+        this._dependencyGraph.applyIdMappings(idMappings);
+
+        const dependencyResult = await this._dependencyGraph.flush(dependencyService);
+        dependencyGraph = dependencyResult.updatedGraph;
+      }
+
+      // Phase 3: Calculate available tasks with updated state
+      const availableSubtasks = this.getAvailableSubtasks();
+
+      return {
+        updatedTree: taskResult.updatedTree,
+        clearedTrackingTree: taskResult.clearedTrackingTree,
+        idMappings: taskResult.idMappings,
+        dependencyGraph,
+        availableSubtasks,
+      };
+    } catch (error) {
+      throw new ReconciliationError(
+        `Failed to flush with dependencies: ${error instanceof Error ? error.message : String(error)}`,
+        [...taskOperations, ...dependencyOperations],
+        [],
+        error instanceof Error ? error : undefined
+      );
+    }
   }
 
   /**

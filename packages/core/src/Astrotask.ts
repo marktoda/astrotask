@@ -13,6 +13,8 @@ import { initializeDatabase } from './database/initialization.js';
 import { type MigrationResult, createMigrationRunner } from './database/migrate.js';
 import type { Store } from './database/store.js';
 import { parseDbUrl } from './database/url-parser.js';
+import { TrackingDependencyGraph } from './entities/TrackingDependencyGraph.js';
+import { TrackingTaskTree } from './entities/TrackingTaskTree.js';
 import {
   AdapterNotAvailableError,
   SDKAlreadyInitializedError,
@@ -22,6 +24,7 @@ import {
   ServiceNotAvailableError,
   wrapError,
 } from './errors/index.js';
+import type { TaskStatus } from './schemas/task.js';
 import type { ComplexityAnalyzer } from './services/ComplexityAnalyzer.js';
 import type { DependencyService } from './services/DependencyService.js';
 import type { TaskExpansionService } from './services/TaskExpansionService.js';
@@ -43,6 +46,23 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 // The migrations folder lives in packages/core/migrations relative to this source file (packages/core/src)
 // We only need to go up one level to reach the package root and then enter migrations
 const DEFAULT_MIGRATIONS_DIR = resolve(__dirname, '..', 'migrations');
+
+/**
+ * Filter options for available tasks
+ */
+export interface AvailableTasksFilter {
+  status?: TaskStatus;
+  priorityScore?: number;
+  useEffectiveStatus?: boolean;
+  parentId?: string;
+}
+
+/**
+ * Filter options for next task selection
+ */
+export interface NextTaskFilter extends AvailableTasksFilter {
+  includeInProgress?: boolean;
+}
 
 /**
  * Configuration options for Astrotask SDK
@@ -218,23 +238,68 @@ export class Astrotask {
   }
 
   /**
-   * Get the task service (lazy initialization)
+   * Get a TrackingTaskTree at the root or specified parent (NEW TREE-CENTRIC API)
+   * @param parentId - Optional parent ID to get subtree from; if not provided, returns project root
    */
-  get tasks(): TaskService {
+  async tasks(parentId?: string): Promise<TrackingTaskTree> {
     this._ensureInitialized();
     if (!this._services) {
       throw new ServiceNotAvailableError('TaskService', 'get-tasks');
+    }
+
+    // Get the task tree from the service
+    const tree = await this._services.taskService.getTaskTree(parentId);
+    if (!tree) {
+      throw new ServiceNotAvailableError('TaskTree', `get-tasks-${parentId || 'root'}`);
+    }
+
+    // Convert to TrackingTaskTree and associate with dependency graph
+    const trackingTree = TrackingTaskTree.fromTaskTree(tree);
+
+    // Set up dependency graph integration
+    const dependencyGraph = await this.dependencies(parentId);
+    trackingTree.withDependencyGraph(dependencyGraph);
+
+    return trackingTree;
+  }
+
+  /**
+   * Get a TrackingDependencyGraph for dependency management
+   * @param graphId - Optional graph ID for scoping dependencies
+   */
+  async dependencies(graphId?: string): Promise<TrackingDependencyGraph> {
+    this._ensureInitialized();
+    if (!this._services) {
+      throw new ServiceNotAvailableError('DependencyService', 'get-dependencies');
+    }
+
+    // Create or get dependency graph from service
+    const baseDependencyGraph = await this._services.dependencyService.createDependencyGraph();
+
+    // Convert to TrackingDependencyGraph
+    return TrackingDependencyGraph.fromDependencyGraph(baseDependencyGraph, graphId || 'default');
+  }
+
+  /**
+   * Legacy getter for TaskService (for backward compatibility)
+   * @deprecated Use the async tasks() method instead
+   */
+  get taskService(): TaskService {
+    this._ensureInitialized();
+    if (!this._services) {
+      throw new ServiceNotAvailableError('TaskService', 'get-taskService');
     }
     return this._services.taskService;
   }
 
   /**
-   * Get the dependency service (lazy initialization)
+   * Legacy getter for DependencyService (for backward compatibility)
+   * @deprecated Use the async dependencies() method instead
    */
-  get dependencies(): DependencyService {
+  get dependencyService(): DependencyService {
     this._ensureInitialized();
     if (!this._services) {
-      throw new ServiceNotAvailableError('DependencyService', 'get-dependencies');
+      throw new ServiceNotAvailableError('DependencyService', 'get-dependencyService');
     }
     return this._services.dependencyService;
   }
@@ -280,6 +345,147 @@ export class Astrotask {
    */
   get databaseType(): string | undefined {
     return this._adapter?.type;
+  }
+
+  // New Convenience Methods for Tree-Centric API
+
+  /**
+   * Get available tasks across the entire project
+   * @param filter - Filter options for task selection
+   */
+  async getAvailableTasks(filter?: AvailableTasksFilter): Promise<TrackingTaskTree[]> {
+    const rootTree = await this.tasks();
+    const availableTasks = rootTree.getAvailableSubtasks();
+
+    if (!filter) return availableTasks;
+
+    return availableTasks.filter((task) => {
+      // Filter by status
+      if (filter.status && task.status !== filter.status) {
+        return false;
+      }
+
+      // Filter by priority score
+      if (
+        filter.priorityScore !== undefined &&
+        (task.task.priorityScore ?? 50) < filter.priorityScore
+      ) {
+        return false;
+      }
+
+      // Filter by parent
+      if (filter.parentId !== undefined && task.task.parentId !== filter.parentId) {
+        return false;
+      }
+
+      return true;
+    });
+  }
+
+  /**
+   * Get the next highest priority available task
+   * @param filter - Filter options for task selection
+   */
+  async getNextTask(filter?: NextTaskFilter): Promise<TrackingTaskTree | null> {
+    const parentTree = filter?.parentId ? await this.tasks(filter.parentId) : await this.tasks();
+    return parentTree.getNextAvailableTask();
+  }
+
+  /**
+   * Create a new task as a TrackingTaskTree
+   * @param taskData - Task creation data
+   * @param parentId - Optional parent task ID
+   */
+  async createTask(
+    taskData: {
+      title: string;
+      description?: string;
+      status?: TaskStatus;
+      priorityScore?: number;
+    },
+    parentId?: string
+  ): Promise<TrackingTaskTree> {
+    // Create task through store
+    const createdTask = await this.store.addTask({
+      title: taskData.title,
+      description: taskData.description || undefined,
+      status: taskData.status || 'pending',
+      priorityScore: taskData.priorityScore || 50,
+      parentId: parentId || undefined,
+    });
+
+    // Return as TrackingTaskTree
+    const trackingTree = TrackingTaskTree.fromTask(createdTask);
+
+    // Set up dependency graph integration
+    const dependencyGraph = await this.dependencies();
+    trackingTree.withDependencyGraph(dependencyGraph);
+
+    return trackingTree;
+  }
+
+  /**
+   * Create multiple tasks with dependencies in a batch operation
+   * @param tasksData - Array of task creation data with optional dependency references
+   */
+  async createTaskBatch(
+    tasksData: Array<{
+      title: string;
+      description?: string;
+      status?: TaskStatus;
+      priorityScore?: number;
+      parentIndex?: number; // Reference to parent by index in this array
+      dependsOn?: number[]; // Array of indices this task depends on
+    }>
+  ): Promise<TrackingTaskTree[]> {
+    const createdTasks: TrackingTaskTree[] = [];
+    const dependencyGraph = await this.dependencies();
+
+    // Phase 1: Create all tasks
+    for (let i = 0; i < tasksData.length; i++) {
+      const taskData = tasksData[i];
+      if (!taskData) continue;
+
+      const parentId =
+        taskData.parentIndex !== undefined ? createdTasks[taskData.parentIndex]?.id : undefined;
+
+      const task = await this.createTask(taskData, parentId);
+      task.withDependencyGraph(dependencyGraph);
+      createdTasks.push(task);
+    }
+
+    // Phase 2: Set up dependencies
+    for (let i = 0; i < tasksData.length; i++) {
+      const taskData = tasksData[i];
+      if (!taskData?.dependsOn) continue;
+
+      const currentTask = createdTasks[i];
+      if (!currentTask) continue;
+
+      for (const depIndex of taskData.dependsOn) {
+        const dependencyTask = createdTasks[depIndex];
+        if (dependencyTask) {
+          currentTask.dependsOn(dependencyTask.id);
+        }
+      }
+    }
+
+    return createdTasks;
+  }
+
+  /**
+   * Execute a coordinated flush operation across task tree and dependencies
+   * @param tree - The TrackingTaskTree to flush
+   */
+  async flushTree(
+    tree: TrackingTaskTree
+  ): Promise<import('./entities/TrackingTaskTree.js').EnhancedFlushResult> {
+    this._ensureInitialized();
+    if (!this._services) {
+      throw new ServiceNotAvailableError('Services', 'flush-tree');
+    }
+
+    return tree.flushWithDependencies(this._services.taskService, this._services.dependencyService);
   }
 
   // Private implementation methods

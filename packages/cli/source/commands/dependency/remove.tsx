@@ -1,7 +1,7 @@
 import { Text } from "ink";
 import { useEffect, useState } from "react";
 import zod from "zod";
-import { useTaskService } from "../../context/DatabaseContext.js";
+import { useAstrotask } from "../../context/DatabaseContext.js";
 
 export const description = "Remove a dependency between tasks";
 
@@ -17,14 +17,15 @@ type Props = {
 };
 
 export default function RemoveDependency({ options }: Props) {
-	const taskService = useTaskService();
+	const astrotask = useAstrotask();
 	const [result, setResult] = useState<string | null>(null);
 	const [error, setError] = useState<string | null>(null);
 
 	useEffect(() => {
 		async function removeDependency() {
 			try {
-				const removed = await taskService.removeTaskDependency(
+				// Use dependency service for removal since store doesn't have remove method
+				const removed = await astrotask.dependencyService.removeDependency(
 					options.dependent,
 					options.dependency,
 				);
@@ -43,7 +44,7 @@ export default function RemoveDependency({ options }: Props) {
 			}
 		}
 		removeDependency();
-	}, [options, taskService]);
+	}, [options, astrotask]);
 
 	if (error) return <Text color="red">Error: {error}</Text>;
 	if (result) return <Text color="green">{result}</Text>;

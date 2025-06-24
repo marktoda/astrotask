@@ -1,9 +1,9 @@
-import type { Task } from "@astrotask/core";
+import type { AvailableTasksFilter, TrackingTaskTree } from "@astrotask/core";
 import { priorityScore, taskStatus } from "@astrotask/core";
 import { Box, Text } from "ink";
 import { useEffect, useState } from "react";
 import zod from "zod";
-import { useTaskService } from "../../context/DatabaseContext.js";
+import { useAstrotask } from "../../context/DatabaseContext.js";
 
 export const description = "List all available tasks that can be started";
 
@@ -14,6 +14,7 @@ export const options = zod.object({
 		.describe(
 			"Filter by minimum priority score (0-100). Tasks with scores >= this value will be included",
 		),
+	parent: zod.string().optional().describe("Filter by parent task ID"),
 });
 
 type Props = {
@@ -21,19 +22,22 @@ type Props = {
 };
 
 export default function Available({ options }: Props) {
-	const taskService = useTaskService();
-	const [tasks, setTasks] = useState<Task[]>([]);
+	const astrotask = useAstrotask();
+	const [tasks, setTasks] = useState<TrackingTaskTree[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
 
 	useEffect(() => {
 		async function loadAvailableTasks() {
 			try {
-				const filter: { status?: any; priorityScore?: number } = {};
-				if (options.status) filter.status = options.status;
-				if (options.priorityScore) filter.priorityScore = options.priorityScore;
+				// NEW TREE API: Much simpler and more powerful
+				const filter: AvailableTasksFilter = {
+					status: options.status,
+					priorityScore: options.priorityScore,
+					parentId: options.parent,
+				};
 
-				const availableTasks = await taskService.getAvailableTasks(filter);
+				const availableTasks = await astrotask.getAvailableTasks(filter);
 				setTasks(availableTasks);
 			} catch (err) {
 				setError(
@@ -44,7 +48,7 @@ export default function Available({ options }: Props) {
 			}
 		}
 		loadAvailableTasks();
-	}, [options, taskService]);
+	}, [options, astrotask]);
 
 	if (loading) return <Text>Loading available tasks...</Text>;
 	if (error) return <Text color="red">Error: {error}</Text>;
@@ -64,8 +68,8 @@ export default function Available({ options }: Props) {
 
 	if (tasks.length === 0) {
 		const filterText =
-			options.status || options.priorityScore
-				? ` matching your filters (status: ${options.status || "any"}, priorityScore: ${options.priorityScore || "any"})`
+			options.status || options.priorityScore || options.parent
+				? ` matching your filters`
 				: "";
 
 		return (
@@ -81,13 +85,19 @@ export default function Available({ options }: Props) {
 
 	// Group by priority level for better organization
 	const tasksByPriority = {
-		high: tasks.filter((t) => t.priorityScore > 70),
-		medium: tasks.filter((t) => t.priorityScore >= 20 && t.priorityScore <= 70),
-		low: tasks.filter((t) => t.priorityScore < 20),
+		high: tasks.filter((t) => (t.task.priorityScore ?? 50) > 70),
+		medium: tasks.filter((t) => {
+			const score = t.task.priorityScore ?? 50;
+			return score >= 20 && score <= 70;
+		}),
+		low: tasks.filter((t) => (t.task.priorityScore ?? 50) < 20),
 	};
 
-	const renderTaskGroup = (tasks: Task[], level: "high" | "medium" | "low") => {
-		if (tasks.length === 0) return null;
+	const renderTaskGroup = (
+		taskTrees: TrackingTaskTree[],
+		level: "high" | "medium" | "low",
+	) => {
+		if (taskTrees.length === 0) return null;
 
 		const colors = {
 			high: "red",
@@ -99,23 +109,53 @@ export default function Available({ options }: Props) {
 			<Box flexDirection="column" marginTop={1}>
 				<Text bold color={colors[level]}>
 					{level.charAt(0).toUpperCase() + level.slice(1)} Priority (
-					{tasks.length})
+					{taskTrees.length})
 				</Text>
-				{tasks.map((task) => (
-					<Box key={task.id} marginLeft={2} marginBottom={1}>
-						<Text>
-							<Text color="cyan">{task.id}</Text> -{" "}
-							<Text bold>{task.title}</Text>
-							<Text color={getStatusColor(task.status)}> [{task.status}]</Text>
-							<Text color="magenta"> [{task.priorityScore}]</Text>
-						</Text>
-						{task.description && (
-							<Box marginLeft={2}>
-								<Text color="gray">{task.description}</Text>
+				{taskTrees.map((taskTree) => {
+					const task = taskTree.task;
+					const isBlocked = taskTree.isBlocked();
+					const availableChildren = taskTree.getAvailableChildren().length;
+
+					return (
+						<Box
+							key={task.id}
+							marginLeft={2}
+							marginBottom={1}
+							flexDirection="column"
+						>
+							<Box>
+								<Text>
+									<Text color="cyan">{task.id}</Text> -{" "}
+									<Text bold>{task.title}</Text>
+									<Text color={getStatusColor(task.status)}>
+										{" "}
+										[{task.status}]
+									</Text>
+									<Text color="magenta"> [{task.priorityScore ?? 50}]</Text>
+									{isBlocked && <Text color="red"> [BLOCKED]</Text>}
+								</Text>
 							</Box>
-						)}
-					</Box>
-				))}
+							{task.description && (
+								<Box marginLeft={2}>
+									<Text color="gray">{task.description}</Text>
+								</Box>
+							)}
+							{/* Enhanced info from tree API */}
+							{availableChildren > 0 && (
+								<Box marginLeft={2}>
+									<Text color="green">
+										✅ {availableChildren} available subtask(s)
+									</Text>
+								</Box>
+							)}
+							{isBlocked && (
+								<Box marginLeft={2}>
+									<Text color="red">🚫 Blocked by dependencies</Text>
+								</Box>
+							)}
+						</Box>
+					);
+				})}
 			</Box>
 		);
 	};
@@ -131,11 +171,14 @@ export default function Available({ options }: Props) {
 			{renderTaskGroup(tasksByPriority.medium, "medium")}
 			{renderTaskGroup(tasksByPriority.low, "low")}
 
-			<Box marginTop={1}>
+			<Box marginTop={1} flexDirection="column">
 				<Text color="green">
-					💡 Tip: Use{" "}
-					<Text color="cyan">astrotask task dependencies &lt;task-id&gt;</Text>{" "}
-					to see why other tasks are blocked
+					💡 Enhanced with Tree API: Now shows blocking status and available
+					subtasks
+				</Text>
+				<Text color="cyan">
+					🎯 Try: astrotask task start-work &lt;task-id&gt; to begin work on a
+					task
 				</Text>
 			</Box>
 		</Box>
