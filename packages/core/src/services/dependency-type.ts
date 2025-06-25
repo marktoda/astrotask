@@ -7,5 +7,4 @@ export enum DependencyType {
   TASK_SERVICE = 'TASK_SERVICE',
 
   // Add new shared objects below -----------------
-  // USER_SETTINGS = 'USER_SETTINGS',
 }

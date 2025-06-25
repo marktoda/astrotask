@@ -12,15 +12,8 @@
 // Complete schema exports
 export * from './schemas/index.js';
 
-// Task tree validation
-export {
-  validateTaskTree,
-  validateTaskTreeData,
-  validateMoveOperation,
-  validateTaskForest,
-  type ValidationWarning,
-  type ValidationOptions,
-} from './entities/TaskTreeValidation.js';
+// Task tree validation (minimal subset - main tree exports are in tree.js)
+export { validateTaskTree } from './entities/TaskTreeValidation.js';
 
 // Status transition validation
 export {

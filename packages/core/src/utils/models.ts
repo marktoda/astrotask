@@ -108,32 +108,3 @@ export function getModelConfig(modelId: string): ModelConfig {
   }
   return config;
 }
-
-/**
- * Get all available model IDs
- *
- * @returns Array of model IDs
- */
-export function getAvailableModels(): string[] {
-  return Object.keys(MODEL_REGISTRY);
-}
-
-/**
- * Get models by provider
- *
- * @param provider - Provider name
- * @returns Array of model configurations for the provider
- */
-export function getModelsByProvider(provider: ModelConfig['provider']): ModelConfig[] {
-  return Object.values(MODEL_REGISTRY).filter((model) => model.provider === provider);
-}
-
-/**
- * Validate if a model ID exists in the registry
- *
- * @param modelId - Model identifier to validate
- * @returns True if model exists, false otherwise
- */
-export function isValidModelId(modelId: string): boolean {
-  return modelId in MODEL_REGISTRY;
-}

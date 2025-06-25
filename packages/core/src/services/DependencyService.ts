@@ -29,7 +29,6 @@ import type {
 } from '../schemas/dependency.js';
 import type { Task } from '../schemas/task.js';
 import { validateDependency } from '../validation/dependency-validation.js';
-import { getTasksFiltered } from './service-utils.js';
 
 /**
  * Service for managing task dependencies and dependency graphs
@@ -224,8 +223,9 @@ export class DependencyService implements IDependencyReconciliationService {
     const graph = await this.createDependencyGraph();
     const blockedTaskIds = graph.getBlockedTasks();
 
-    const tasks = await getTasksFiltered(this.store, blockedTaskIds);
-    const blockedTasks = tasks.map((task) => {
+    const tasks = await Promise.all(blockedTaskIds.map((id) => this.store.getTask(id)));
+    const validTasks = tasks.filter((task): task is Task => task !== null);
+    const blockedTasks = validTasks.map((task: Task) => {
       const dependencyGraph = graph.getTaskDependencyGraph(task.id);
       return {
         ...task,
@@ -259,7 +259,8 @@ export class DependencyService implements IDependencyReconciliationService {
     const graph = await this.createDependencyGraph();
     const executableTaskIds = graph.getExecutableTasks();
 
-    return getTasksFiltered(this.store, executableTaskIds);
+    const tasks = await Promise.all(executableTaskIds.map((id) => this.store.getTask(id)));
+    return tasks.filter((task): task is Task => task !== null);
   }
 
   /**

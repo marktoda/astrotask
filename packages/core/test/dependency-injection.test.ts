@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { createAstrotask, createTestAstrotask, type Astrotask } from '../src/index.js';
-import { Registry, DependencyType } from '../src/index.js';
+import { Registry, DependencyType } from '../src/advanced.js';
 
 describe('Dependency Injection System', () => {
   let astrotask: Astrotask;
@@ -131,12 +131,12 @@ describe('Dependency Injection System', () => {
     expect(retrieved).toEqual(task);
 
     // Use task service
-    const taskTree = await astrotask.tasks.getTaskTree(task.id);
+    const taskTree = await astrotask.taskService.getTaskTree(task.id);
     expect(taskTree).toBeDefined();
     expect(taskTree?.task.id).toBe(task.id);
 
     // Use dependency service
-    const deps = await astrotask.dependencies.getDependencies(task.id);
+    const deps = await astrotask.dependencyService.getDependencies(task.id);
     expect(Array.isArray(deps)).toBe(true);
   });
 

@@ -33,16 +33,3 @@ export {
 // Configuration
 export * from './utils/config.js';
 export * from './utils/models.js';
-
-// Acceptance criteria utilities
-export * from './utils/acceptanceCriteria.js';
-
-// Status transitions
-export {
-  isValidStatusTransition,
-  canTransitionStatus,
-  getTransitionRejectionReason,
-  validateStatusTransition,
-  taskStatusTransitions,
-  type StatusTransitionResult,
-} from './utils/statusTransitions.js';
