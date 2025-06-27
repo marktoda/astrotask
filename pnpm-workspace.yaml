@@ -1,2 +1,12 @@
 packages:
-  - 'packages/*'
+  - packages/*
+
+ignoredBuiltDependencies:
+  - '@biomejs/biome'
+  - '@prisma/client'
+  - '@prisma/engines'
+  - better-sqlite3
+  - core-js
+  - esbuild
+  - prisma
+  - protobufjs

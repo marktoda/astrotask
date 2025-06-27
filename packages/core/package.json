@@ -1,6 +1,6 @@
 {
   "name": "@astrotask/core",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "A local-first, MCP-compatible task-navigation platform for humans + AI agents",
   "main": "dist/index.js",
   "type": "module",
