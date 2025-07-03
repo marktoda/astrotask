@@ -7,7 +7,7 @@ import { useAstrotask } from "../../context/DatabaseContext.js";
 import { formatPriority } from "../../utils/priority.js";
 
 export const description =
-	"Show the next available task to work on using intelligent Tree API - considers dependencies, priority, and workflow";
+	"Show the next available task to work on, based on status and completed dependencies";
 
 export const options = zod.object({
 	status: taskStatus.optional().describe("Filter by task status"),
@@ -16,11 +16,11 @@ export const options = zod.object({
 		.describe(
 			"Filter by minimum priority score (0-100). Tasks with scores >= this value will be included",
 		),
-	parent: zod
+	root: zod
 		.string()
 		.optional()
 		.describe(
-			"Parent task ID - limit search to subtasks of this task. Use this to focus on a specific project or feature area.",
+			"Root task ID - limit search to subtasks of this task. Use this to focus on a specific project or feature area.",
 		),
 	includeInProgress: zod
 		.boolean()
@@ -60,7 +60,7 @@ export default function Next({ options }: Props) {
 				const filter: NextTaskFilter = {
 					status: options.status,
 					priorityScore: options.priorityScore,
-					parentId: options.parent,
+					parentId: options.root,
 					includeInProgress: options.includeInProgress,
 				};
 
@@ -88,8 +88,8 @@ export default function Next({ options }: Props) {
 					message =
 						availableCount > 0
 							? "No unblocked tasks available (all available tasks are blocked by dependencies)"
-							: options.parent
-								? `No tasks available under parent ${options.parent}`
+							: options.root
+								? `No tasks available under root ${options.root}`
 								: "No tasks available with current filters";
 				}
 
@@ -165,11 +165,10 @@ export default function Next({ options }: Props) {
 					<Text color="green">
 						💡 Try: <Text color="cyan">astrotask task available</Text> to see
 						all available tasks
-						{options.parent && (
+						{options.root && (
 							<>
 								{" "}
-								or{" "}
-								<Text color="cyan">astrotask task tree {options.parent}</Text>{" "}
+								or <Text color="cyan">astrotask task tree {options.root}</Text>{" "}
 								to see the full task hierarchy
 							</>
 						)}
@@ -192,7 +191,7 @@ export default function Next({ options }: Props) {
 		>
 			<Text bold color="green">
 				🎯 Next Recommended Task
-				{options.parent ? ` (under ${options.parent})` : ""}
+				{options.root ? ` (under ${options.root})` : ""}
 			</Text>
 
 			<Box flexDirection="column" marginTop={1}>
