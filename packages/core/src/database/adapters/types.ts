@@ -2,7 +2,6 @@
  * Shared types and interfaces for database adapters
  */
 
-import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import type { PgliteDatabase } from 'drizzle-orm/pglite';
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 
@@ -22,7 +21,7 @@ export interface DbCapabilities {
 /**
  * Drizzle operations we rely on across dialects.
  * We keep the signatures loose here because each dialect has its own overloads.
- * Concrete dialect types (PostgresJsDatabase, PgliteDatabase, BetterSQLite3Database)
+ * Concrete dialect types (PostgresJsDatabase, PgliteDatabase, SqliteDrizzle)
  * will be compatible with this structure while still providing their richer types
  * when a generic parameter is concrete.
  *
@@ -56,8 +55,8 @@ export type PostgresDrizzle<TSchema extends DrizzleSchema = DrizzleSchema> =
 
 export type PgliteDrizzle<TSchema extends DrizzleSchema = DrizzleSchema> = PgliteDatabase<TSchema>;
 
-export type SqliteDrizzle<TSchema extends DrizzleSchema = DrizzleSchema> =
-  BetterSQLite3Database<TSchema>;
+// Using libSQL driver – treat as unknown until official types are published.
+export type SqliteDrizzle = unknown;
 
 /**
  * SQL query parameters - can be various primitive types

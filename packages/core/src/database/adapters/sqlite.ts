@@ -2,18 +2,16 @@
  * SQLite database adapter
  */
 
-import Database from 'better-sqlite3';
-import { type BetterSQLite3Database, drizzle as drizzleSqlite } from 'drizzle-orm/better-sqlite3';
-import { createModuleLogger } from '../../utils/logger.js';
+import { createClient } from '@libsql/client';
+import type { Client } from '@libsql/client';
+import { drizzle as drizzleLibsql } from 'drizzle-orm/libsql';
 import { sqliteSchema } from '../schema.js';
 import type { DatabaseBackend, DbCapabilities } from './types.js';
 
-const logger = createModuleLogger('SqliteAdapter');
-
-/**
- * SQLite backend adapter with WAL mode for better concurrency
- */
-export class SqliteAdapter implements DatabaseBackend<BetterSQLite3Database<typeof sqliteSchema>> {
+// The adapter now relies on libSQL (`@libsql/client`) which works both for local file databases
+// (using the `file:` URL scheme) and for remote Turso databases. We pass the libSQL client to
+// Drizzle's `libsql` driver.
+export class SqliteAdapter implements DatabaseBackend {
   public readonly type = 'sqlite' as const;
   public readonly capabilities: DbCapabilities = {
     concurrentWrites: true, // WAL mode allows multiple readers + 1 writer, handles concurrency natively
@@ -21,8 +19,9 @@ export class SqliteAdapter implements DatabaseBackend<BetterSQLite3Database<type
     extensions: new Set(),
   };
 
-  private sqlite!: Database.Database;
-  public drizzle!: BetterSQLite3Database<typeof sqliteSchema>;
+  private client!: Client;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  public drizzle!: any;
 
   constructor(
     private readonly config: {
@@ -32,37 +31,24 @@ export class SqliteAdapter implements DatabaseBackend<BetterSQLite3Database<type
   ) {}
 
   async init(): Promise<void> {
-    this.sqlite = new Database(this.config.dataDir, {
-      verbose: this.config.debug
-        ? (message?: unknown, ...additionalArgs: unknown[]) =>
-            logger.debug('SQLite SQL:', { message, additionalArgs })
-        : undefined,
-    });
+    const connectionUrl = `file:${this.config.dataDir}`;
 
-    // Enable WAL mode for better concurrency (multiple readers + 1 writer)
-    this.sqlite.pragma('journal_mode = WAL');
-    // NORMAL sync is safer than OFF but much faster than FULL
-    this.sqlite.pragma('synchronous = NORMAL');
-    // Increased timeout for better handling of write contention
-    this.sqlite.pragma('busy_timeout = 20000'); // 20 seconds
-    // Larger cache for better performance
-    this.sqlite.pragma('cache_size = -64000'); // 64MB cache
-    // Optimize checkpoint behavior
-    this.sqlite.pragma('wal_autocheckpoint = 1000'); // Checkpoint every 1000 pages
+    this.client = createClient({ url: connectionUrl });
 
-    this.drizzle = drizzleSqlite(this.sqlite, { schema: sqliteSchema });
+    // Drizzle's libsql driver is async-capable, but still exposes familiar methods.
+    this.drizzle = drizzleLibsql(this.client, { schema: sqliteSchema });
   }
 
-  get rawClient(): Database.Database {
-    return this.sqlite;
+  get rawClient(): Client {
+    return this.client;
   }
 
   async migrate(migrationsDir: string): Promise<void> {
-    const { migrate } = await import('drizzle-orm/better-sqlite3/migrator');
+    const { migrate } = await import('drizzle-orm/libsql/migrator');
     await migrate(this.drizzle, { migrationsFolder: migrationsDir });
   }
 
   async close(): Promise<void> {
-    this.sqlite.close();
+    await this.client.close();
   }
 }
