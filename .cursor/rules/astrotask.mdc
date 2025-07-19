@@ -3,7 +3,6 @@ description: Guidelines for working with Astrotask task management system - MCP 
 globs: "**/*"
 alwaysApply: true
 ---
-
 - **Astrotask Overview:**
   - Local-first, MCP-compatible task management platform for human + AI collaboration
   - Hierarchical task management with parent-child relationships
@@ -78,7 +77,10 @@ alwaysApply: true
   - `complexity` - Risk assessment and complexity notes
   - `requirements` - Clarifications and acceptance criteria
   - `testing` - Test strategies and coverage notes
-  - `general` - Miscellaneous notes and observations- **❌ DON'T:**
+  - `general` - Miscellaneous notes and observations
+  - `acceptance` - Acceptance criteria that must be met for task completion
+
+- **❌ DON'T:**
   - Don't forget to update task status when starting work
   - Don't create tasks without clear titles and descriptions
   - Don't skip adding context for important decisions
@@ -90,3 +92,28 @@ alwaysApply: true
   - Reference tasks in PR descriptions and code comments
   - Add links to external resources in task context
   - Track progress by updating status as work progresses
+
+- **Acceptance Criteria Best Practices:**
+  - Add acceptance criteria when creating tasks that need clear completion conditions
+  - Use `contextType: "acceptance"` for all acceptance criteria entries
+  - Write criteria as testable statements (e.g., "API returns 200 status")
+  - Include specific validation steps in the description
+  - Check all acceptance criteria before marking tasks as `done`
+  
+  ```typescript
+  // ✅ DO: Add clear acceptance criteria
+  await addTaskContext({
+    taskId: currentTask.id,
+    title: "API endpoint handles errors gracefully",
+    description: "Returns 400 for invalid input, 404 for missing resources, with descriptive error messages",
+    contextType: "acceptance"
+  });
+  
+  // ✅ DO: Make criteria measurable
+  await addTaskContext({
+    taskId: currentTask.id,
+    title: "Page loads within 3 seconds",
+    description: "Initial page load completes in <3s on 3G connection. Measured with Lighthouse.",
+    contextType: "acceptance"
+  });
+  ```
