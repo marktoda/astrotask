@@ -45,7 +45,7 @@ Astrotask keeps workstreams organised and agent‑ready:
 
 ```bash
 # Until v1.0 install the latest pre‑release tag
-npm install -g @astrotask/cli@next      # or: pnpm / yarn
+npm install -g @astrotask/cli@latest      # or: pnpm / yarn
 ```
 
 Upgrading is just as easy:
